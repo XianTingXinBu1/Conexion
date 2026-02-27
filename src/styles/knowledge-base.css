@@ -1,0 +1,22 @@
+/* KnowledgeBasePage 样式 */
+
+/* 知识库列表 */
+.kb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+/* 条目列表 */
+.entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.entry-list.dragging-active {
+  touch-action: none;
+}

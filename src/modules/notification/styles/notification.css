@@ -1,0 +1,231 @@
+/**
+ * 通知系统样式 - Notification Styles
+ *
+ * 提供通知气泡的样式，支持浅色/深色主题和多种通知类型
+ */
+
+/* ==================== 通知容器 ==================== */
+.notification-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: calc(60px + env(safe-area-inset-top));
+  pointer-events: none;
+}
+
+/* ==================== 通知气泡 ==================== */
+.notification-toast {
+  width: calc(100% - 32px);
+  max-width: 360px;
+  background: var(--bg-secondary, #ffffff);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  margin-bottom: 12px;
+  pointer-events: auto;
+  overflow: hidden;
+  position: relative;
+  transform-origin: top center;
+  will-change: transform, opacity;
+}
+
+/* ==================== 通知内容 ==================== */
+.notification-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+/* 通知图标 */
+.notification-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+}
+
+.notification-icon.info {
+  background: var(--accent-purple, #9D8DF1);
+}
+
+.notification-icon.warning {
+  background: #f59e0b;
+}
+
+.notification-icon.error {
+  background: #ef4444;
+}
+
+.notification-icon.success {
+  background: #10b981;
+}
+
+/* 通知文本区域 */
+.notification-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notification-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main, #2D2D44);
+  line-height: 1.4;
+}
+
+.notification-message {
+  font-size: 13px;
+  color: var(--text-muted, #8E8E93);
+  line-height: 1.4;
+}
+
+/* 关闭按钮 */
+.notification-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #8E8E93);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.notification-close:hover {
+  background: var(--bg-primary, #F8F7FF);
+  color: var(--text-main, #2D2D44);
+}
+
+.notification-close:active {
+  transform: scale(0.9);
+}
+
+/* 暂停状态的通知 */
+.notification-toast.notification-paused {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+/* 暂停状态的进度条 */
+.notification-progress-bar.paused {
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+}
+
+/* ==================== 进度条 ==================== */
+.notification-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.notification-progress-bar {
+  height: 100%;
+  background: currentColor;
+  transition: width 0.1s linear;
+}
+
+/* 不同类型的进度条颜色 */
+.notification-toast.info .notification-progress-bar {
+  color: var(--accent-purple, #9D8DF1);
+}
+
+.notification-toast.warning .notification-progress-bar {
+  color: #f59e0b;
+}
+
+.notification-toast.error .notification-progress-bar {
+  color: #ef4444;
+}
+
+.notification-toast.success .notification-progress-bar {
+  color: #10b981;
+}
+
+/* ==================== 深色主题 ==================== */
+[data-theme='dark'] .notification-toast {
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .notification-icon.info {
+  background: var(--accent-purple, #B7A3E3);
+}
+
+/* ==================== 动画效果 ==================== */
+
+/* 入场动画：从顶部滑入 + 缩放 */
+.notification-enter-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.notification-enter-from {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.9);
+}
+
+/* 离场动画：向上滑出 + 淡出 */
+.notification-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.notification-leave-to {
+  opacity: 0;
+  transform: translateY(-15px) scale(0.95);
+}
+
+/* 堆叠移动动画：通知位置变化时的过渡 */
+.notification-move {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ==================== 触摸反馈 ==================== */
+.notification-toast:active {
+  transform: scale(0.98);
+}
+
+/* ==================== 响应式调整 ==================== */
+@media (min-width: 768px) {
+  .notification-container {
+    align-items: flex-start;
+    padding-left: 16px;
+  }
+
+  .notification-toast {
+    width: 320px;
+    max-width: 320px;
+  }
+}
+
+/* ==================== 辅助类 ==================== */
+.notification-clickable {
+  cursor: pointer;
+}
+
+.notification-clickable:active {
+  background: var(--bg-primary, #F8F7FF);
+}
+
+[data-theme='dark'] .notification-clickable:active {
+  background: var(--bg-primary, #12121A);
+}

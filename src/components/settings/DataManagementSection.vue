@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { Trash2, RotateCcw, Database } from 'lucide-vue-next';
+import ConfirmDialog from '../common/ConfirmDialog.vue';
 
 interface Props {
   dataSize: number;

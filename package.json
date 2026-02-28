@@ -6,7 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "health-check": "node scripts/health-check/health-check.js",
+    "health-check:quick": "node scripts/health-check/health-check.js --skip-tests --skip-build",
+    "health-check:verbose": "node scripts/health-check/health-check.js --verbose"
   },
   "dependencies": {
     "@types/dompurify": "^3.0.5",
@@ -19,15 +26,20 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
+    "@testing-library/vue": "^8.1.0",
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.2",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "^4.0.18",
     "@vue/tsconfig": "^0.8.1",
     "autoprefixer": "^10.4.24",
+    "happy-dom": "^20.7.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
+    "vitest": "^4.0.18",
     "vue-tsc": "^3.1.5"
   }
 }

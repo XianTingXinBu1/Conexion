@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { Plus, Hash } from 'lucide-vue-next';
+import { ref, computed } from 'vue';
 import type { Theme, RegexRule } from '../types';
-import { DEFAULT_REGEX_SCRIPTS } from '../constants';
+import { Plus, Hash } from 'lucide-vue-next';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { getStorage, setStorage } from '@/utils/storage';
+import { useRegexRules } from '../composables/useRegexRules';
 import { PageHeader, EmptyState, Modal } from './common';
 import { RegexRuleCard, RegexRuleForm } from './regex';
 import { FormActions } from './form';
@@ -14,29 +13,24 @@ interface Props {
   theme: Theme;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 const emit = defineEmits<{
   back: [];
-  toggleTheme: [];
 }>();
 
-// 使用确认对话框 composable
+// 使用 composables
 const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete, ConfirmDialog } = useConfirmDialog();
-
-// 使用通知 composable
 const { showSuccess, showInfo } = useNotifications();
-
-// 规则管理
-const rules = ref<RegexRule[]>([]);
+const { rules, addRule, updateRule, deleteRule, toggleEnabled } = useRegexRules();
 
 // 模态框状态
 const showNewModal = ref(false);
 const showEditModal = ref(false);
 const editingRuleId = ref<string | null>(null);
 
-// 表单数据
-const newRuleForm = ref<Partial<RegexRule>>({
+// 默认表单数据
+const createDefaultForm = (): Partial<RegexRule> => ({
   name: '',
   enabled: true,
   pattern: '',
@@ -46,50 +40,30 @@ const newRuleForm = ref<Partial<RegexRule>>({
   applyTo: 'after-macro',
 });
 
+// 表单数据
+const newRuleForm = ref<Partial<RegexRule>>(createDefaultForm());
 const editRuleForm = ref<Partial<RegexRule>>({});
-
-// 加载规则
-const loadRules = async () => {
-  const stored = await getStorage<RegexRule[]>('conexion_regex_scripts', [...DEFAULT_REGEX_SCRIPTS]);
-  rules.value = stored;
-};
-
-// 保存规则
-const saveRules = async () => {
-  await setStorage('conexion_regex_scripts', rules.value);
-};
 
 // 打开新建模态框
 const openNewModal = () => {
-  newRuleForm.value = {
-    name: '',
-    enabled: true,
-    pattern: '',
-    flags: 'g',
-    replacement: '',
-    scope: 'all',
-    applyTo: 'after-macro',
-  };
+  newRuleForm.value = createDefaultForm();
   showNewModal.value = true;
 };
 
 // 添加新规则
-const handleAddRule = async () => {
+const handleAddRule = () => {
   if (!newRuleForm.value.name?.trim() || !newRuleForm.value.pattern?.trim()) return;
 
-  const rule: RegexRule = {
-    id: Date.now().toString(),
-    name: newRuleForm.value.name!,
+  addRule({
+    name: newRuleForm.value.name.trim(),
     enabled: newRuleForm.value.enabled ?? true,
-    pattern: newRuleForm.value.pattern!,
+    pattern: newRuleForm.value.pattern.trim(),
     flags: newRuleForm.value.flags ?? 'g',
     replacement: newRuleForm.value.replacement ?? '',
     scope: newRuleForm.value.scope ?? 'all',
     applyTo: newRuleForm.value.applyTo ?? 'after-macro',
-  };
+  });
 
-  rules.value.push(rule);
-  await saveRules();
   const msg = getNotificationMessage('REGEX_RULE_ADD_SUCCESS', { name: newRuleForm.value.name });
   showSuccess(msg.title, msg.message);
   showNewModal.value = false;
@@ -103,16 +77,20 @@ const openEditModal = (rule: RegexRule) => {
 };
 
 // 保存编辑
-const handleSaveEdit = async () => {
+const handleSaveEdit = () => {
   if (!editingRuleId.value || !editRuleForm.value.name?.trim() || !editRuleForm.value.pattern?.trim()) return;
 
-  const index = rules.value.findIndex(r => r.id === editingRuleId.value);
-  if (index !== -1) {
-    rules.value[index] = {
-      ...rules.value[index],
-      ...editRuleForm.value,
-    } as RegexRule;
-    await saveRules();
+  const success = updateRule(editingRuleId.value, {
+    name: editRuleForm.value.name.trim(),
+    pattern: editRuleForm.value.pattern.trim(),
+    enabled: editRuleForm.value.enabled,
+    flags: editRuleForm.value.flags,
+    replacement: editRuleForm.value.replacement,
+    scope: editRuleForm.value.scope,
+    applyTo: editRuleForm.value.applyTo,
+  });
+
+  if (success) {
     const msg = getNotificationMessage('REGEX_RULE_UPDATE_SUCCESS', { name: editRuleForm.value.name });
     showSuccess(msg.title, msg.message);
   }
@@ -121,35 +99,39 @@ const handleSaveEdit = async () => {
 };
 
 // 删除规则
-const deleteRule = (id: string) => {
+const handleDeleteRule = (id: string) => {
   const rule = rules.value.find(r => r.id === id);
-  showDeleteConfirm(id, rule?.name || '', '规则');
+  if (rule) {
+    showDeleteConfirm(id, rule.name, '规则');
+  }
 };
 
 // 确认删除
-const handleConfirmDelete = async () => {
+const handleConfirmDelete = () => {
   const id = confirmDelete();
   if (!id) return;
 
-  rules.value = rules.value.filter(r => r.id !== id);
-  await saveRules();
-  const msg = getNotificationMessage('REGEX_RULE_DELETE_SUCCESS');
-  showInfo(msg.title, msg.message);
+  const success = deleteRule(id);
+  if (success) {
+    const msg = getNotificationMessage('REGEX_RULE_DELETE_SUCCESS');
+    showInfo(msg.title, msg.message);
+  }
 };
 
 // 切换启用状态
-const toggleEnabled = async (id: string) => {
+const handleToggleEnabled = (id: string) => {
   const rule = rules.value.find(r => r.id === id);
-  if (rule) {
-    rule.enabled = !rule.enabled;
-    await saveRules();
-    if (rule.enabled) {
-      const msg = getNotificationMessage('REGEX_RULE_ENABLE_SUCCESS', { name: rule.name });
-      showSuccess(msg.title, msg.message);
-    } else {
-      const msg = getNotificationMessage('REGEX_RULE_DISABLE_SUCCESS', { name: rule.name });
-      showInfo(msg.title, msg.message);
-    }
+  if (!rule) return;
+
+  const newEnabled = !rule.enabled;
+  toggleEnabled(id);
+
+  if (newEnabled) {
+    const msg = getNotificationMessage('REGEX_RULE_ENABLE_SUCCESS', { name: rule.name });
+    showSuccess(msg.title, msg.message);
+  } else {
+    const msg = getNotificationMessage('REGEX_RULE_DISABLE_SUCCESS', { name: rule.name });
+    showInfo(msg.title, msg.message);
   }
 };
 
@@ -165,10 +147,6 @@ const editFormActions = computed(() => [
 ]);
 
 const formActionsAlign = 'space-between' as const;
-
-onMounted(async () => {
-  await loadRules();
-});
 </script>
 
 <template>
@@ -204,9 +182,9 @@ onMounted(async () => {
             v-for="rule in rules"
             :key="rule.id"
             :rule="rule"
-            @toggle="toggleEnabled"
+            @toggle="handleToggleEnabled"
             @edit="openEditModal"
-            @delete="deleteRule"
+            @delete="handleDeleteRule"
           />
         </div>
       </div>

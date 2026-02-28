@@ -185,18 +185,4 @@ export async function getStorageUsage(): Promise<{
   }
 }
 
-/**
- * 迁移数据：从 localStorage 迁移到 IndexedDB
- */
-export async function migrateToIndexedDB(key: string): Promise<void> {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw !== null) {
-      const value = JSON.parse(raw);
-      await set(key, value, dbStore);
-      localStorage.removeItem(key);
-    }
-  } catch (e) {
-    console.warn(`Failed to migrate ${key} to IndexedDB:`, e);
-  }
-}
+// 注意：如需迁移数据，可使用 getStorage 从 localStorage 读取后，使用 setStorage 保存到 IndexedDB

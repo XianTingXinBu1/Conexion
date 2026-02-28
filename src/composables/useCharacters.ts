@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import type { UserCharacter, AICharacter, CharacterType } from '../types';
 import { DEFAULT_USER_CHARACTER, DEFAULT_AI_CHARACTERS, STORAGE_KEYS } from '../constants';
 import { getStorage, setStorage } from '@/utils/storage';
+import { generalLogger } from '../modules/debug';
 
 /**
  * 角色管理 Composable
@@ -14,6 +15,9 @@ export function useCharacters() {
 
   // AI 角色
   const aiCharacters = ref<AICharacter[]>([]);
+  
+  // 错误状态
+  const error = ref<string | null>(null);
 
   /**
    * 计算属性：当前选中的用户角色
@@ -25,24 +29,44 @@ export function useCharacters() {
   /**
    * 加载用户角色
    */
-  const loadUserCharacters = async () => {
-    const stored = await getStorage<UserCharacter[]>(STORAGE_KEYS.USER_CHARACTERS, [DEFAULT_USER_CHARACTER]);
-    if (stored && stored.length > 0) {
-      userCharacters.value = stored;
-    } else {
+  const loadUserCharacters = async (): Promise<boolean> => {
+    try {
+      const stored = await getStorage<UserCharacter[]>(STORAGE_KEYS.USER_CHARACTERS, [DEFAULT_USER_CHARACTER]);
+      if (stored && stored.length > 0) {
+        userCharacters.value = stored;
+      } else {
+        userCharacters.value = [DEFAULT_USER_CHARACTER];
+      }
+      error.value = null;
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '加载用户角色失败';
+      error.value = msg;
+      generalLogger.error('加载用户角色失败', { error: msg });
       userCharacters.value = [DEFAULT_USER_CHARACTER];
+      return false;
     }
   };
 
   /**
    * 加载 AI 角色
    */
-  const loadAICharacters = async () => {
-    const stored = await getStorage<AICharacter[]>(STORAGE_KEYS.AI_CHARACTERS, [...DEFAULT_AI_CHARACTERS]);
-    if (stored && stored.length > 0) {
-      aiCharacters.value = stored;
-    } else {
+  const loadAICharacters = async (): Promise<boolean> => {
+    try {
+      const stored = await getStorage<AICharacter[]>(STORAGE_KEYS.AI_CHARACTERS, [...DEFAULT_AI_CHARACTERS]);
+      if (stored && stored.length > 0) {
+        aiCharacters.value = stored;
+      } else {
+        aiCharacters.value = [...DEFAULT_AI_CHARACTERS];
+      }
+      error.value = null;
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '加载 AI 角色失败';
+      error.value = msg;
+      generalLogger.error('加载 AI 角色失败', { error: msg });
       aiCharacters.value = [...DEFAULT_AI_CHARACTERS];
+      return false;
     }
   };
 
@@ -61,15 +85,33 @@ export function useCharacters() {
   /**
    * 保存用户角色
    */
-  const saveUserCharacters = async () => {
-    await setStorage(STORAGE_KEYS.USER_CHARACTERS, userCharacters.value);
+  const saveUserCharacters = async (): Promise<boolean> => {
+    try {
+      await setStorage(STORAGE_KEYS.USER_CHARACTERS, userCharacters.value);
+      error.value = null;
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '保存用户角色失败';
+      error.value = msg;
+      generalLogger.error('保存用户角色失败', { error: msg });
+      return false;
+    }
   };
 
   /**
    * 保存 AI 角色
    */
-  const saveAICharacters = async () => {
-    await setStorage(STORAGE_KEYS.AI_CHARACTERS, aiCharacters.value);
+  const saveAICharacters = async (): Promise<boolean> => {
+    try {
+      await setStorage(STORAGE_KEYS.AI_CHARACTERS, aiCharacters.value);
+      error.value = null;
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '保存 AI 角色失败';
+      error.value = msg;
+      generalLogger.error('保存 AI 角色失败', { error: msg });
+      return false;
+    }
   };
 
   /**
@@ -210,10 +252,18 @@ export function useCharacters() {
   /**
    * 初始化（加载所有角色数据）
    */
-  const init = async () => {
-    await loadUserCharacters();
-    await loadAICharacters();
-    await loadSelectedUser();
+  const init = async (): Promise<boolean> => {
+    try {
+      await loadUserCharacters();
+      await loadAICharacters();
+      await loadSelectedUser();
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '初始化角色数据失败';
+      error.value = msg;
+      generalLogger.error('初始化角色数据失败', { error: msg });
+      return false;
+    }
   };
 
   return {
@@ -223,6 +273,9 @@ export function useCharacters() {
     selectedUser,
     // AI 角色
     aiCharacters,
+    // 错误状态
+    error,
+    clearError: () => { error.value = null; },
     // 通用方法
     loadUserCharacters,
     loadAICharacters,

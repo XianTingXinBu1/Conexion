@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import type { KnowledgeBase, KnowledgeEntry } from '../types';
 import { STORAGE_KEYS, DEFAULT_KNOWLEDGE_BASES } from '../constants';
 import { getStorage, setStorage } from '@/utils/storage';
+import { generalLogger } from '../modules/debug';
 
 /**
  * 知识库管理 Composable
@@ -10,6 +11,8 @@ import { getStorage, setStorage } from '@/utils/storage';
 export function useKnowledgeBases() {
   const knowledgeBases = ref<KnowledgeBase[]>([...DEFAULT_KNOWLEDGE_BASES]);
   const selectedKnowledgeBaseId = ref<string | null>(null);
+  const error = ref<string | null>(null);
+  const isLoading = ref(false);
 
   /**
    * 计算属性：当前选中的知识库
@@ -23,18 +26,39 @@ export function useKnowledgeBases() {
   /**
    * 加载知识库列表
    */
-  const loadKnowledgeBases = async () => {
-    const saved = await getStorage<KnowledgeBase[]>(STORAGE_KEYS.KNOWLEDGE_BASES, [...DEFAULT_KNOWLEDGE_BASES]);
-    if (saved && Array.isArray(saved)) {
-      knowledgeBases.value = saved;
+  const loadKnowledgeBases = async (): Promise<boolean> => {
+    isLoading.value = true;
+    try {
+      const saved = await getStorage<KnowledgeBase[]>(STORAGE_KEYS.KNOWLEDGE_BASES, [...DEFAULT_KNOWLEDGE_BASES]);
+      if (saved && Array.isArray(saved)) {
+        knowledgeBases.value = saved;
+      }
+      error.value = null;
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '加载知识库失败';
+      error.value = msg;
+      generalLogger.error('加载知识库失败', { error: msg });
+      return false;
+    } finally {
+      isLoading.value = false;
     }
   };
 
   /**
    * 保存知识库列表
    */
-  const saveKnowledgeBases = async () => {
-    await setStorage(STORAGE_KEYS.KNOWLEDGE_BASES, knowledgeBases.value);
+  const saveKnowledgeBases = async (): Promise<boolean> => {
+    try {
+      await setStorage(STORAGE_KEYS.KNOWLEDGE_BASES, knowledgeBases.value);
+      error.value = null;
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '保存知识库失败';
+      error.value = msg;
+      generalLogger.error('保存知识库失败', { error: msg });
+      return false;
+    }
   };
 
   /**
@@ -228,14 +252,25 @@ export function useKnowledgeBases() {
   /**
    * 初始化
    */
-  const init = async () => {
-    await loadKnowledgeBases();
+  const init = async (): Promise<boolean> => {
+    try {
+      await loadKnowledgeBases();
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '初始化知识库失败';
+      error.value = msg;
+      generalLogger.error('初始化知识库失败', { error: msg });
+      return false;
+    }
   };
 
   return {
     knowledgeBases,
     selectedKnowledgeBaseId,
     currentKnowledgeBase,
+    error,
+    isLoading,
+    clearError: () => { error.value = null; },
     loadKnowledgeBases,
     saveKnowledgeBases,
     selectKnowledgeBase,

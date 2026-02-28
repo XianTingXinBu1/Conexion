@@ -10,3 +10,7 @@ export { useApiConnection } from './useApiConnection';
 export { useDebugLogger } from './useDebugLogger';
 export { useTouchHandler } from './useTouchHandler';
 export { useFormDataManager } from './useFormDataManager';
+export { usePageLeaveGuard } from './usePageLeaveGuard';
+export { useListManager } from './useListManager';
+export type { PageLeaveGuardOptions } from './usePageLeaveGuard';
+export type { ListManagerOptions, ListItem } from './useListManager';

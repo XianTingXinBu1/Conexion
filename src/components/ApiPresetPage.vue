@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { onMounted, watch } from 'vue';
 import { Save, RefreshCw, Zap, AlertTriangle } from 'lucide-vue-next';
 import type { Theme } from '../types';
 import { DEFAULTS } from '../constants';
@@ -9,7 +9,7 @@ import { ApiConfigForm, ModelSelector, ParameterSettings, PresetSelector, useApi
 import { useApiModels } from '../composables/useApiModels';
 import { useApiConnection } from '../composables/useApiConnection';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { useFormDataManager } from '../composables/useFormDataManager';
+import { useFormDataManager, usePageLeaveGuard } from '../composables';
 
 interface Props {
   theme: Theme;
@@ -99,9 +99,6 @@ const {
   },
 });
 
-// 退出确认对话框
-const showExitConfirmDialog = ref(false);
-
 // 获取当前表单数据（合并模型信息）
 function getFormData() {
   return {
@@ -109,6 +106,24 @@ function getFormData() {
     model: modelInput.value || selectedModel.value,
   };
 }
+
+// 使用页面离开守卫
+const {
+  showLeaveConfirm,
+  confirmDialogProps: leaveConfirmDialogProps,
+  checkBeforeLeave,
+  handleSaveAndLeave,
+  handleDiscardAndLeave,
+  handleCancelLeave,
+} = usePageLeaveGuard({
+  enabled: hasUnsavedChanges,
+  title: '未保存的更改',
+  message: '您有未保存的更改',
+  description: '是否保存更改后再离开？不保存将丢失所有修改。',
+  saveText: '保存并退出',
+  discardText: '不保存',
+  cancelText: '取消',
+});
 
 // 初始化
 onMounted(() => {
@@ -225,32 +240,26 @@ function handleCreateNewPreset() {
 
 // 处理返回按钮点击
 function handleBack() {
-  if (hasUnsavedChanges.value) {
-    showExitConfirmDialog.value = true;
-  } else {
-    emit('back');
-  }
+  checkBeforeLeave(() => emit('back'));
 }
 
 // 保存并退出
-function handleSaveAndExit() {
-  handleSaveCurrentPreset();
-  showExitConfirmDialog.value = false;
-  // 等待一小段时间让保存完成
-  setTimeout(() => {
+async function onSaveAndExit() {
+  await handleSaveAndLeave(() => {
+    handleSaveCurrentPreset();
     emit('back');
-  }, 100);
+  });
 }
 
 // 不保存直接退出
-function handleDiscardAndExit() {
-  showExitConfirmDialog.value = false;
+function onDiscardAndExit() {
+  handleDiscardAndLeave();
   emit('back');
 }
 
 // 取消退出
-function handleCancelExit() {
-  showExitConfirmDialog.value = false;
+function onCancelExit() {
+  handleCancelLeave();
 }
 
 // 获取模型列表
@@ -430,8 +439,8 @@ async function handleTestConnection() {
 
     <!-- 退出确认对话框 -->
     <Modal
-      v-model:show="showExitConfirmDialog"
-      title="未保存的更改"
+      v-model:show="showLeaveConfirm"
+      :title="leaveConfirmDialogProps.title"
       size="sm"
     >
       <div class="exit-confirm-content">
@@ -439,13 +448,13 @@ async function handleTestConnection() {
           <AlertTriangle :size="32" />
         </div>
         <div class="exit-confirm-text">
-          您有未保存的更改，是否保存后再退出？
+          {{ leaveConfirmDialogProps.description }}
         </div>
       </div>
       <template #footer>
-        <button class="modal-btn secondary" @click="handleDiscardAndExit">不保存</button>
-        <button class="modal-btn secondary" @click="handleCancelExit">取消</button>
-        <button class="modal-btn primary" @click="handleSaveAndExit">保存并退出</button>
+        <button class="modal-btn secondary" @click="onDiscardAndExit">{{ leaveConfirmDialogProps.thirdButtonText }}</button>
+        <button class="modal-btn secondary" @click="onCancelExit">{{ leaveConfirmDialogProps.cancelText }}</button>
+        <button class="modal-btn primary" @click="onSaveAndExit">{{ leaveConfirmDialogProps.confirmText }}</button>
       </template>
     </Modal>
   </div>

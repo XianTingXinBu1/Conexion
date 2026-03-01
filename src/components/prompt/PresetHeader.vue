@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { ChevronLeft, Plus, Settings, X } from 'lucide-vue-next';
-import type { Theme } from '../../types';
 
 interface Props {
   currentPresetName: string;
   enabledCount: number;
   totalCount: number;
   showNewForm: boolean;
-  theme: Theme;
 }
 
 defineProps<Props>();

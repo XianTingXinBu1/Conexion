@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { ChevronLeft, Plus, Database } from 'lucide-vue-next';
-import type { Theme, KnowledgeBase } from '../../types';
+import type { KnowledgeBase } from '../../types';
 import KnowledgeBaseCard from './KnowledgeBaseCard.vue';
 import EmptyState from '../common/EmptyState.vue';
 
 interface Props {
   knowledgeBases: KnowledgeBase[];
   selectedKnowledgeBaseId: string | null;
-  theme: Theme;
 }
 
 const props = defineProps<Props>();

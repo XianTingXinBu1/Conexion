@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { GripVertical } from 'lucide-vue-next';
-import type { Theme, PromptItem } from '../../types';
+import type { PromptItem } from '../../types';
 import { useDraggable } from '../../composables/useDraggable';
 import PromptItemCard from './PromptItemCard.vue';
 import EmptyState from '../common/EmptyState.vue';
 
 interface Props {
   items: PromptItem[];
-  theme: Theme;
   isDragging?: boolean;
   editingId: string | null;
   editingItem: Partial<PromptItem>;

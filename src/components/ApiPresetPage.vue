@@ -2,7 +2,6 @@
 import { onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Save, RefreshCw, Zap, AlertTriangle } from 'lucide-vue-next';
-import type { Theme } from '../types';
 import { DEFAULTS } from '../constants';
 import PageHeader from './common/PageHeader.vue';
 import Modal from './common/Modal.vue';
@@ -11,12 +10,6 @@ import { useApiModels } from '../composables/useApiModels';
 import { useApiConnection } from '../composables/useApiConnection';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import { useFormDataManager, usePageLeaveGuard } from '../composables';
-
-interface Props {
-  theme: Theme;
-}
-
-const props = defineProps<Props>();
 
 const router = useRouter();
 

@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
-import type { Theme, Message, AICharacter, RegexRule, Conversation, UserCharacter, PromptPreset, ChatMessage } from '../types';
+import type { Message, AICharacter, RegexRule, Conversation, UserCharacter, PromptPreset, ChatMessage } from '../types';
 import { applyRules, clearRegexCache } from '../utils/regexEngine';
 import { countMessagesTokens } from '../utils/tokenCounter';
 import { DEFAULT_REGEX_SCRIPTS, STORAGE_KEYS, DEFAULT_PROMPT_PRESETS } from '../constants';
@@ -15,24 +15,30 @@ import { useNotifications, getNotificationMessage } from '../modules/notificatio
 import { buildSystemPrompt } from '../modules/system-prompt';
 import { logPrompt, logSystemPrompt } from '../modules/debug';
 import { useConversationManager } from '../composables/useConversationManager';
+import { useAppSettings } from '../composables/useAppSettings';
+import { useTheme } from '../composables/useTheme';
 
 import '../styles/common.css';
 import '../styles/chat.css';
 
 interface Props {
-  theme: Theme;
-  enterToSend: boolean;
-  showWordCount: boolean;
-  enableMarkdown: boolean;
-  showMessageIndex: boolean;
-  chatHistoryLimit: number;
-  promptMergeMode: 'none' | 'adjacent' | 'all';
   character?: AICharacter;
   conversationId?: string;
   userCharacter?: UserCharacter;
 }
 
 const props = defineProps<Props>();
+
+// 获取应用设置和主题
+const {
+  enterToSend,
+  showWordCount,
+  enableMarkdown,
+  showMessageIndex,
+  chatHistoryLimit,
+  promptMergeMode,
+} = useAppSettings();
+const { theme } = useTheme();
 
 const router = useRouter();
 
@@ -135,7 +141,7 @@ const aiMessageCount = computed(() => {
 });
 
 const loadMessages = () => {
-  const limit = props.chatHistoryLimit;
+  const limit = chatHistoryLimit.value;
   const totalCount = messages.value.length;
 
   if (totalCount <= limit) {
@@ -148,7 +154,7 @@ const loadMessages = () => {
 };
 
 const loadMoreMessages = () => {
-  const limit = props.chatHistoryLimit;
+  const limit = chatHistoryLimit.value;
   const remaining = messages.value.length - loadedCount.value;
 
   if (remaining <= 0) return;
@@ -288,7 +294,7 @@ const handleSendMessage = async (content: string) => {
       knowledgeBases: knowledgeBases.value.filter(kb => kb.globallyEnabled),
       chatHistory: chatHistory,
       userInstruction: processedContent,
-      mergeMode: props.promptMergeMode,
+      mergeMode: promptMergeMode.value,
     });
     systemMessages = result.messages;
 

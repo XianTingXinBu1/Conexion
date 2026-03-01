@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Plus, X, User, Bot } from 'lucide-vue-next';
-import type { Theme, UserCharacter, AICharacter, CharacterType } from '../types';
+import type { UserCharacter, AICharacter, CharacterType } from '../types';
 import { DEFAULT_USER_CHARACTER, DEFAULT_AI_CHARACTERS, STORAGE_KEYS } from '../constants';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
@@ -13,12 +13,6 @@ import UserCharacterList from './role/UserCharacterList.vue';
 import AICharacterList from './role/AICharacterList.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import '../styles/role-management.css';
-
-interface Props {
-  theme: Theme;
-}
-
-const props = defineProps<Props>();
 
 const router = useRouter();
 

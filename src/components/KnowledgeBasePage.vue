@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import type { Theme, KnowledgeBase, KnowledgeEntry } from '../types';
+import type { KnowledgeBase, KnowledgeEntry } from '../types';
 import { useKnowledgeBases } from '../composables/useKnowledgeBases';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
@@ -10,12 +10,6 @@ import KnowledgeBaseDetailView from './knowledge/KnowledgeBaseDetailView.vue';
 import KnowledgeBaseFormModal from './knowledge/KnowledgeBaseFormModal.vue';
 import KnowledgeEntryFormModal from './knowledge/KnowledgeEntryFormModal.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
-
-interface Props {
-  theme: Theme;
-}
-
-defineProps<Props>();
 
 const router = useRouter();
 
@@ -190,7 +184,6 @@ onMounted(() => {
       v-if="isViewingList"
       :knowledge-bases="knowledgeBases"
       :selected-knowledge-base-id="selectedKnowledgeBaseId"
-      :theme="theme"
       @back="handleBack"
       @select="handleSelectKb"
       @add="handleAddKb"
@@ -202,7 +195,6 @@ onMounted(() => {
       v-else
       :current-knowledge-base="currentKnowledgeBase"
       :selected-knowledge-base-id="selectedKnowledgeBaseId"
-      :theme="theme"
       @back="handleBack"
       @update-base="handleUpdateBase"
       @delete-base="handleDeleteBase"

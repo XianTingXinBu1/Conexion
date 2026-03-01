@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { Theme, RegexRule } from '../types';
+import type { RegexRule } from '../types';
 import { Plus, Hash } from 'lucide-vue-next';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
@@ -8,12 +8,6 @@ import { useRegexRules } from '../composables/useRegexRules';
 import { PageHeader, EmptyState, Modal } from './common';
 import { RegexRuleCard, RegexRuleForm } from './regex';
 import { FormActions } from './form';
-
-interface Props {
-  theme: Theme;
-}
-
-defineProps<Props>();
 
 // 使用 composables
 const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete, ConfirmDialog } = useConfirmDialog();

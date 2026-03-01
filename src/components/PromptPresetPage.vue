@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import type { Theme, PromptPreset, PromptItem } from '../types';
+import type { PromptPreset, PromptItem } from '../types';
 import { STORAGE_KEYS, DEFAULT_PROMPT_PRESETS, DEFAULT_PROMPT_ITEMS } from '../constants';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
@@ -11,12 +11,6 @@ import PromptMenu from './prompt/PromptMenu.vue';
 import PromptItemList from './prompt/PromptItemList.vue';
 import PromptFormModal from './prompt/PromptFormModal.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
-
-interface Props {
-  theme: Theme;
-}
-
-defineProps<Props>();
 
 const router = useRouter();
 
@@ -322,7 +316,6 @@ onMounted(async () => {
       :enabled-count="enabledCount"
       :total-count="promptItems.length"
       :show-new-form="showNewItemForm"
-      :theme="theme"
       @back="handleBack"
       @open-menu="openPresetMenu"
       @toggle-new-form="showNewItemForm ? (showNewItemForm = false, newItem = { name: '', description: '', prompt: '', roleType: 'system' }) : showNewItemForm = true"
@@ -333,7 +326,6 @@ onMounted(async () => {
       <!-- 条目列表 -->
       <PromptItemList
         :items="promptItems"
-        :theme="theme"
         :is-dragging="isDragging"
         :editing-id="editingId"
         :editing-item="editingItem"

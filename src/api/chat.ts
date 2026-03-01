@@ -12,8 +12,11 @@ import { logApi, logApiError } from '@/modules/debug';
  * 聊天 API 服务
  */
 export class ChatApi extends ApiClient {
-  constructor(config: ApiClientConfig) {
+  private model: string;
+
+  constructor(config: ApiClientConfig, model: string) {
     super(config);
+    this.model = model;
   }
 
   /**
@@ -60,7 +63,7 @@ export class ChatApi extends ApiClient {
     const apiMessages = this.convertMessages(messages, systemPrompt, systemMessages);
 
     const requestBody: ChatCompletionRequest = {
-      model: '', // 模型名称由 ApiClient 的配置决定（这里需要特殊处理）
+      model: this.model,
       messages: apiMessages,
       temperature: temperature ?? 0.7,
       max_tokens: maxTokens ?? 2048,
@@ -87,7 +90,7 @@ export class ChatApi extends ApiClient {
       onError?: (error: string) => void;
     } = {}
   ): AsyncGenerator<string> {
-    const { systemPrompt, systemMessages, temperature, maxTokens, onChunk, onComplete, onError } = options;
+    const { systemPrompt, systemMessages, temperature, maxTokens, onChunk, onComplete } = options;
 
     try {
       this.validateUrl(this.baseURL);
@@ -96,7 +99,7 @@ export class ChatApi extends ApiClient {
       const apiMessages = this.convertMessages(messages, systemPrompt, systemMessages);
 
       const requestBody: ChatCompletionRequest = {
-        model: '',
+        model: this.model,
         messages: apiMessages,
         temperature: temperature ?? 0.7,
         max_tokens: maxTokens ?? 2048,
@@ -117,26 +120,32 @@ export class ChatApi extends ApiClient {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        const errorMessage = this.parseErrorMessage(errorText);
-        const error = new Error(`API 请求失败 (${response.status}): ${errorMessage || response.statusText}`);
 
-        logApiError('流式请求失败', { status: response.status, message: errorMessage });
+              const errorText = await response.text();
 
-        if (onError) {
-          onError(error.message);
-        }
+              const errorMessage = this.parseErrorMessage(errorText);
 
-        throw error;
-      }
+              const error = new Error(`API 请求失败 (${response.status}): ${errorMessage || response.statusText}`);
 
-      if (!response.body) {
-        const error = new Error('无法读取响应流');
-        if (onError) {
-          onError(error.message);
-        }
-        throw error;
-      }
+      
+
+              logApiError('流式请求失败', { status: response.status, message: errorMessage });
+
+      
+
+              throw error;
+
+            }
+
+      
+
+            if (!response.body) {
+
+              const error = new Error('无法读取响应流');
+
+              throw error;
+
+            }
 
       logApi('开始接收流式响应');
 
@@ -195,10 +204,6 @@ export class ChatApi extends ApiClient {
       }
 
       logApiError('流式请求异常', { error: errorMessage });
-
-      if (onError) {
-        onError(errorMessage);
-      }
 
       throw new Error(errorMessage);
     }

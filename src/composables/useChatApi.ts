@@ -49,7 +49,7 @@ export function useChatApi() {
       } : undefined,
     };
 
-    return new ChatApi(config);
+    return new ChatApi(config, preset.model);
   }
 
   /**

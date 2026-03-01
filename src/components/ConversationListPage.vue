@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft, Plus, Clock, MessageSquare } from 'lucide-vue-next';
-import type { Theme, AICharacter, Conversation } from '../types';
+import type { AICharacter, Conversation } from '../types';
 import { STORAGE_KEYS, DEFAULT_AI_CHARACTERS } from '../constants';
 import { CharacterSelector, ConversationItem } from './conversation';
 import ConfirmDialog from './ConfirmDialog.vue';
@@ -12,12 +12,6 @@ import PageHeader from './common/PageHeader.vue';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import { getStorage, setStorage } from '@/utils/storage';
 import '../styles/conversation-list.css';
-
-interface Props {
-  theme: Theme;
-}
-
-const props = defineProps<Props>();
 
 const router = useRouter();
 

@@ -68,127 +68,104 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
     <div class="token-details-panel" :class="theme">
       <div class="token-details-overlay" @click="emit('close')"></div>
       <div class="token-details-content">
-        <div class="token-details-header">
-          <div class="token-details-title">Token 用量</div>
-          <button class="close-btn" @click="emit('close')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- 当前会话统计 -->
-        <div class="token-details-section">
-          <div class="token-details-section-title">当前会话</div>
-          <div class="token-details-item">
-            <span class="token-details-label">总使用量</span>
-            <span class="token-details-value token-details-total">{{ currentContextCount.toLocaleString() }}</span>
+        <!-- 顶部关键指标 -->
+        <div class="token-summary">
+          <div class="summary-item summary-main">
+            <div class="summary-main-left">
+              <div class="summary-label">使用率</div>
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: `${Math.round((currentContextCount / maxContextLength) * 100)}%` }"></div>
+              </div>
+            </div>
+            <div class="summary-value token-details-percent">{{ Math.round((currentContextCount / maxContextLength) * 100) }}%</div>
           </div>
-          <div class="token-details-item">
-            <span class="token-details-label">使用率</span>
-            <span class="token-details-value token-details-percent">{{ Math.round((currentContextCount / maxContextLength) * 100) }}%</span>
+          <div class="summary-item">
+            <div class="summary-label">总使用</div>
+            <div class="summary-value">{{ currentContextCount.toLocaleString() }}</div>
           </div>
-          <div class="token-details-item">
-            <span class="token-details-label">剩余可用</span>
-            <span class="token-details-value">{{ remainingTokens.toLocaleString() }}</span>
+          <div class="summary-item">
+            <div class="summary-label">剩余</div>
+            <div class="summary-value">{{ remainingTokens.toLocaleString() }}</div>
           </div>
-          <div class="token-details-item">
-            <span class="token-details-label">最大上下文</span>
-            <span class="token-details-value">{{ maxContextLength.toLocaleString() }}</span>
+          <div class="summary-item">
+            <div class="summary-label">上限</div>
+            <div class="summary-value">{{ maxContextLength.toLocaleString() }}</div>
           </div>
         </div>
 
-        <!-- 本次请求统计 -->
-        <div class="token-details-section" v-if="usage">
-          <div class="token-details-section-title">本次请求</div>
-          <div class="token-details-item">
-            <span class="token-details-label">输入 Token</span>
-            <span class="token-details-value">{{ usage.promptTokens.toLocaleString() }}</span>
-          </div>
-          <div class="token-details-item">
-            <span class="token-details-label">输出 Token</span>
-            <span class="token-details-value">{{ usage.completionTokens.toLocaleString() }}</span>
-          </div>
-          <div class="token-details-item">
-            <span class="token-details-label">本次总计</span>
-            <span class="token-details-value token-details-total">{{ usage.totalTokens.toLocaleString() }}</span>
-          </div>
-        </div>
-
-        <!-- 聊天历史统计 -->
-        <div class="token-details-section">
-          <div class="token-details-section-title">聊天历史</div>
-          <div class="token-details-item token-details-expandable" @click="toggleSection('chatHistory')">
-            <span class="token-details-label">总消息数</span>
-            <div class="token-details-value-wrapper">
-              <span class="token-details-value">{{ chatMessageCount }}</span>
-              <svg :class="['expand-icon', { expanded: expandedSections.chatHistory }]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- 聊天历史 -->
+        <div class="token-card" @click="toggleSection('chatHistory')">
+          <div class="card-header expandable">
+            <span class="card-title">聊天历史</span>
+            <div class="card-right">
+              <span class="card-badge">{{ chatMessageCount }} 条</span>
+              <svg :class="['expand-icon', { expanded: expandedSections.chatHistory }]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </div>
           </div>
           <Transition name="expand">
-            <div v-if="expandedSections.chatHistory" class="token-details-subsection">
-              <div class="token-details-subitem">
-                <span class="token-details-sublabel">用户消息</span>
-                <span class="token-details-subvalue">{{ userMessageCount }} 条 / {{ userTokens.toLocaleString() }} Token</span>
+            <div v-if="expandedSections.chatHistory" class="card-content">
+              <div class="stat-row">
+                <span class="stat-label">用户</span>
+                <span class="stat-value">{{ userMessageCount }} / {{ userTokens.toLocaleString() }}</span>
               </div>
-              <div class="token-details-subitem">
-                <span class="token-details-sublabel">AI 消息</span>
-                <span class="token-details-subvalue">{{ aiMessageCount }} 条 / {{ aiTokens.toLocaleString() }} Token</span>
+              <div class="stat-row">
+                <span class="stat-label">AI</span>
+                <span class="stat-value">{{ aiMessageCount }} / {{ aiTokens.toLocaleString() }}</span>
               </div>
             </div>
           </Transition>
         </div>
 
-        <!-- 提示词统计 -->
-        <div class="token-details-section" v-if="lastSystemPromptResult">
-          <div class="token-details-section-title">提示词统计</div>
-          <div class="token-details-item token-details-expandable" @click="toggleSection('promptDetails')">
-            <span class="token-details-label">系统提示词</span>
-            <div class="token-details-value-wrapper">
-              <span class="token-details-value">{{ lastSystemPromptResult.estimatedTokens.toLocaleString() }} Token</span>
-              <svg :class="['expand-icon', { expanded: expandedSections.promptDetails }]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- 系统提示词 -->
+        <div class="token-card" v-if="lastSystemPromptResult" @click="toggleSection('promptDetails')">
+          <div class="card-header expandable">
+            <span class="card-title">系统提示词</span>
+            <div class="card-right">
+              <span class="card-badge">{{ lastSystemPromptResult.estimatedTokens.toLocaleString() }}</span>
+              <svg :class="['expand-icon', { expanded: expandedSections.promptDetails }]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </div>
           </div>
           <Transition name="expand">
-            <div v-if="expandedSections.promptDetails && lastSystemPromptResult.metadata" class="token-details-subsection">
-              <div class="token-details-subitem" v-if="lastSystemPromptResult.metadata.filledPlaceholders?.character">
-                <span class="token-details-sublabel">角色设定</span>
-                <span class="token-details-subvalue">{{ lastSystemPromptResult.metadata.filledPlaceholders.character.contentLength.toLocaleString() }} Token</span>
+            <div v-if="expandedSections.promptDetails && lastSystemPromptResult.metadata" class="card-content">
+              <div class="stat-row" v-if="lastSystemPromptResult.metadata.filledPlaceholders?.character">
+                <span class="stat-label">角色</span>
+                <span class="stat-value">{{ lastSystemPromptResult.metadata.filledPlaceholders.character.contentLength.toLocaleString() }}</span>
               </div>
-              <div class="token-details-subitem" v-if="lastSystemPromptResult.metadata.filledPlaceholders?.user">
-                <span class="token-details-sublabel">用户设定</span>
-                <span class="token-details-subvalue">{{ lastSystemPromptResult.metadata.filledPlaceholders.user.contentLength.toLocaleString() }} Token</span>
+              <div class="stat-row" v-if="lastSystemPromptResult.metadata.filledPlaceholders?.user">
+                <span class="stat-label">用户</span>
+                <span class="stat-value">{{ lastSystemPromptResult.metadata.filledPlaceholders.user.contentLength.toLocaleString() }}</span>
               </div>
-              <div class="token-details-subitem" v-if="lastSystemPromptResult.metadata.filledPlaceholders?.knowledge">
-                <span class="token-details-sublabel">知识库</span>
-                <span class="token-details-subvalue">{{ lastSystemPromptResult.metadata.filledPlaceholders.knowledge.contentLength.toLocaleString() }} Token</span>
+              <div class="stat-row" v-if="lastSystemPromptResult.metadata.filledPlaceholders?.knowledge">
+                <span class="stat-label">知识库</span>
+                <span class="stat-value">{{ lastSystemPromptResult.metadata.filledPlaceholders.knowledge.contentLength.toLocaleString() }}</span>
               </div>
-              <div class="token-details-subitem">
-                <span class="token-details-sublabel">启用条目</span>
-                <span class="token-details-subvalue">{{ lastSystemPromptResult.metadata.enabledItems }} / {{ lastSystemPromptResult.metadata.totalItems }}</span>
+              <div class="stat-row">
+                <span class="stat-label">启用</span>
+                <span class="stat-value">{{ lastSystemPromptResult.metadata.enabledItems }}/{{ lastSystemPromptResult.metadata.totalItems }}</span>
               </div>
             </div>
           </Transition>
         </div>
 
         <!-- 模型信息 -->
-        <div class="token-details-section">
-          <div class="token-details-section-title">模型信息</div>
-          <div class="token-details-item">
-            <span class="token-details-label">当前模型</span>
-            <span class="token-details-value">{{ currentApiPreset?.model || '未设置' }}</span>
+        <div class="token-card">
+          <div class="card-header">
+            <span class="card-title">模型</span>
+            <span class="card-badge">{{ currentApiPreset?.model || '未设置' }}</span>
           </div>
-          <div class="token-details-item" v-if="currentApiPreset">
-            <span class="token-details-label">温度参数</span>
-            <span class="token-details-value">{{ currentApiPreset.temperature }}</span>
-          </div>
-          <div class="token-details-item">
-            <span class="token-details-label">API 预设</span>
-            <span class="token-details-value">{{ currentApiPreset?.name || '未设置' }}</span>
+          <div class="card-content">
+            <div class="stat-row" v-if="currentApiPreset">
+              <span class="stat-label">温度</span>
+              <span class="stat-value">{{ currentApiPreset.temperature }}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">预设</span>
+              <span class="stat-value">{{ currentApiPreset?.name || '未设置' }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -199,32 +176,26 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
 <style scoped>
 .token-details-panel {
   position: fixed;
-  top: 0;
-  right: 0;
-  width: 100%;
-  height: 100%;
+  top: 64px;
+  right: 12px;
   z-index: 1000;
-  display: flex;
-  justify-content: flex-end;
+  pointer-events: none;
 }
 
 .token-details-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  display: none;
 }
 
 .token-details-content {
   position: relative;
-  width: 90%;
-  max-width: 400px;
-  height: 100%;
+  width: 260px;
+  max-height: calc(100vh - 80px);
   overflow-y: auto;
-  padding: 20px;
+  padding: 12px;
   box-sizing: border-box;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
 }
 
 .token-details-panel.light .token-details-content {
@@ -235,169 +206,220 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
   background: #1c1c26;
 }
 
-.token-details-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid;
-}
-
-.token-details-panel.light .token-details-header {
-  border-color: #e5e7eb;
-}
-
-.token-details-panel.dark .token-details-header {
-  border-color: #2d2d3a;
-}
-
-.token-details-title {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.token-details-panel.light .token-details-title {
-  color: #1f2937;
-}
-
-.token-details-panel.dark .token-details-title {
-  color: #f3f4f6;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.token-details-panel.light .close-btn {
-  color: #6b7280;
-}
-
-.token-details-panel.dark .close-btn {
-  color: #9ca3af;
-}
-
-.close-btn:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-.token-details-section {
-  margin-bottom: 20px;
-}
-
-.token-details-section-title {
-  font-size: 14px;
-  font-weight: 600;
+/* 顶部关键指标 */
+.token-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
   margin-bottom: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  padding: 10px;
+  border-radius: 8px;
 }
 
-.token-details-panel.light .token-details-section-title {
-  color: #6b7280;
+.token-details-panel.light .token-summary {
+  background: rgba(157, 141, 241, 0.08);
 }
 
-.token-details-panel.dark .token-details-section-title {
-  color: #9ca3af;
+.token-details-panel.dark .token-summary {
+  background: rgba(183, 163, 227, 0.08);
 }
 
-.token-details-item {
+.summary-item {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.summary-main {
+  grid-column: 1 / -1;
+  flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid;
+  padding: 10px 12px;
+  background: rgba(157, 141, 241, 0.15);
+  border-radius: 6px;
+  gap: 12px;
 }
 
-.token-details-panel.light .token-details-item {
-  border-color: #f3f4f6;
+.token-details-panel.dark .summary-main {
+  background: rgba(183, 163, 227, 0.15);
 }
 
-.token-details-panel.dark .token-details-item {
-  border-color: #2d2d3a;
+.summary-main-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
-.token-details-item:last-child {
-  border-bottom: none;
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(157, 141, 241, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
 }
 
-.token-details-expandable {
-  cursor: pointer;
-  user-select: none;
-  transition: background-color 0.2s;
+.token-details-panel.dark .progress-bar {
+  background: rgba(183, 163, 227, 0.2);
 }
 
-.token-details-expandable:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-  margin: 0 -10px;
-  padding: 10px;
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #34d399 50%, #f59e0b 80%, #ef4444 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
 }
 
-.token-details-label {
-  font-size: 14px;
-}
-
-.token-details-panel.light .token-details-label {
-  color: #4b5563;
-}
-
-.token-details-panel.dark .token-details-label {
-  color: #d1d5db;
-}
-
-.token-details-value {
-  font-size: 14px;
+.summary-label {
+  font-size: 11px;
   font-weight: 500;
 }
 
-.token-details-panel.light .token-details-value {
+.token-details-panel.light .summary-label {
+  color: #6b7280;
+}
+
+.token-details-panel.dark .summary-label {
+  color: #9ca3af;
+}
+
+.summary-main .summary-label {
+  font-size: 12px;
+}
+
+.summary-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.token-details-panel.light .summary-value {
   color: #1f2937;
 }
 
-.token-details-panel.dark .token-details-value {
+.token-details-panel.dark .summary-value {
   color: #f3f4f6;
 }
 
-.token-details-total {
+.summary-main .summary-value {
+  font-size: 16px;
+}
+
+/* 卡片样式 */
+.token-card {
+  margin-bottom: 10px;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.token-details-panel.light .token-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.token-details-panel.dark .token-card {
+  background: #23232f;
+  border: 1px solid #2d2d3a;
+}
+
+.token-card.expandable {
+  cursor: pointer;
+}
+
+.token-card.expandable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  min-height: 36px;
+}
+
+.card-header.expandable {
+  padding: 8px 10px;
+}
+
+.card-title {
+  font-size: 12px;
   font-weight: 600;
 }
 
-.token-details-panel.light .token-details-total {
+.token-details-panel.light .card-title {
+  color: #374151;
+}
+
+.token-details-panel.dark .card-title {
+  color: #e5e7eb;
+}
+
+.card-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(157, 141, 241, 0.1);
+}
+
+.token-details-panel.light .card-badge {
   color: #9d8df1;
 }
 
-.token-details-panel.dark .token-details-total {
+.token-details-panel.dark .card-badge {
   color: #b7a3e3;
 }
 
-.token-details-percent {
-  font-weight: 600;
+.card-content {
+  padding: 0 10px 8px;
 }
 
-.token-details-panel.light .token-details-percent {
-  color: #10b981;
-}
-
-.token-details-panel.dark .token-details-percent {
-  color: #34d399;
-}
-
-.token-details-value-wrapper {
+.stat-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.stat-label {
+  font-size: 11px;
+}
+
+.token-details-panel.light .stat-label {
+  color: #6b7280;
+}
+
+.token-details-panel.dark .stat-label {
+  color: #9ca3af;
+}
+
+.stat-value {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.token-details-panel.light .stat-value {
+  color: #374151;
+}
+
+.token-details-panel.dark .stat-value {
+  color: #e5e7eb;
 }
 
 .expand-icon {
-  transition: transform 0.3s ease;
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
 }
 
 .expand-icon.expanded {
@@ -412,47 +434,57 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
   color: #6b7280;
 }
 
-.token-details-subsection {
-  margin-top: 10px;
-  padding-left: 20px;
+/* 颜色类 */
+.token-details-total {
+  color: var(--accent-purple);
 }
 
-.token-details-subitem {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
+.token-details-panel.light .token-details-total {
+  color: #9d8df1;
 }
 
-.token-details-sublabel {
-  font-size: 13px;
+.token-details-panel.dark .token-details-total {
+  color: #b7a3e3;
 }
 
-.token-details-panel.light .token-details-sublabel {
-  color: #6b7280;
+.token-details-percent {
+  color: #10b981;
 }
 
-.token-details-panel.dark .token-details-sublabel {
-  color: #9ca3af;
+.token-details-panel.dark .token-details-percent {
+  color: #34d399;
 }
 
-.token-details-subvalue {
-  font-size: 13px;
-  font-weight: 500;
+/* 滚动条样式 */
+.token-details-content::-webkit-scrollbar {
+  width: 3px;
 }
 
-.token-details-panel.light .token-details-subvalue {
-  color: #4b5563;
+.token-details-content::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.token-details-panel.dark .token-details-subvalue {
-  color: #d1d5db;
+.token-details-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
 }
 
-/* Slide-in transition */
+.token-details-panel.dark .token-details-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Slide-in from right top */
 .slide-in-enter-active,
 .slide-in-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-in-enter-active .token-details-content {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+}
+
+.slide-in-leave-active .token-details-content {
+  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
 }
 
 .slide-in-enter-from,
@@ -462,14 +494,14 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
 
 .slide-in-enter-from .token-details-content,
 .slide-in-leave-to .token-details-content {
-  transform: translateX(100%);
+  transform: translateX(20px) translateY(-10px);
 }
 
 /* Expand transition */
 .expand-enter-active,
 .expand-leave-active {
-  transition: all 0.3s ease;
-  max-height: 300px;
+  transition: all 0.25s ease;
+  max-height: 200px;
   overflow: hidden;
 }
 

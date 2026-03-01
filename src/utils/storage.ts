@@ -82,7 +82,9 @@ export async function setStorage<T>(key: string, value: T): Promise<void> {
     if (type === 'local') {
       localStorage.setItem(key, JSON.stringify(value));
     } else {
-      await set(key, value, dbStore);
+      // 序列化并反序列化以移除 Vue 响应式属性
+      const serialized = JSON.parse(JSON.stringify(value));
+      await set(key, serialized, dbStore);
     }
   } catch (e) {
     console.warn(`Failed to set ${key} to ${type}:`, e);

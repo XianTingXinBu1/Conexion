@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { ArrowLeft, Plus, Clock, MessageSquare } from 'lucide-vue-next';
 import type { Theme, AICharacter, Conversation } from '../types';
 import { STORAGE_KEYS, DEFAULT_AI_CHARACTERS } from '../constants';
@@ -18,13 +19,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const emit = defineEmits<{
-  back: [];
-  toggleTheme: [];
-  navigateChat: [];
-  navigateChatWithCharacter: [character: AICharacter];
-  navigateToConversation: [conversationId: string];
-}>();
+const router = useRouter();
 
 // 使用通知 composable
 const { showSuccess, showInfo, showError } = useNotifications();
@@ -112,7 +107,7 @@ const confirmRename = async () => {
 
 // 打开会话
 const openConversation = (conversation: Conversation) => {
-  emit('navigateToConversation', conversation.id);
+  router.push(`/chat/${conversation.id}`);
 };
 
 onMounted(async () => {
@@ -128,12 +123,12 @@ const openCharacterSelector = async () => {
 
 // 选择临时会话
 const handleTempChatClick = () => {
-  emit('navigateChat');
+  router.push('/chat');
 };
 
 // 选择角色并进入会话
 const selectCharacter = (character: AICharacter) => {
-  emit('navigateChatWithCharacter', character);
+  router.push({ path: '/chat', query: { characterId: character.id } });
   showCharacterSelector.value = false;
 };
 </script>
@@ -144,7 +139,6 @@ const selectCharacter = (character: AICharacter) => {
     <PageHeader
       title="会话"
       subtitle="Conversations"
-      @back="emit('back')"
     >
       <button class="nav-btn" @click="openCharacterSelector">
         <Plus :size="22" />

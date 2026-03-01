@@ -1,24 +1,73 @@
 <script setup lang="ts">
 import { Sun, Moon, MessageSquare, Zap, Settings, FileText, User, BookOpen, Hash } from 'lucide-vue-next';
+import { useRouter } from 'vue-router';
+import { inject } from 'vue';
 import type { Theme } from '../types';
 
-interface Props {
-  theme: Theme;
-}
+// 获取路由实例
+const router = useRouter();
 
-defineProps<Props>();
+// 从 AppProvider 注入的主题切换函数
+const appTheme = inject('app-theme') as { theme: Theme; toggleTheme: () => void } | undefined;
 
-const emit = defineEmits<{
-  toggleTheme: [];
-  navigateChat: [];
-  navigateApiPreset: [];
-  navigateSettings: [];
-  navigateConversationList: [];
-  navigateRegexScript: [];
-  navigateRoleManagement: [];
-  navigatePromptPreset: [];
-  navigateKnowledgeBase: [];
-}>();
+// 获取主题
+const theme = appTheme?.theme || 'light';
+
+/**
+ * 切换主题
+ */
+const handleToggleTheme = () => {
+  appTheme?.toggleTheme();
+};
+
+/**
+ * 导航到会话列表
+ */
+const navigateToConversationList = () => {
+  router.push('/conversation-list');
+};
+
+/**
+ * 导航到 API 预设
+ */
+const navigateToApiPreset = () => {
+  router.push('/api-preset');
+};
+
+/**
+ * 导航到设置
+ */
+const navigateToSettings = () => {
+  router.push('/settings');
+};
+
+/**
+ * 导航到正则脚本
+ */
+const navigateToRegexScript = () => {
+  router.push('/regex-script');
+};
+
+/**
+ * 导航到角色管理
+ */
+const navigateToRoleManagement = () => {
+  router.push('/role-management');
+};
+
+/**
+ * 导航到提示词预设
+ */
+const navigateToPromptPreset = () => {
+  router.push('/prompt-preset');
+};
+
+/**
+ * 导航到知识库
+ */
+const navigateToKnowledgeBase = () => {
+  router.push('/knowledge-base');
+};
 </script>
 
 <template>
@@ -29,7 +78,7 @@ const emit = defineEmits<{
         <span class="brand-name">Conexion</span>
         <span class="brand-dot"></span>
       </div>
-      <button class="theme-toggle" @click="emit('toggleTheme')">
+      <button class="theme-toggle" @click="handleToggleTheme">
         <Sun v-if="theme === 'light'" :size="20" />
         <Moon v-else :size="20" />
       </button>
@@ -39,7 +88,7 @@ const emit = defineEmits<{
     <main class="content">
       <!-- 主入口 -->
       <div class="hero-section">
-        <div class="hero-card" @click="emit('navigateConversationList')">
+        <div class="hero-card" @click="navigateToConversationList">
           <div class="hero-icon">
             <MessageSquare :size="32" />
           </div>
@@ -59,25 +108,25 @@ const emit = defineEmits<{
       <section class="section">
         <h3 class="section-title">内容管理</h3>
         <div class="grid">
-          <div class="grid-card" @click="emit('navigateRoleManagement')">
+          <div class="grid-card" @click="navigateToRoleManagement">
             <div class="grid-icon role">
               <User :size="24" />
             </div>
             <span class="grid-label">角色卡</span>
           </div>
-          <div class="grid-card" @click="emit('navigateKnowledgeBase')">
+          <div class="grid-card" @click="navigateToKnowledgeBase">
             <div class="grid-icon knowledge">
               <BookOpen :size="24" />
             </div>
             <span class="grid-label">知识库</span>
           </div>
-          <div class="grid-card" @click="emit('navigatePromptPreset')">
+          <div class="grid-card" @click="navigateToPromptPreset">
             <div class="grid-icon prompt">
               <FileText :size="24" />
             </div>
             <span class="grid-label">提示词</span>
           </div>
-          <div class="grid-card" @click="emit('navigateRegexScript')">
+          <div class="grid-card" @click="navigateToRegexScript">
             <div class="grid-icon regex">
               <Hash :size="24" />
             </div>
@@ -90,7 +139,7 @@ const emit = defineEmits<{
       <section class="section">
         <h3 class="section-title">配置</h3>
         <div class="list">
-          <div class="list-card" @click="emit('navigateApiPreset')">
+          <div class="list-card" @click="navigateToApiPreset">
             <div class="list-icon api">
               <Zap :size="20" />
             </div>
@@ -102,7 +151,7 @@ const emit = defineEmits<{
               <path d="M9 18l6-6-6-6" />
             </svg>
           </div>
-          <div class="list-card" @click="emit('navigateSettings')">
+          <div class="list-card" @click="navigateToSettings">
             <div class="list-icon settings">
               <Settings :size="20" />
             </div>

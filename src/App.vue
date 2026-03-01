@@ -1,72 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
 import AppProvider from './components/AppProvider.vue';
-import ConfirmDialog from './components/ConfirmDialog.vue';
 import { NotificationContainer } from '@/modules/notification';
-
-const router = useRouter();
-
-// 本地管理退出确认状态（使用 Vue Router 守卫）
-const showExitConfirm = ref(false);
-
-/**
- * 处理路由变化
- */
-const handleRouteChange = () => {
-  // 如果当前不在首页，监听浏览器返回事件
-  if (router.currentRoute.value.path !== '/') {
-    // 添加浏览器历史记录
-    window.history.pushState({ canExit: false }, '', '');
-  }
-};
-
-/**
- * 处理浏览器返回事件
- */
-const handlePopState = (event: PopStateEvent) => {
-  // 如果有 canExit 状态，说明用户想要退出
-  if (event.state && event.state.canExit === false) {
-    event.preventDefault();
-    showExitConfirm.value = true;
-  }
-};
-
-/**
- * 确认退出
- */
-const confirmExit = () => {
-  showExitConfirm.value = false;
-  // 移除事件监听
-  window.removeEventListener('popstate', handlePopState);
-  // 执行返回
-  window.history.back();
-};
-
-/**
- * 取消退出
- */
-const cancelExit = () => {
-  showExitConfirm.value = false;
-  // 重新添加历史记录
-  window.history.pushState({ canExit: false }, '', '');
-};
-
-// 监听路由变化
-router.afterEach(handleRouteChange);
-
-// 生命周期
-onMounted(() => {
-  window.addEventListener('popstate', handlePopState);
-  // 初始化历史记录
-  if (router.currentRoute.value.path !== '/') {
-    window.history.pushState({ canExit: false }, '', '');
-  }
-});
-
-onUnmounted(() => {
-  window.removeEventListener('popstate', handlePopState);
-});
 </script>
 
 <template>
@@ -77,18 +11,6 @@ onUnmounted(() => {
           <component :is="Component" :key="route.path" />
         </Transition>
       </router-view>
-
-      <!-- 退出确认对话框 -->
-      <ConfirmDialog
-        :show="showExitConfirm"
-        title="退出应用"
-        message="确定要退出应用吗？"
-        type="warning"
-        confirm-text="退出"
-        cancel-text="取消"
-        @confirm="confirmExit"
-        @cancel="cancelExit"
-      />
 
       <!-- 通知容器 -->
       <NotificationContainer />

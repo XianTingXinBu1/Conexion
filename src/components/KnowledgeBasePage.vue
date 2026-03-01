@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import type { Theme, KnowledgeBase, KnowledgeEntry } from '../types';
 import { useKnowledgeBases } from '../composables/useKnowledgeBases';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
@@ -16,9 +17,7 @@ interface Props {
 
 defineProps<Props>();
 
-const emit = defineEmits<{
-  back: [];
-}>();
+const router = useRouter();
 
 const {
   knowledgeBases,
@@ -173,7 +172,7 @@ const handleConfirmDelete = () => {
 
 const handleBack = () => {
   if (isViewingList.value) {
-    emit('back');
+    router.back();
   } else {
     goToListView();
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { Theme, Message, AICharacter, RegexRule, Conversation, UserCharacter, PromptPreset, ChatMessage } from '../types';
 import { applyRules, clearRegexCache } from '../utils/regexEngine';
@@ -33,11 +34,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const emit = defineEmits<{
-  back: [];
-  toggleTheme: [];
-  updateConversation: [conversation: Conversation];
-}>();
+const router = useRouter();
 
 const messagesContainer = ref<HTMLElement>();
 const messages = ref<Message[]>([]);
@@ -52,7 +49,9 @@ const {
   createNewConversation: createConv,
   saveConversation: saveConv,
   setCurrentConversationId,
-} = useConversationManager((conv) => emit('updateConversation', conv));
+} = useConversationManager(() => {
+  // 会话更新时不需要通过 emit 通知父组件，因为使用 Vue Router
+});
 
 // 初始化会话ID
 setCurrentConversationId(props.conversationId);
@@ -414,7 +413,7 @@ watch(() => messages.value, () => {
 <template>
   <div class="chat-page">
     <header class="chat-header">
-      <button class="nav-btn" @click="emit('back')">
+      <button class="nav-btn" @click="router.back()">
         <ArrowLeft :size="22" />
       </button>
       <div class="header-content">

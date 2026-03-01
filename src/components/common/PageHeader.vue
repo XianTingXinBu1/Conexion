@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ArrowLeft } from 'lucide-vue-next';
+import { useRouter } from 'vue-router';
 
 interface Props {
   title: string;
@@ -16,14 +17,22 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  back: [];
   action: [];
 }>();
+
+const router = useRouter();
+
+/**
+ * 处理返回操作
+ */
+const handleBack = () => {
+  router.back();
+};
 </script>
 
 <template>
   <header class="page-header">
-    <button v-if="showBack" class="nav-btn" @click="emit('back')">
+    <button v-if="showBack" class="nav-btn" @click="handleBack">
       <ArrowLeft :size="22" />
     </button>
     <div class="header-content">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import type { Theme, PromptPreset, PromptItem } from '../types';
 import { STORAGE_KEYS, DEFAULT_PROMPT_PRESETS, DEFAULT_PROMPT_ITEMS } from '../constants';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
@@ -17,9 +18,7 @@ interface Props {
 
 defineProps<Props>();
 
-const emit = defineEmits<{
-  back: [];
-}>();
+const router = useRouter();
 
 // 使用确认对话框 composable
 const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete } = useConfirmDialog();
@@ -306,7 +305,7 @@ const handleBack = () => {
   } else if (editingId.value) {
     cancelEdit();
   } else {
-    emit('back');
+    router.back();
   }
 };
 

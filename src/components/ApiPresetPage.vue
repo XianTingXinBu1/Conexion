@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { Save, RefreshCw, Zap, AlertTriangle } from 'lucide-vue-next';
 import type { Theme } from '../types';
 import { DEFAULTS } from '../constants';
@@ -17,10 +18,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const emit = defineEmits<{
-  back: [];
-  toggleTheme: [];
-}>();
+const router = useRouter();
 
 // 使用 composables
 const {
@@ -240,21 +238,21 @@ function handleCreateNewPreset() {
 
 // 处理返回按钮点击
 function handleBack() {
-  checkBeforeLeave(() => emit('back'));
+  checkBeforeLeave(() => router.back());
 }
 
 // 保存并退出
 async function onSaveAndExit() {
   await handleSaveAndLeave(() => {
     handleSaveCurrentPreset();
-    emit('back');
+    router.back();
   });
 }
 
 // 不保存直接退出
 function onDiscardAndExit() {
   handleDiscardAndLeave();
-  emit('back');
+  router.back();
 }
 
 // 取消退出

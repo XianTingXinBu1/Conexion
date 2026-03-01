@@ -15,10 +15,6 @@ interface Props {
 
 defineProps<Props>();
 
-const emit = defineEmits<{
-  back: [];
-}>();
-
 // 使用 composables
 const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete, ConfirmDialog } = useConfirmDialog();
 const { showSuccess, showInfo } = useNotifications();
@@ -155,10 +151,8 @@ const formActionsAlign = 'space-between' as const;
     <PageHeader
       title="正则脚本"
       subtitle="Regex Scripts"
-      :show-back="true"
       :show-action="true"
       :action-icon="Plus"
-      @back="emit('back')"
       @action="openNewModal"
     />
 

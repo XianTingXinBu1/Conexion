@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { Plus, X, User, Bot } from 'lucide-vue-next';
 import type { Theme, UserCharacter, AICharacter, CharacterType } from '../types';
 import { DEFAULT_USER_CHARACTER, DEFAULT_AI_CHARACTERS, STORAGE_KEYS } from '../constants';
@@ -19,10 +20,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const emit = defineEmits<{
-  back: [];
-  toggleTheme: [];
-}>();
+const router = useRouter();
 
 // 使用确认对话框 composable
 const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete } = useConfirmDialog();
@@ -236,7 +234,7 @@ const handleBack = () => {
   } else if (editingId.value) {
     cancelEdit();
   } else {
-    emit('back');
+    router.back();
   }
 };
 

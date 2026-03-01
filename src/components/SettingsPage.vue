@@ -1,43 +1,78 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, inject } from 'vue';
+import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
-import type { Theme } from '../types';
 import type { MergeMode } from '../modules/system-prompt';
 import { STORAGE_KEYS } from '../constants';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { getStorage } from '@/utils/storage';
+import { getStorage, setStorage } from '@/utils/storage';
 import ChatSettingsSection from './settings/ChatSettingsSection.vue';
 import DataManagementSection from './settings/DataManagementSection.vue';
 
-interface Props {
-  theme: Theme;
-  enterToSend: boolean;
-  showWordCount: boolean;
-  enableMarkdown: boolean;
-  showMessageIndex: boolean;
-  chatHistoryLimit: number;
-  debugMode: boolean;
-  promptMergeMode: MergeMode;
-}
+const router = useRouter();
 
-const props = defineProps<Props>();
+// 从 AppProvider 注入的应用状态
+const appSettings = inject('app-settings') as Record<string, any> | undefined;
+const appDebug = inject('app-debug') as { debugMode: { value: boolean }; toggleDebugMode: () => void } | undefined;
 
-const emit = defineEmits<{
-  back: [];
-  toggleTheme: [];
-  updateEnterToSend: [value: boolean];
-  updateShowWordCount: [value: boolean];
-  updateEnableMarkdown: [value: boolean];
-  updateShowMessageIndex: [value: boolean];
-  updateChatHistoryLimit: [value: number];
-  updatePromptMergeMode: [value: MergeMode];
-  deleteAllData: [];
-  restoreDefaults: [];
-  toggleDebugMode: [];
-}>();
+// 设置值
+const enterToSend = ref(appSettings?.enterToSend?.value ?? true);
+const showWordCount = ref(appSettings?.showWordCount?.value ?? false);
+const enableMarkdown = ref(appSettings?.enableMarkdown?.value ?? true);
+const showMessageIndex = ref(appSettings?.showMessageIndex?.value ?? false);
+const chatHistoryLimit = ref(appSettings?.chatHistoryLimit?.value ?? 50);
+const debugMode = ref(appDebug?.debugMode?.value ?? false);
+const promptMergeMode = ref<MergeMode>('adjacent');
+
+// 从存储加载设置
+const loadSettings = async () => {
+  enterToSend.value = await getStorage(STORAGE_KEYS.ENTER_TO_SEND, true);
+  showWordCount.value = await getStorage(STORAGE_KEYS.SHOW_WORD_COUNT, false);
+  enableMarkdown.value = await getStorage(STORAGE_KEYS.ENABLE_MARKDOWN, true);
+  showMessageIndex.value = await getStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, false);
+  chatHistoryLimit.value = await getStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, 50);
+  debugMode.value = await getStorage(STORAGE_KEYS.DEBUG_MODE, false);
+  promptMergeMode.value = await getStorage(STORAGE_KEYS.PROMPT_MERGE_MODE, 'adjacent');
+};
+
+// 更新设置
+const updateEnterToSend = async (value: boolean) => {
+  enterToSend.value = value;
+  await setStorage(STORAGE_KEYS.ENTER_TO_SEND, value);
+};
+
+const updateShowWordCount = async (value: boolean) => {
+  showWordCount.value = value;
+  await setStorage(STORAGE_KEYS.SHOW_WORD_COUNT, value);
+};
+
+const updateEnableMarkdown = async (value: boolean) => {
+  enableMarkdown.value = value;
+  await setStorage(STORAGE_KEYS.ENABLE_MARKDOWN, value);
+};
+
+const updateShowMessageIndex = async (value: boolean) => {
+  showMessageIndex.value = value;
+  await setStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, value);
+};
+
+const updateChatHistoryLimit = async (value: number) => {
+  chatHistoryLimit.value = value;
+  await setStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, value);
+};
+
+const updatePromptMergeMode = async (value: MergeMode) => {
+  promptMergeMode.value = value;
+  await setStorage(STORAGE_KEYS.PROMPT_MERGE_MODE, value);
+};
+
+const toggleDebugMode = () => {
+  debugMode.value = !debugMode.value;
+  appDebug?.toggleDebugMode();
+};
 
 // 使用通知 composable
-const { showSuccess, showWarning } = useNotifications();
+const { showSuccess } = useNotifications();
 
 // 计算数据占用大小
 const dataSize = ref(0);
@@ -55,21 +90,31 @@ const calculateDataSize = async () => {
   dataSize.value = totalSize;
 };
 
-const handleDeleteAllData = () => {
-  emit('deleteAllData');
-  const msg = getNotificationMessage('SETTINGS_DATA_DELETE_SUCCESS');
-  showWarning(msg.title, msg.message);
+const handleDeleteAllData = async () => {
+  Object.values(STORAGE_KEYS).forEach(async (key) => {
+    await setStorage(key, null);
+  });
+  location.reload();
 };
 
-const handleRestoreDefaults = () => {
-  emit('restoreDefaults');
+const handleRestoreDefaults = async () => {
+  // 恢复默认设置
+  await setStorage(STORAGE_KEYS.ENTER_TO_SEND, true);
+  await setStorage(STORAGE_KEYS.SHOW_WORD_COUNT, false);
+  await setStorage(STORAGE_KEYS.ENABLE_MARKDOWN, true);
+  await setStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, false);
+  await setStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, 50);
+  await setStorage(STORAGE_KEYS.DEBUG_MODE, false);
+  await setStorage(STORAGE_KEYS.PROMPT_MERGE_MODE, 'adjacent');
+  await loadSettings();
   const msg = getNotificationMessage('SETTINGS_RESTORE_SUCCESS');
   showSuccess(msg.title, msg.message);
 };
 
-// 组件挂载时计算数据大小
+// 组件挂载时计算数据大小和加载设置
 onMounted(async () => {
   await calculateDataSize();
+  await loadSettings();
 });
 </script>
 
@@ -77,7 +122,7 @@ onMounted(async () => {
   <div class="settings-page">
     <!-- 顶部导航栏 -->
     <header class="page-header">
-      <button class="nav-btn" @click="emit('back')">
+      <button class="nav-btn" @click="router.back()">
         <ArrowLeft :size="22" />
       </button>
       <div class="header-content">
@@ -98,13 +143,13 @@ onMounted(async () => {
         :debug-mode="debugMode"
         :chat-history-limit="chatHistoryLimit"
         :prompt-merge-mode="promptMergeMode"
-        @update-enter-to-send="emit('updateEnterToSend', $event)"
-        @update-show-word-count="emit('updateShowWordCount', $event)"
-        @update-enable-markdown="emit('updateEnableMarkdown', $event)"
-        @update-show-message-index="emit('updateShowMessageIndex', $event)"
-        @update-chat-history-limit="emit('updateChatHistoryLimit', $event)"
-        @update-prompt-merge-mode="emit('updatePromptMergeMode', $event)"
-        @toggle-debug-mode="emit('toggleDebugMode')"
+        @update-enter-to-send="updateEnterToSend"
+        @update-show-word-count="updateShowWordCount"
+        @update-enable-markdown="updateEnableMarkdown"
+        @update-show-message-index="updateShowMessageIndex"
+        @update-chat-history-limit="updateChatHistoryLimit"
+        @update-prompt-merge-mode="updatePromptMergeMode"
+        @toggle-debug-mode="toggleDebugMode"
       />
 
       <!-- 数据管理 -->

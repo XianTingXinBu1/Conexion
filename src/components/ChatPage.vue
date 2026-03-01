@@ -279,6 +279,53 @@ const confirmDelete = async () => {
 };
 
 const handleShowPromptAssistant = () => {
+  // 实时构建提示词
+  const currentPreset = getCurrentPromptPreset();
+  let systemMessages: ChatMessage[] = [];
+
+  if (currentPreset) {
+    logPrompt('实时构建提示词预览', { presetName: currentPreset.name, itemCount: currentPreset.items.length });
+    const result = buildSystemPrompt({
+      preset: currentPreset,
+      aiCharacter: currentCharacter.value || undefined,
+      userCharacter: selectedUser.value || undefined,
+      knowledgeBases: knowledgeBases.value.filter(kb => kb.globallyEnabled),
+      chatHistory: messages.value.filter(m => m.type !== 'system'),
+      userInstruction: '',
+      mergeMode: promptMergeMode.value,
+    });
+    systemMessages = result.messages;
+
+    lastSystemPromptResult.value = {
+      estimatedTokens: result.estimatedTokens,
+      metadata: result.metadata,
+    };
+  } else {
+    logPrompt('实时构建提示词预览（默认）');
+    if (currentCharacter.value) {
+      const parts: string[] = [];
+      if (currentCharacter.value.name) {
+        parts.push(`你的名字是：${currentCharacter.value.name}`);
+      }
+      if (currentCharacter.value.description) {
+        parts.push(`你的描述：${currentCharacter.value.description}`);
+      }
+      if (currentCharacter.value.personality) {
+        parts.push(`你的性格：${currentCharacter.value.personality}`);
+      }
+      if (parts.length > 0) {
+        systemMessages.push({
+          role: 'system' as const,
+          content: parts.join('\n')
+        });
+      }
+    }
+    lastSystemPromptResult.value = {
+      estimatedTokens: systemMessages.reduce((sum, msg) => sum + msg.content.length, 0),
+    };
+  }
+
+  lastSystemMessages.value = systemMessages;
   showPromptPreview.value = true;
 };
 
@@ -593,6 +640,7 @@ watch(() => messages.value, () => {
       :estimated-tokens="lastSystemPromptResult?.estimatedTokens"
       :theme="theme"
       @update:show="showPromptPreview = false"
+      @refresh="handleShowPromptAssistant"
     />
 
     <!-- 删除确认对话框 -->

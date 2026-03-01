@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { X, Copy, Check, ChevronDown, ChevronUp, Search, XCircle } from 'lucide-vue-next';
+import DOMPurify from 'dompurify';
+import { X, Copy, Check, ChevronDown, ChevronUp, Search, XCircle, RefreshCw, Zap, FileText, SearchX } from 'lucide-vue-next';
 import type { ChatMessage } from '../../types';
 
 interface Props {
@@ -14,6 +15,7 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
   'update:show': [value: boolean];
+  refresh: [];
 }>();
 
 const copied = ref(false);
@@ -40,7 +42,9 @@ const highlightText = (text: string, query: string) => {
   if (!query.trim()) return text;
 
   const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-  return text.replace(regex, '<mark class="highlight">$1</mark>');
+  const highlighted = text.replace(regex, '<mark class="highlight">$1</mark>');
+  // 使用 DOMPurify 清洗 HTML，只允许 <mark> 标签
+  return DOMPurify.sanitize(highlighted, { ALLOWED_TAGS: ['mark'], ALLOWED_ATTR: ['class'] });
 };
 
 // 初始化折叠状态，默认全部折叠
@@ -68,6 +72,10 @@ watch(searchQuery, (query) => {
 
 const clearSearch = () => {
   searchQuery.value = '';
+};
+
+const handleRefresh = () => {
+  emit('refresh');
 };
 
 const closeModal = () => {
@@ -110,44 +118,60 @@ const getRoleLabel = (role: string) => {
   }
 };
 
-const getRoleBadgeColor = (role: string) => {
+const getRoleColor = (role: string) => {
   switch (role) {
     case 'system':
-      return 'background: var(--accent-purple); color: white;';
+      return 'var(--accent-purple)';
     case 'user':
-      return 'background: #3b82f6; color: white;';
+      return 'var(--role-user-color)';
     case 'assistant':
-      return 'background: #10b981; color: white;';
+      return 'var(--role-assistant-color)';
     default:
-      return 'background: var(--bg-tertiary); color: var(--text-main);';
+      return 'var(--text-muted)';
   }
 };
 
 const tokenInfo = computed(() => {
   return props.estimatedTokens !== undefined
-    ? `估计 Token 数: ${props.estimatedTokens.toLocaleString()}`
+    ? `${props.estimatedTokens.toLocaleString()} tokens`
     : '';
 });
+
+// 辅助函数：截断文本
+const truncateText = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
+};
 </script>
 
 <template>
   <Transition name="modal">
     <div v-if="show" class="modal-overlay" @click="closeModal">
       <div class="modal-content" @click.stop>
+        <!-- 背景装饰 -->
+        <div class="modal-bg-decorator"></div>
+
         <div class="modal-header">
-          <h2 class="modal-title">提示词预览</h2>
-          <button class="close-btn" @click="closeModal">
-            <X :size="20" />
-          </button>
+          <div class="header-left">
+            <h2 class="modal-title">提示词预览</h2>
+            <div v-if="tokenInfo" class="token-badge">
+              <Zap :size="14" />
+              <span>{{ tokenInfo }}</span>
+            </div>
+          </div>
+          <div class="header-actions">
+            <button class="icon-btn" @click="handleRefresh" title="刷新提示词">
+              <RefreshCw :size="18" />
+            </button>
+            <button class="icon-btn" @click="closeModal">
+              <X :size="20" />
+            </button>
+          </div>
         </div>
 
         <div class="modal-body">
-          <div v-if="tokenInfo" class="token-info">
-            {{ tokenInfo }}
-          </div>
-
           <!-- 搜索框 -->
-          <div class="search-box">
+          <div class="search-container">
             <Search :size="16" class="search-icon" />
             <input
               v-model="searchQuery"
@@ -164,42 +188,46 @@ const tokenInfo = computed(() => {
           </div>
 
           <div v-if="!systemMessages || systemMessages.length === 0" class="empty-state">
-            暂无提示词数据
+            <FileText :size="48" class="empty-icon" />
+            <p class="empty-text">暂无提示词数据</p>
           </div>
 
           <div v-else-if="filteredMessages.length === 0" class="empty-state">
-            未找到匹配的内容
+            <SearchX :size="48" class="empty-icon" />
+            <p class="empty-text">未找到匹配的内容</p>
           </div>
 
           <div v-else class="messages-list">
             <div
               v-for="(message, filteredIndex) in filteredMessages"
               :key="filteredIndex"
-              class="message-item"
+              class="message-card"
             >
               <div
                 class="message-header"
+                :class="{ expanded: !collapsedMessages[filteredIndex] }"
                 @click="toggleCollapse(filteredIndex)"
               >
-                <div class="header-left">
-                  <span class="role-badge" :style="getRoleBadgeColor(message.role)">
-                    {{ getRoleLabel(message.role) }}
-                  </span>
+                <div class="message-title">
+                  <span class="role-dot" :style="{ backgroundColor: getRoleColor(message.role) }"></span>
+                  <span class="role-label">{{ getRoleLabel(message.role) }}</span>
+                  <span class="message-separator">·</span>
                   <span class="message-preview">
-                    <span
-                      v-if="collapsedMessages[filteredIndex]"
-                      v-html="highlightText(message.content.slice(0, 50) + '...', searchQuery)"
-                    />
-                    <span v-else>点击展开/收起</span>
+                    <span v-if="collapsedMessages[filteredIndex]" v-html="highlightText(truncateText(message.content, 60), searchQuery)" />
+                    <span v-else class="expand-hint">点击收起</span>
                   </span>
                 </div>
-                <ChevronDown v-if="collapsedMessages[filteredIndex]" :size="18" class="chevron" />
-                <ChevronUp v-else :size="18" class="chevron" />
+                <ChevronDown
+                  v-if="collapsedMessages[filteredIndex]"
+                  :size="18"
+                  class="chevron-icon"
+                />
+                <ChevronUp v-else :size="18" class="chevron-icon" />
               </div>
 
-              <Transition name="collapse">
-                <div v-if="!collapsedMessages[filteredIndex]" class="message-content">
-                  <pre v-html="highlightText(message.content, searchQuery)"></pre>
+              <Transition name="slide">
+                <div v-if="!collapsedMessages[filteredIndex]" class="message-body">
+                  <pre v-html="highlightText(message.content, searchQuery)" class="message-content"></pre>
                 </div>
               </Transition>
             </div>
@@ -207,13 +235,18 @@ const tokenInfo = computed(() => {
         </div>
 
         <div class="modal-footer">
-          <button class="action-btn secondary" @click="closeModal">
+          <button class="btn btn-secondary" @click="closeModal">
             关闭
           </button>
-          <button class="action-btn primary" @click="copyPrompt" :disabled="!systemMessages || systemMessages.length === 0">
+          <button
+            class="btn btn-primary"
+            @click="copyPrompt"
+            :disabled="!systemMessages || systemMessages.length === 0"
+            :class="{ 'btn-copied': copied }"
+          >
             <Check v-if="copied" :size="16" />
             <Copy v-else :size="16" />
-            {{ copied ? '已复制' : '复制提示词' }}
+            {{ copied ? '已复制' : '复制全部' }}
           </button>
         </div>
       </div>
@@ -222,39 +255,80 @@ const tokenInfo = computed(() => {
 </template>
 
 <style scoped>
+/* ========== 变量定义 ========== */
+:root {
+  --role-user-color: #6366f1;
+  --role-assistant-color: #10b981;
+  --modal-backdrop: rgba(0, 0, 0, 0.6);
+  --modal-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --transition-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme='dark'] {
+  --modal-backdrop: rgba(0, 0, 0, 0.75);
+  --modal-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --card-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* ========== Modal Overlay ========== */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: var(--modal-backdrop);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  padding: 16px;
 }
 
+/* ========== Modal Content ========== */
 .modal-content {
+  position: relative;
   background: var(--bg-primary);
-  border-radius: 16px;
+  border-radius: 20px;
   width: 100%;
-  max-width: 600px;
-  max-height: 80vh;
+  max-width: 640px;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--modal-shadow);
   overflow: hidden;
+  animation: modalSlideIn 0.4s var(--transition-smooth);
 }
 
+.modal-bg-decorator {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, var(--accent-purple) 0%, transparent 70%);
+  opacity: 0.05;
+  pointer-events: none;
+  filter: blur(40px);
+}
+
+/* ========== Modal Header ========== */
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 20px 24px;
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .modal-title {
@@ -262,282 +336,89 @@ const tokenInfo = computed(() => {
   font-weight: 600;
   color: var(--text-main);
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
-.close-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+.token-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, var(--accent-purple), #a78bfa);
+  color: white;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(157, 141, 241, 0.3);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: none;
-  background: transparent;
+  background: var(--bg-secondary);
   color: var(--text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--transition-smooth);
 }
 
-.close-btn:hover {
+.icon-btn:hover {
   background: var(--bg-tertiary);
   color: var(--text-main);
+  transform: translateY(-1px);
 }
 
+.icon-btn:active {
+  transform: scale(0.95);
+}
+
+/* ========== Modal Body ========== */
 .modal-body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.token-info {
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-  border-left: 3px solid var(--accent-purple);
-}
-
-.prompt-content {
-  flex: 1;
-  overflow-y: auto;
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 16px;
-  border: 1px solid var(--border-color);
-}
-
-.prompt-content pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-main);
-}
-
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--border-color);
-  flex-shrink: 0;
-}
-
-.action-btn {
-  padding: 10px 16px;
-  border-radius: 8px;
-  border: none;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-}
-
-.action-btn.secondary {
-  background: var(--bg-secondary);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
-}
-
-.action-btn.secondary:hover {
-  background: var(--bg-tertiary);
-}
-
-.action-btn.primary {
-  background: var(--accent-purple);
-  color: white;
-}
-
-.action-btn.primary:hover:not(:disabled) {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(157, 141, 241, 0.3);
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Modal transition */
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-enter-active .modal-content,
-.modal-leave-active .modal-content {
-  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-from .modal-content,
-.modal-leave-to .modal-content {
-  transform: scale(0.95) translateY(10px);
-}
-
-/* Scrollbar */
-.modal-body::-webkit-scrollbar,
-.prompt-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.modal-body::-webkit-scrollbar-track,
-.prompt-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.modal-body::-webkit-scrollbar-thumb,
-.prompt-content::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
-}
-
-.modal-body::-webkit-scrollbar-thumb:hover,
-.prompt-content::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
-
-/* Empty state */
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-/* Messages list */
-.messages-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* Message item */
-.message-item {
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.message-item:hover {
-  border-color: var(--accent-purple);
-}
-
-/* Message header */
-.message-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  cursor: pointer;
-  user-select: none;
-  transition: background-color 0.2s ease;
-}
-
-.message-header:hover {
-  background: var(--bg-tertiary);
-}
-
-.header-left {
+/* ========== Search Container ========== */
+.search-container {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
-  min-width: 0;
-}
-
-.role-badge {
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.message-preview {
-  font-size: 13px;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chevron {
-  color: var(--text-muted);
-  flex-shrink: 0;
-  transition: transform 0.3s ease;
-}
-
-/* Message content */
-.message-content {
-  padding: 0 16px 16px;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
-}
-
-.message-content pre {
-  margin: 0;
-  padding-top: 16px;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-main);
-}
-
-/* Collapse transition */
-.collapse-enter-active,
-.collapse-leave-active {
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  max-height: 500px;
-  overflow: hidden;
-}
-
-.collapse-enter-from,
-.collapse-leave-to {
-  max-height: 0;
-  opacity: 0;
-}
-
-/* Search box */
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  transition: all 0.25s var(--transition-smooth);
+  position: relative;
 }
 
-.search-box:focus-within {
+.search-container:focus-within {
   border-color: var(--accent-purple);
-  box-shadow: 0 0 0 3px rgba(157, 141, 241, 0.15);
+  background: var(--bg-primary);
+  box-shadow: 0 0 0 4px rgba(157, 141, 241, 0.1);
 }
 
 .search-icon {
   color: var(--text-muted);
   flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+.search-container:focus-within .search-icon {
+  color: var(--accent-purple);
 }
 
 .search-input {
@@ -548,34 +429,297 @@ const tokenInfo = computed(() => {
   font-size: 14px;
   color: var(--text-main);
   min-width: 0;
+  padding: 0;
 }
 
 .search-input::placeholder {
   color: var(--text-muted);
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .clear-icon {
   color: var(--text-muted);
   cursor: pointer;
   flex-shrink: 0;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
+  padding: 2px;
 }
 
 .clear-icon:hover {
   color: var(--text-main);
+  transform: scale(1.1);
 }
 
-/* Highlight */
-:deep(.highlight) {
-  background: rgba(255, 215, 0, 0.3);
+/* ========== Empty State ========== */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.empty-icon {
+  opacity: 0.4;
+  stroke-width: 1.5;
+}
+
+.empty-text {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ========== Messages List ========== */
+.messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ========== Message Card ========== */
+.message-card {
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  transition: all 0.3s var(--transition-smooth);
+  box-shadow: var(--card-shadow);
+}
+
+.message-card:hover {
+  border-color: var(--accent-purple);
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.message-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.message-header.expanded {
+  background: var(--bg-tertiary);
+}
+
+.message-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.role-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.role-label {
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-main);
-  padding: 1px 2px;
-  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.message-separator {
+  color: var(--text-muted);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.message-preview {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.expand-hint {
+  color: var(--accent-purple);
   font-weight: 500;
 }
 
+.chevron-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 0.3s var(--transition-smooth);
+}
+
+/* ========== Message Body ========== */
+.message-body {
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+.message-content {
+  margin: 0;
+  padding: 16px 18px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-main);
+}
+
+/* ========== Modal Footer ========== */
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+/* ========== Buttons ========== */
+.btn {
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.25s var(--transition-smooth);
+  font-family: inherit;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--text-muted);
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-purple), #a78bfa);
+  color: white;
+  box-shadow: 0 4px 12px rgba(157, 141, 241, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(157, 141, 241, 0.4);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-copied {
+  background: linear-gradient(135deg, #10b981, #34d399) !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
+}
+
+/* ========== Transitions ========== */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.3s var(--transition-smooth);
+  overflow: hidden;
+  max-height: 600px;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ========== Scrollbar ========== */
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ========== Highlight ========== */
+:deep(.highlight) {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.15));
+  color: var(--text-main);
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 500;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
 [data-theme='dark'] :deep(.highlight) {
-  background: rgba(255, 215, 0, 0.4);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.4), rgba(251, 191, 36, 0.2));
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* ========== Utility ========== */
+.truncate-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

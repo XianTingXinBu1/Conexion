@@ -6,8 +6,9 @@ import type { Message, AICharacter, RegexRule, Conversation, UserCharacter, Prom
 import { applyRules, clearRegexCache } from '../utils/regexEngine';
 import { countMessagesTokens } from '../utils/tokenCounter';
 import { DEFAULT_REGEX_SCRIPTS, STORAGE_KEYS, DEFAULT_PROMPT_PRESETS } from '../constants';
-import { ChatInput, MessageItem, ContextRing, TokenDetailsPanel } from './chat';
+import { ChatInput, MessageItem, ContextRing, TokenDetailsPanel, EditMessageModal } from './chat';
 import { useChatApi } from '../composables/useChatApi';
+import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useCharacters } from '../composables/useCharacters';
 import { useKnowledgeBases } from '../composables/useKnowledgeBases';
 import { useApiPresets } from '../modules/api-preset';
@@ -48,6 +49,20 @@ const displayMessages = ref<Message[]>([]);
 const loadedCount = ref(0);
 const regexRules = ref<RegexRule[]>([]);
 
+// 消息编辑和删除状态
+const showEditModal = ref(false);
+const editingMessageId = ref<string>('');
+const editingMessageContent = ref('');
+
+// 使用确认对话框 composable
+const {
+  confirmDialogProps,
+  showDeleteConfirm: showDeleteConfirmDialog,
+  confirmDelete: confirmDeleteMessage,
+  cancelDelete,
+  ConfirmDialog: ConfirmDialogComponent,
+} = useConfirmDialog();
+
 // 使用会话管理器
 const {
   currentConversation,
@@ -55,6 +70,8 @@ const {
   createNewConversation: createConv,
   saveConversation: saveConv,
   setCurrentConversationId,
+  editMessage,
+  deleteMessage,
 } = useConversationManager(() => {
   // 会话更新时不需要通过 emit 通知父组件，因为使用 Vue Router
 });
@@ -200,6 +217,52 @@ const scrollToBottom = async () => {
   await nextTick();
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+  }
+};
+
+// 消息编辑和删除处理函数
+const handleEditMessage = (messageId: string) => {
+  const message = messages.value.find(m => m.id === messageId);
+  if (message) {
+    editingMessageId.value = messageId;
+    editingMessageContent.value = message.content;
+    showEditModal.value = true;
+  }
+};
+
+const handleSaveEdit = async (messageId: string, newContent: string) => {
+  const success = await editMessage(messageId, newContent);
+  if (success) {
+    const message = messages.value.find(m => m.id === messageId);
+    if (message) {
+      message.content = newContent;
+    }
+    showSuccess('编辑成功', '消息已更新');
+  } else {
+    showError('编辑失败', '无法编辑临时会话的消息');
+  }
+};
+
+const handleDeleteMessage = (messageId: string) => {
+  const message = messages.value.find(m => m.id === messageId);
+  if (message) {
+    showDeleteConfirmDialog(messageId, `消息 #${message.content.slice(0, 20)}...`, '这条消息');
+  }
+};
+
+const confirmDelete = async () => {
+  const messageId = confirmDeleteMessage();
+  if (messageId) {
+    const success = await deleteMessage(messageId);
+    if (success) {
+      const index = messages.value.findIndex(m => m.id === messageId);
+      if (index !== -1) {
+        messages.value.splice(index, 1);
+      }
+      showSuccess('删除成功', '消息已删除');
+    } else {
+      showError('删除失败', '无法删除临时会话的消息');
+    }
   }
 };
 
@@ -454,6 +517,8 @@ watch(() => messages.value, () => {
         :enable-markdown="enableMarkdown"
         :show-word-count="showWordCount"
         :show-message-index="showMessageIndex"
+        @edit="handleEditMessage"
+        @delete="handleDeleteMessage"
       />
     </div>
 
@@ -477,6 +542,24 @@ watch(() => messages.value, () => {
     <ChatInput
       :enter-to-send="enterToSend"
       @send="handleSendMessage"
+    />
+
+    <!-- 编辑消息模态框 -->
+    <EditMessageModal
+      :show="showEditModal"
+      :message-id="editingMessageId"
+      :content="editingMessageContent"
+      @update:show="showEditModal = false"
+      @save="handleSaveEdit"
+    />
+
+    <!-- 删除确认对话框 -->
+    <component
+      :is="ConfirmDialogComponent"
+      v-bind="confirmDialogProps"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+      @update-show="cancelDelete"
     />
   </div>
 </template>

@@ -130,6 +130,88 @@ export function useConversationManager(
     currentConversationId.value = id;
   };
 
+  /**
+   * 编辑消息
+   */
+  const editMessage = async (messageId: string, newContent: string): Promise<boolean> => {
+    if (!currentConversationId.value) {
+      return false;
+    }
+
+    // 临时会话不支持编辑
+    if (currentConversationId.value.startsWith('temp-')) {
+      return false;
+    }
+
+    const conversations = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
+    const index = conversations.findIndex(c => c.id === currentConversationId.value);
+
+    if (index === -1) {
+      return false;
+    }
+
+    const conversation = conversations[index]!;
+    const messageIndex = conversation.messages.findIndex(m => m.id === messageId);
+
+    if (messageIndex === -1) {
+      return false;
+    }
+
+    const originalMessage = conversation.messages[messageIndex]!;
+    conversation.messages[messageIndex] = {
+      id: originalMessage.id,
+      type: originalMessage.type,
+      content: newContent,
+      timestamp: originalMessage.timestamp,
+    };
+    conversation.updatedAt = Date.now();
+
+    conversations[index] = conversation;
+    await setStorage(STORAGE_KEYS.CONVERSATIONS, conversations);
+    currentConversation.value = conversation;
+    emitUpdateConversation(conversation);
+
+    return true;
+  };
+
+  /**
+   * 删除消息
+   */
+  const deleteMessage = async (messageId: string): Promise<boolean> => {
+    if (!currentConversationId.value) {
+      return false;
+    }
+
+    // 临时会话不支持删除
+    if (currentConversationId.value.startsWith('temp-')) {
+      return false;
+    }
+
+    const conversations = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
+    const index = conversations.findIndex(c => c.id === currentConversationId.value);
+
+    if (index === -1) {
+      return false;
+    }
+
+    const conversation = conversations[index]!;
+    const messageIndex = conversation.messages.findIndex(m => m.id === messageId);
+
+    if (messageIndex === -1) {
+      return false;
+    }
+
+    conversation.messages.splice(messageIndex, 1);
+    conversation.updatedAt = Date.now();
+
+    conversations[index] = conversation;
+    await setStorage(STORAGE_KEYS.CONVERSATIONS, conversations);
+    currentConversation.value = conversation;
+    emitUpdateConversation(conversation);
+
+    return true;
+  };
+
   return {
     currentConversationId,
     currentConversation,
@@ -139,5 +221,7 @@ export function useConversationManager(
     getCurrentConversation,
     getCurrentConversationId,
     setCurrentConversationId,
+    editMessage,
+    deleteMessage,
   };
 }

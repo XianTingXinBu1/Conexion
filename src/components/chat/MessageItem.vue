@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Message, Theme } from '../../types';
 import { MarkdownRenderer } from '@/modules/markdown';
+import { Edit2, Trash2 } from 'lucide-vue-next';
 
 interface Props {
   message: Message;
@@ -14,6 +15,11 @@ interface Props {
 }
 
 defineProps<Props>();
+
+const emit = defineEmits<{
+  'edit': [messageId: string];
+  'delete': [messageId: string];
+}>();
 
 const getWordCount = (text: string) => {
   return text.length;
@@ -30,6 +36,14 @@ const getWordCount = (text: string) => {
       <div class="message-label">{{ message.type === 'user' ? '用户' : 'AI' }}</div>
       <div v-if="showWordCount" class="message-word-count">{{ getWordCount(message.content) }} 字</div>
       <div v-if="showMessageIndex" class="message-index">#{{ totalMessages - displayCount + index + 1 }}</div>
+      <div class="message-actions">
+        <button class="action-btn" @click="$emit('edit', message.id)" title="编辑">
+          <Edit2 :size="14" />
+        </button>
+        <button class="action-btn" @click="$emit('delete', message.id)" title="删除">
+          <Trash2 :size="14" />
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -98,5 +112,35 @@ const getWordCount = (text: string) => {
   background: rgba(157, 141, 241, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+.message-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.action-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.action-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent-purple);
+}
+
+.action-btn:active {
+  transform: scale(0.9);
 }
 </style>

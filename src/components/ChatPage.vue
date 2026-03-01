@@ -24,6 +24,7 @@ import '../styles/chat.css';
 
 interface Props {
   character?: AICharacter;
+  characterId?: string;
   conversationId?: string;
   userCharacter?: UserCharacter;
 }
@@ -42,6 +43,17 @@ const {
 const { theme } = useTheme();
 
 const router = useRouter();
+
+// 加载 AI 角色数据
+const loadAICharacter = async (characterId: string): Promise<AICharacter | undefined> => {
+  const { getStorage } = await import('@/utils/storage');
+  const { DEFAULT_AI_CHARACTERS, STORAGE_KEYS } = await import('../constants');
+  const stored = await getStorage<AICharacter[]>(STORAGE_KEYS.AI_CHARACTERS, DEFAULT_AI_CHARACTERS);
+  return stored.find(c => c.id === characterId);
+};
+
+// 当前角色对象（可能是从 props 传入的，也可能是从 characterId 加载的）
+const currentCharacter = ref<AICharacter | undefined>(props.character);
 
 const messagesContainer = ref<HTMLElement>();
 const messages = ref<Message[]>([]);
@@ -84,7 +96,7 @@ const loadConversation = async () => {
 };
 
 const createNewConversation = async (firstMessage: Message): Promise<Conversation> => {
-  return await createConv(firstMessage, props.character);
+  return await createConv(firstMessage, currentCharacter.value);
 };
 
 const saveConversation = async () => {
@@ -197,8 +209,8 @@ const loadMoreMessages = () => {
 };
 
 const getChatTitle = () => {
-  if (props.character?.name) {
-    return props.character.name;
+  if (currentCharacter.value?.name) {
+    return currentCharacter.value.name;
   }
   if (currentConversation.value?.characterName) {
     return currentConversation.value.characterName;
@@ -207,7 +219,7 @@ const getChatTitle = () => {
 };
 
 const getChatSubtitle = () => {
-  if (props.character || currentConversation.value?.characterName) {
+  if (currentCharacter.value || currentConversation.value?.characterName) {
     return 'AI Character';
   }
   return 'TemporaryConversation';
@@ -352,7 +364,7 @@ const handleSendMessage = async (content: string) => {
     logPrompt('使用提示词预设', { presetName: currentPreset.name, itemCount: currentPreset.items.length });
     const result = buildSystemPrompt({
       preset: currentPreset,
-      aiCharacter: props.character || undefined,
+      aiCharacter: currentCharacter.value || undefined,
       userCharacter: selectedUser.value || undefined,
       knowledgeBases: knowledgeBases.value.filter(kb => kb.globallyEnabled),
       chatHistory: chatHistory,
@@ -391,16 +403,16 @@ const handleSendMessage = async (content: string) => {
     });
   } else {
     logPrompt('未找到提示词预设，使用默认构建');
-    if (props.character) {
+    if (currentCharacter.value) {
       const parts: string[] = [];
-      if (props.character.name) {
-        parts.push(`你的名字是：${props.character.name}`);
+      if (currentCharacter.value.name) {
+        parts.push(`你的名字是：${currentCharacter.value.name}`);
       }
-      if (props.character.description) {
-        parts.push(`你的描述：${props.character.description}`);
+      if (currentCharacter.value.description) {
+        parts.push(`你的描述：${currentCharacter.value.description}`);
       }
-      if (props.character.personality) {
-        parts.push(`你的性格：${props.character.personality}`);
+      if (currentCharacter.value.personality) {
+        parts.push(`你的性格：${currentCharacter.value.personality}`);
       }
       if (parts.length > 0) {
         systemMessages.push({
@@ -459,6 +471,14 @@ const handleSendMessage = async (content: string) => {
 };
 
 onMounted(async () => {
+  // 如果通过 characterId 参数传入了角色ID，则加载角色数据
+  if (props.characterId && !props.character) {
+    const loadedCharacter = await loadAICharacter(props.characterId);
+    if (loadedCharacter) {
+      currentCharacter.value = loadedCharacter;
+    }
+  }
+
   await loadRegexRules();
   await loadConversation();
   loadMessages();

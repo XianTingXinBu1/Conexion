@@ -122,7 +122,7 @@ const handleTempChatClick = () => {
 
 // 选择角色并进入会话
 const selectCharacter = (character: AICharacter) => {
-  router.push({ path: '/chat', query: { characterId: character.id } });
+  router.push(`/chat/character/${character.id}`);
   showCharacterSelector.value = false;
 };
 </script>

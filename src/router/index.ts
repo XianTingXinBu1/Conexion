@@ -32,6 +32,13 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '聊天' },
   },
   {
+    path: '/chat/character/:characterId',
+    name: 'chat-character',
+    component: ChatPage,
+    meta: { title: '聊天' },
+    props: (route) => ({ characterId: route.params.characterId }),
+  },
+  {
     path: '/chat/:conversationId',
     name: 'chat-conversation',
     component: ChatPage,

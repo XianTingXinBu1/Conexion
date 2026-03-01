@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, provide } from 'vue';
+import { onMounted, provide } from 'vue';
 import { useTheme } from '@/composables/useTheme';
 import { useCharacters } from '@/composables/useCharacters';
 import { useDebugLogger } from '@/composables/useDebugLogger';
 import { useAppSettings } from '@/composables/useAppSettings';
-import { useNavigation } from '@/composables/useNavigation';
-import { useHistoryInterception } from '@/composables/useHistoryInterception';
 import { getStorage, setStorage, removeStorage } from '@/utils/storage';
 import { STORAGE_KEYS, DEFAULT_PROMPT_PRESETS } from '@/constants';
 
@@ -20,36 +18,6 @@ const { debugMode, showDebugHelp } = useDebugLogger();
 
 // 应用设置
 const { ...appSettings } = useAppSettings();
-
-// 导航管理
-const {
-  currentPage,
-  transitionName,
-  pageHistory,
-  currentCharacter,
-  currentConversationId,
-  navigateToChat,
-  navigateToChatWithCharacter,
-  navigateToConversation,
-  navigateToApiPreset,
-  navigateToSettings,
-  navigateToConversationList,
-  navigateToRegexScript,
-  navigateToRoleManagement,
-  navigateToPromptPreset,
-  navigateToKnowledgeBase,
-  navigateBack,
-  navigateToMain,
-} = useNavigation();
-
-// 历史拦截
-const {
-  showExitConfirm,
-  setupHistoryInterception,
-  cleanupHistoryInterception,
-  confirmExit,
-  cancelExit,
-} = useHistoryInterception(navigateBack, () => currentPage.value, pageHistory, { value: false });
 
 /**
  * 切换调试模式
@@ -75,7 +43,6 @@ const deleteAllData = async () => {
  * 初始化应用
  */
 const initializeApp = async () => {
-  setupHistoryInterception();
   initCharacters();
 
   // 初始化提示词预设（如果不存在）
@@ -96,38 +63,13 @@ onMounted(() => {
   initializeApp();
 });
 
-onUnmounted(() => {
-  cleanupHistoryInterception();
-});
-
 // 提供全局状态给子组件
 provide('app-theme', { theme, toggleTheme });
-provide('app-navigation', {
-  currentPage,
-  transitionName,
-  currentCharacter,
-  currentConversationId,
-  navigateToChat,
-  navigateToChatWithCharacter,
-  navigateToConversation,
-  navigateToApiPreset,
-  navigateToSettings,
-  navigateToConversationList,
-  navigateToRegexScript,
-  navigateToRoleManagement,
-  navigateToPromptPreset,
-  navigateToKnowledgeBase,
-  navigateBack,
-  navigateToMain,
-});
 provide('app-debug', { debugMode, toggleDebugMode });
 provide('app-settings', appSettings);
 provide('app-data', {
   selectedUser,
   deleteAllData,
-  showExitConfirm,
-  confirmExit,
-  cancelExit,
 });
 </script>
 

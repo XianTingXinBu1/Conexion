@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, watch } from 'vue';
-import { Send, Plus, Image, Paperclip, Smile, Mic } from 'lucide-vue-next';
+import { Send, Plus, Sparkles } from 'lucide-vue-next';
 
 interface Props {
   enterToSend: boolean;
@@ -10,6 +10,7 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
   send: [message: string];
+  showPromptAssistant: [];
 }>();
 
 const messageInput = ref('');
@@ -45,6 +46,11 @@ const toggleToolbar = () => {
   isToolbarExpanded.value = !isToolbarExpanded.value;
 };
 
+const handlePromptAssistant = () => {
+  emit('showPromptAssistant');
+  isToolbarExpanded.value = false;
+};
+
 watch(messageInput, () => {
   nextTick(() => {
     adjustTextareaHeight();
@@ -63,21 +69,9 @@ defineExpose({
     <transition name="fade-slide">
       <div v-if="isToolbarExpanded" class="toolbar-panel">
         <div class="toolbar-grid">
-          <button class="toolbar-item">
-            <div class="icon-wrapper"><Image :size="20" /></div>
-            <span>图片</span>
-          </button>
-          <button class="toolbar-item">
-            <div class="icon-wrapper"><Paperclip :size="20" /></div>
-            <span>附件</span>
-          </button>
-          <button class="toolbar-item">
-            <div class="icon-wrapper"><Smile :size="20" /></div>
-            <span>表情</span>
-          </button>
-          <button class="toolbar-item">
-            <div class="icon-wrapper"><Mic :size="20" /></div>
-            <span>语音</span>
+          <button class="toolbar-item" @click="handlePromptAssistant">
+            <div class="icon-wrapper"><Sparkles :size="20" /></div>
+            <span>提示词助手</span>
           </button>
         </div>
       </div>
@@ -139,7 +133,7 @@ defineExpose({
 /* 工具栏网格 */
 .toolbar-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(1, 1fr);
   gap: 12px;
   padding: 16px;
   background: var(--bg-primary);

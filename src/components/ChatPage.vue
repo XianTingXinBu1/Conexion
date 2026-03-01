@@ -6,7 +6,7 @@ import type { Message, AICharacter, RegexRule, Conversation, UserCharacter, Prom
 import { applyRules, clearRegexCache } from '../utils/regexEngine';
 import { countMessagesTokens } from '../utils/tokenCounter';
 import { DEFAULT_REGEX_SCRIPTS, STORAGE_KEYS, DEFAULT_PROMPT_PRESETS } from '../constants';
-import { ChatInput, MessageItem, ContextRing, TokenDetailsPanel, EditMessageModal } from './chat';
+import { ChatInput, MessageItem, ContextRing, TokenDetailsPanel, EditMessageModal, PromptPreviewModal } from './chat';
 import { useChatApi } from '../composables/useChatApi';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useCharacters } from '../composables/useCharacters';
@@ -278,6 +278,10 @@ const confirmDelete = async () => {
   }
 };
 
+const handleShowPromptAssistant = () => {
+  showPromptPreview.value = true;
+};
+
 const { sendStreamChatRequest, usage, resetUsage } = useChatApi();
 const { showSuccess, showError } = useNotifications();
 const { selectedUser, init: initCharacters } = useCharacters();
@@ -323,6 +327,12 @@ const lastSystemPromptResult = ref<{
     enabledItems: number;
   };
 } | null>(null);
+
+// 保存上一次构建的系统消息
+const lastSystemMessages = ref<ChatMessage[]>([]);
+
+// 提示词预览模态框
+const showPromptPreview = ref(false);
 
 const handleSendMessage = async (content: string) => {
   resetUsage();
@@ -372,6 +382,7 @@ const handleSendMessage = async (content: string) => {
       mergeMode: promptMergeMode.value,
     });
     systemMessages = result.messages;
+    lastSystemMessages.value = systemMessages;
 
     lastSystemPromptResult.value = {
       estimatedTokens: result.estimatedTokens,
@@ -421,6 +432,7 @@ const handleSendMessage = async (content: string) => {
         });
       }
     }
+    lastSystemMessages.value = systemMessages;
     lastSystemPromptResult.value = {
       estimatedTokens: systemMessages.reduce((sum, msg) => sum + msg.content.length, 0),
     };
@@ -562,6 +574,7 @@ watch(() => messages.value, () => {
     <ChatInput
       :enter-to-send="enterToSend"
       @send="handleSendMessage"
+      @show-prompt-assistant="handleShowPromptAssistant"
     />
 
     <!-- 编辑消息模态框 -->
@@ -571,6 +584,15 @@ watch(() => messages.value, () => {
       :content="editingMessageContent"
       @update:show="showEditModal = false"
       @save="handleSaveEdit"
+    />
+
+    <!-- 提示词预览模态框 -->
+    <PromptPreviewModal
+      :show="showPromptPreview"
+      :system-messages="lastSystemMessages"
+      :estimated-tokens="lastSystemPromptResult?.estimatedTokens"
+      :theme="theme"
+      @update:show="showPromptPreview = false"
     />
 
     <!-- 删除确认对话框 -->

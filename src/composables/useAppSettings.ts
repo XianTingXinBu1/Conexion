@@ -8,6 +8,7 @@ import { ref } from 'vue';
 import { useLocalStorage } from './useLocalStorage';
 import { STORAGE_KEYS, DEFAULTS } from '@/constants';
 import type { MergeMode } from '@/modules/system-prompt';
+import { setStorage } from '@/utils/storage';
 
 /**
  * 应用设置接口
@@ -22,6 +23,30 @@ export interface AppSettings {
 
   // 提示词设置
   promptMergeMode: MergeMode;
+}
+
+export const APP_SETTINGS_DEFAULTS = {
+  enterToSend: true,
+  showWordCount: false,
+  enableMarkdown: true,
+  showMessageIndex: DEFAULTS.SHOW_MESSAGE_INDEX,
+  chatHistoryLimit: DEFAULTS.CHAT_HISTORY_LIMIT,
+  promptMergeMode: DEFAULTS.PROMPT_MERGE_MODE,
+  mergePromptPresets: DEFAULTS.MERGE_PROMPT_PRESETS,
+  debugMode: DEFAULTS.DEBUG_MODE,
+} as const;
+
+export async function writeAppSettingsDefaults(
+  write: typeof setStorage = setStorage,
+) {
+  await write(STORAGE_KEYS.ENTER_TO_SEND, APP_SETTINGS_DEFAULTS.enterToSend);
+  await write(STORAGE_KEYS.SHOW_WORD_COUNT, APP_SETTINGS_DEFAULTS.showWordCount);
+  await write(STORAGE_KEYS.ENABLE_MARKDOWN, APP_SETTINGS_DEFAULTS.enableMarkdown);
+  await write(STORAGE_KEYS.SHOW_MESSAGE_INDEX, APP_SETTINGS_DEFAULTS.showMessageIndex);
+  await write(STORAGE_KEYS.CHAT_HISTORY_LIMIT, APP_SETTINGS_DEFAULTS.chatHistoryLimit);
+  await write(STORAGE_KEYS.MERGE_PROMPT_PRESETS, APP_SETTINGS_DEFAULTS.mergePromptPresets);
+  await write(STORAGE_KEYS.PROMPT_MERGE_MODE, APP_SETTINGS_DEFAULTS.promptMergeMode);
+  await write(STORAGE_KEYS.DEBUG_MODE, APP_SETTINGS_DEFAULTS.debugMode);
 }
 
 /**
@@ -66,19 +91,25 @@ export function useAppSettings() {
     promptMergeMode.value = value;
   };
 
+  const applyDefaultRefs = () => {
+    enterToSend.value = APP_SETTINGS_DEFAULTS.enterToSend;
+    showWordCount.value = APP_SETTINGS_DEFAULTS.showWordCount;
+    enableMarkdown.value = APP_SETTINGS_DEFAULTS.enableMarkdown;
+    showMessageIndex.value = APP_SETTINGS_DEFAULTS.showMessageIndex;
+    chatHistoryLimit.value = APP_SETTINGS_DEFAULTS.chatHistoryLimit;
+    promptMergeMode.value = APP_SETTINGS_DEFAULTS.promptMergeMode;
+  };
+
+  const applyDefaults = async () => {
+    await writeAppSettingsDefaults();
+    applyDefaultRefs();
+  };
+
   /**
    * 恢复默认设置
    */
   const restoreDefaults = async () => {
-    const { setStorage } = await import('@/utils/storage');
-    await setStorage(STORAGE_KEYS.ENTER_TO_SEND, true);
-    await setStorage(STORAGE_KEYS.SHOW_WORD_COUNT, false);
-    await setStorage(STORAGE_KEYS.ENABLE_MARKDOWN, true);
-    await setStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, DEFAULTS.SHOW_MESSAGE_INDEX);
-    await setStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, DEFAULTS.CHAT_HISTORY_LIMIT);
-    await setStorage(STORAGE_KEYS.MERGE_PROMPT_PRESETS, DEFAULTS.MERGE_PROMPT_PRESETS);
-    await setStorage(STORAGE_KEYS.PROMPT_MERGE_MODE, DEFAULTS.PROMPT_MERGE_MODE);
-    await setStorage(STORAGE_KEYS.DEBUG_MODE, DEFAULTS.DEBUG_MODE);
+    await applyDefaults();
     location.reload();
   };
 
@@ -114,6 +145,7 @@ export function useAppSettings() {
     updatePromptMergeMode,
 
     // 其他方法
+    applyDefaults,
     restoreDefaults,
     settings,
   };

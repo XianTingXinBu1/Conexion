@@ -1,73 +1,39 @@
 <script setup lang="ts">
-import { ref, onMounted, inject } from 'vue';
+import { ref, onMounted, inject, type Ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
-import type { MergeMode } from '../modules/system-prompt';
 import { STORAGE_KEYS } from '../constants';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { getStorage, setStorage } from '@/utils/storage';
+import { clearStorage, getStorage } from '@/utils/storage';
+import { useAppSettings } from '../composables/useAppSettings';
 import ChatSettingsSection from './settings/ChatSettingsSection.vue';
 import DataManagementSection from './settings/DataManagementSection.vue';
 
 const router = useRouter();
 
-// 从 AppProvider 注入的应用状态
-const appSettings = inject('app-settings') as Record<string, any> | undefined;
-const appDebug = inject('app-debug') as { debugMode: { value: boolean }; toggleDebugMode: () => void } | undefined;
+const injectedAppSettings = inject<ReturnType<typeof useAppSettings> | undefined>('app-settings');
+const appSettings = injectedAppSettings ?? useAppSettings();
+const appDebug = inject<{ debugMode: Ref<boolean>; toggleDebugMode: () => void } | undefined>('app-debug');
 
-// 设置值
-const enterToSend = ref(appSettings?.enterToSend?.value ?? true);
-const showWordCount = ref(appSettings?.showWordCount?.value ?? false);
-const enableMarkdown = ref(appSettings?.enableMarkdown?.value ?? true);
-const showMessageIndex = ref(appSettings?.showMessageIndex?.value ?? false);
-const chatHistoryLimit = ref(appSettings?.chatHistoryLimit?.value ?? 50);
-const debugMode = ref(appDebug?.debugMode?.value ?? false);
-const promptMergeMode = ref<MergeMode>('adjacent');
+const {
+  enterToSend,
+  showWordCount,
+  enableMarkdown,
+  showMessageIndex,
+  chatHistoryLimit,
+  promptMergeMode,
+  updateEnterToSend,
+  updateShowWordCount,
+  updateEnableMarkdown,
+  updateShowMessageIndex,
+  updateChatHistoryLimit,
+  updatePromptMergeMode,
+  applyDefaults,
+} = appSettings;
 
-// 从存储加载设置
-const loadSettings = async () => {
-  enterToSend.value = await getStorage(STORAGE_KEYS.ENTER_TO_SEND, true);
-  showWordCount.value = await getStorage(STORAGE_KEYS.SHOW_WORD_COUNT, false);
-  enableMarkdown.value = await getStorage(STORAGE_KEYS.ENABLE_MARKDOWN, true);
-  showMessageIndex.value = await getStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, false);
-  chatHistoryLimit.value = await getStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, 50);
-  debugMode.value = await getStorage(STORAGE_KEYS.DEBUG_MODE, false);
-  promptMergeMode.value = await getStorage(STORAGE_KEYS.PROMPT_MERGE_MODE, 'adjacent');
-};
-
-// 更新设置
-const updateEnterToSend = async (value: boolean) => {
-  enterToSend.value = value;
-  await setStorage(STORAGE_KEYS.ENTER_TO_SEND, value);
-};
-
-const updateShowWordCount = async (value: boolean) => {
-  showWordCount.value = value;
-  await setStorage(STORAGE_KEYS.SHOW_WORD_COUNT, value);
-};
-
-const updateEnableMarkdown = async (value: boolean) => {
-  enableMarkdown.value = value;
-  await setStorage(STORAGE_KEYS.ENABLE_MARKDOWN, value);
-};
-
-const updateShowMessageIndex = async (value: boolean) => {
-  showMessageIndex.value = value;
-  await setStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, value);
-};
-
-const updateChatHistoryLimit = async (value: number) => {
-  chatHistoryLimit.value = value;
-  await setStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, value);
-};
-
-const updatePromptMergeMode = async (value: MergeMode) => {
-  promptMergeMode.value = value;
-  await setStorage(STORAGE_KEYS.PROMPT_MERGE_MODE, value);
-};
+const debugMode = appDebug?.debugMode ?? ref(false);
 
 const toggleDebugMode = () => {
-  debugMode.value = !debugMode.value;
   appDebug?.toggleDebugMode();
 };
 
@@ -91,30 +57,20 @@ const calculateDataSize = async () => {
 };
 
 const handleDeleteAllData = async () => {
-  Object.values(STORAGE_KEYS).forEach(async (key) => {
-    await setStorage(key, null);
-  });
+  await clearStorage();
   location.reload();
 };
 
 const handleRestoreDefaults = async () => {
-  // 恢复默认设置
-  await setStorage(STORAGE_KEYS.ENTER_TO_SEND, true);
-  await setStorage(STORAGE_KEYS.SHOW_WORD_COUNT, false);
-  await setStorage(STORAGE_KEYS.ENABLE_MARKDOWN, true);
-  await setStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, false);
-  await setStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, 50);
-  await setStorage(STORAGE_KEYS.DEBUG_MODE, false);
-  await setStorage(STORAGE_KEYS.PROMPT_MERGE_MODE, 'adjacent');
-  await loadSettings();
+  await applyDefaults();
+  debugMode.value = false;
   const msg = getNotificationMessage('SETTINGS_RESTORE_SUCCESS');
   showSuccess(msg.title, msg.message);
 };
 
-// 组件挂载时计算数据大小和加载设置
+// 组件挂载时计算数据大小
 onMounted(async () => {
   await calculateDataSize();
-  await loadSettings();
 });
 </script>
 

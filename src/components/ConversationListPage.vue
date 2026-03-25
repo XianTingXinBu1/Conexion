@@ -10,7 +10,8 @@ import Modal from './common/Modal.vue';
 import EmptyState from './common/EmptyState.vue';
 import PageHeader from './common/PageHeader.vue';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { getStorage, setStorage } from '@/utils/storage';
+import { getStorage } from '@/utils/storage';
+import { useConversations } from '../composables/useConversations';
 import '../styles/conversation-list.css';
 
 const router = useRouter();
@@ -23,7 +24,12 @@ const showCharacterSelector = ref(false);
 const aiCharacters = ref<AICharacter[]>([]);
 
 // 历史会话列表
-const conversations = ref<Conversation[]>([]);
+const {
+  conversations,
+  loadAllConversations,
+  deleteConversation,
+  renameConversation,
+} = useConversations();
 
 // 删除确认对话框
 const showDeleteDialog = ref(false);
@@ -42,8 +48,8 @@ const loadAICharacters = async () => {
 
 // 加载历史会话
 const loadConversations = async () => {
-  const stored = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
-  conversations.value = stored.sort((a: Conversation, b: Conversation) => b.updatedAt - a.updatedAt);
+  const stored = await loadAllConversations();
+  conversations.value = [...stored].sort((a: Conversation, b: Conversation) => b.updatedAt - a.updatedAt);
 };
 
 // 删除会话
@@ -56,9 +62,7 @@ const handleDeleteConversation = (conversation: Conversation) => {
 const confirmDelete = async () => {
   if (!conversationToDelete.value) return;
 
-  const stored = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
-  const filtered = stored.filter((c: Conversation) => c.id !== conversationToDelete.value!.id);
-  await setStorage(STORAGE_KEYS.CONVERSATIONS, filtered);
+  await deleteConversation(conversationToDelete.value.id);
   await loadConversations();
   // 显示通知
   const msg = getNotificationMessage('CONVERSATION_DELETE_SUCCESS');
@@ -79,15 +83,15 @@ const openRenameDialog = (conversation: Conversation) => {
 const confirmRename = async () => {
   if (!conversationToRename.value || !newConversationName.value.trim()) return;
 
-  const stored = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
-  const index = stored.findIndex((c: Conversation) => c.id === conversationToRename.value!.id);
-  if (index !== -1 && stored[index]) {
-    stored[index]!.title = newConversationName.value.trim();
-    stored[index]!.updatedAt = Date.now();
-    await setStorage(STORAGE_KEYS.CONVERSATIONS, stored);
+  const targetId = conversationToRename.value.id;
+  const nextName = newConversationName.value.trim();
+  const exists = conversations.value.some((conversation: Conversation) => conversation.id === targetId);
+
+  if (exists) {
+    await renameConversation(targetId, nextName);
     await loadConversations();
     // 显示通知
-    const msg = getNotificationMessage('CONVERSATION_RENAME_SUCCESS', { name: newConversationName.value.trim() });
+    const msg = getNotificationMessage('CONVERSATION_RENAME_SUCCESS', { name: nextName });
     showSuccess(msg.title, msg.message);
   } else {
     const errorMsg = getNotificationMessage('OPERATION_FAILED', { error: '重命名会话失败' });

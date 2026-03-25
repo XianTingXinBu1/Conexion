@@ -4,7 +4,7 @@ import { useTheme } from '@/composables/useTheme';
 import { useCharacters } from '@/composables/useCharacters';
 import { useDebugLogger } from '@/composables/useDebugLogger';
 import { useAppSettings } from '@/composables/useAppSettings';
-import { getStorage, setStorage, removeStorage } from '@/utils/storage';
+import { clearStorage, getStorage, setStorage } from '@/utils/storage';
 import { STORAGE_KEYS, DEFAULT_PROMPT_PRESETS } from '@/constants';
 
 // 主题管理
@@ -33,9 +33,7 @@ const toggleDebugMode = () => {
  * 删除所有数据
  */
 const deleteAllData = async () => {
-  Object.values(STORAGE_KEYS).forEach((key) => {
-    removeStorage(key);
-  });
+  await clearStorage();
   location.reload();
 };
 

@@ -19,8 +19,8 @@ src/modules/system-prompt/
 │   ├── index.ts               # 工具函数
 │   └── constants.ts           # 常量定义
 ├── __tests__/
-│   ├── example.test.ts        # 使用示例
-│   └── validate.test.ts       # 功能验证
+│   ├── builder.test.ts        # 核心构建测试
+│   └── merger.test.ts         # 合并逻辑测试
 ├── README.md                  # 模块文档
 ├── USAGE.md                   # 使用指南
 └── SUMMARY.md                 # 本文件
@@ -92,11 +92,16 @@ console.log(result.estimatedTokens); // 估算的 token 数量
 import { buildSystemPrompt } from '@/modules/system-prompt';
 import { useCharacters } from '@/composables/useCharacters';
 import { useKnowledgeBases } from '@/composables/useKnowledgeBases';
-import { usePromptPresets } from '@/composables/usePromptPresets';
+import { getStorage } from '@/utils/storage';
+import { STORAGE_KEYS } from '@/constants';
 
 const { selectedAICharacter, selectedUserCharacter } = useCharacters();
 const { knowledgeBases } = useKnowledgeBases();
-const { selectedPreset } = usePromptPresets();
+const selectedPreset = ref();
+
+onMounted(async () => {
+  selectedPreset.value = await getStorage(STORAGE_KEYS.SELECTED_PROMPT_PRESET, null);
+});
 
 // 构建系统提示词
 const buildMessages = () => {

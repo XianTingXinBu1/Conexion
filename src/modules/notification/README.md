@@ -57,11 +57,15 @@ import { NotificationContainer } from '@/modules/notification/components'
 ## 预设消息
 
 ```typescript
-import { showSuccessPreset, showErrorPreset, showInfoPreset, showWarningPreset } from '@/modules/notification/messages'
+import { getNotificationMessage, useNotifications } from '@/modules/notification'
 
-// 显示预设消息
-showSuccessPreset('api_save', '预设已保存')
-showErrorPreset('api_connection_failed', '连接失败')
+const { showSuccess, showError } = useNotifications()
+
+const success = getNotificationMessage('API_PRESET_SAVE_SUCCESS')
+showSuccess(success.title, success.message)
+
+const failure = getNotificationMessage('API_CONNECTION_TEST_FAILED', { error: '连接失败' })
+showError(failure.title, failure.message)
 ```
 
 ## 配置

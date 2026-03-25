@@ -50,11 +50,16 @@ console.log('Metadata:', result.metadata);
 import { buildSystemPrompt } from '@/modules/system-prompt';
 import { useCharacters } from '@/composables/useCharacters';
 import { useKnowledgeBases } from '@/composables/useKnowledgeBases';
-import { usePromptPresets } from '@/composables/usePromptPresets';
+import { getStorage } from '@/utils/storage';
+import { STORAGE_KEYS } from '@/constants';
 
 const { selectedAICharacter, selectedUserCharacter } = useCharacters();
 const { knowledgeBases } = useKnowledgeBases();
-const { selectedPreset } = usePromptPresets();
+const selectedPreset = ref();
+
+onMounted(async () => {
+  selectedPreset.value = await getStorage(STORAGE_KEYS.SELECTED_PROMPT_PRESET, null);
+});
 
 // 构建系统提示词
 const buildMessages = () => {

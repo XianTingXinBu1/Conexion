@@ -2,6 +2,7 @@
 
 移动端优先的 AI 聊天前端项目。
 
+
 ## 技术栈
 
 Vue 3.5.25 | TypeScript 5.9.3 | Vite 7.3.1 | Tailwind CSS 4.1.18
@@ -20,6 +21,8 @@ Vue 3.5.25 | TypeScript 5.9.3 | Vite 7.3.1 | Tailwind CSS 4.1.18
 ```bash
 npm install && npm run dev
 ```
+或在线体验
+https://conexion.venturoso.sbs
 
 ## 开发命令
 

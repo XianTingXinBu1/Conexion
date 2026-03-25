@@ -1,20 +1,18 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [vue()],
   test: {
-    // 测试环境
-    environment: 'happy-dom',
-
-    // 全局配置
+    dir: 'src',
+    environment: 'node',
     globals: true,
 
-    // 覆盖率配置
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
+      include: ['src/modules/system-prompt/**/*.ts', 'src/utils/**/*.ts'],
       exclude: [
         'node_modules/',
         'dist/',
@@ -24,34 +22,15 @@ export default defineConfig({
         'scripts/',
         'public/',
         '**/*.d.ts',
-        '**/*.test.ts',
-        '**/*.spec.ts',
+        '**/__tests__/**',
       ],
     },
 
-    // 包含的测试文件
-    include: ['**/__tests__/**/*.{test,spec}.{ts,tsx}'],
-    exclude: [
-      'node_modules',
-      'dist',
-      '.idea',
-      '.git',
-      '.cache',
-      '**/example.test.ts',
-      '**/validate.test.ts',
-    ],
-
-    // 测试超时时间（毫秒）
+    include: ['**/*.test.ts', '**/*.spec.ts', '**/*.test.tsx', '**/*.spec.tsx'],
+    exclude: [...configDefaults.exclude],
     testTimeout: 10000,
-
-    // 并发数
-    threads: true,
-
-    // 监听模式
     watch: false,
   },
-
-  // 路径别名
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),

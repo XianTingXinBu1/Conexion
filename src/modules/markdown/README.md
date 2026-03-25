@@ -1,11 +1,11 @@
 # Markdown 渲染模块
 
-提供安全的 Markdown 渲染功能，支持 XSS 防护和代码高亮。
+提供安全的 Markdown 渲染功能，支持 XSS 防护和自定义代码块渲染。
 
 ## 功能特性
 
 - **XSS 防护**：使用 DOMPurify 进行 HTML 清理
-- **代码高亮**：支持 highlight.js 语法高亮
+- **代码块渲染**：内置代码块容器、复制按钮等交互，不依赖 highlight.js
 - **自定义渲染**：支持渲染钩子（beforeRender/afterRender）
 - **全局配置**：支持全局配置和运行时配置
 

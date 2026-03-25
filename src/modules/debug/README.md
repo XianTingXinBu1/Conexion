@@ -54,7 +54,7 @@ showDebugHelp()
 ### useDebugLogger Composable
 
 ```typescript
-import { useDebugLogger } from '@/modules/debug'
+import { useDebugLogger } from '@/composables/useDebugLogger'
 
 const {
   debugMode,
@@ -130,7 +130,7 @@ const MAX_LOG_HISTORY = 100  // 最大日志数量
 
 ```vue
 <script setup lang="ts">
-import { useDebugLogger } from '@/modules/debug'
+import { useDebugLogger } from '@/composables/useDebugLogger'
 import { onMounted } from 'vue'
 
 const { logApi, logApiError, debugMode } = useDebugLogger()

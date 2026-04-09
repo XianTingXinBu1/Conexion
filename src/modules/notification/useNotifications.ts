@@ -23,7 +23,13 @@ const MAX_NOTIFICATIONS = 3;
 const DEFAULT_DURATION = 3000;
 
 // 定时器映射
-const timers = new Map<string, number>();
+const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+// 暂停时剩余时间映射
+const remainingDurations = new Map<string, number>();
+
+// 定时器开始时间映射
+const startedAt = new Map<string, number>();
 
 // ==================== 核心方法 ====================
 
@@ -31,6 +37,28 @@ const timers = new Map<string, number>();
  * 生成唯一ID
  */
 const generateId = () => `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+const startTimer = (id: string, duration: number) => {
+  startedAt.set(id, Date.now());
+  remainingDurations.set(id, duration);
+
+  const timer = setTimeout(() => {
+    removeNotification(id);
+  }, duration);
+
+  timers.set(id, timer);
+};
+
+const clearTimerState = (id: string) => {
+  const timer = timers.get(id);
+  if (timer) {
+    clearTimeout(timer);
+    timers.delete(id);
+  }
+
+  startedAt.delete(id);
+  remainingDurations.delete(id);
+};
 
 /**
  * 添加通知
@@ -62,10 +90,7 @@ const addNotification = (
 
     // 设置自动关闭定时器
     if (notification.duration && notification.duration > 0) {
-      const timer = setTimeout(() => {
-        removeNotification(notification.id);
-      }, notification.duration);
-      timers.set(notification.id, timer);
+      startTimer(notification.id, notification.duration);
     }
   } else {
     // 添加到队列
@@ -80,11 +105,7 @@ const addNotification = (
  */
 const removeNotification = (id: string) => {
   // 清除定时器
-  const timer = timers.get(id);
-  if (timer) {
-    clearTimeout(timer);
-    timers.delete(id);
-  }
+  clearTimerState(id);
 
   // 从列表中删除
   const index = notifications.value.findIndex(n => n.id === id);
@@ -100,18 +121,22 @@ const removeNotification = (id: string) => {
  * 暂停通知自动关闭
  */
 const pauseNotification = (id: string) => {
-  // 清除定时器
+  const notification = notifications.value.find(n => n.id === id);
+  if (!notification) return;
+
   const timer = timers.get(id);
-  if (timer) {
+  const started = startedAt.get(id);
+
+  if (timer && started !== undefined) {
+    const elapsed = Date.now() - started;
+    const currentRemaining = remainingDurations.get(id) ?? notification.duration ?? DEFAULT_DURATION;
+    remainingDurations.set(id, Math.max(0, currentRemaining - elapsed));
     clearTimeout(timer);
     timers.delete(id);
   }
 
-  // 标记为暂停状态
-  const notification = notifications.value.find(n => n.id === id);
-  if (notification) {
-    notification.paused = true;
-  }
+  startedAt.delete(id);
+  notification.paused = true;
 };
 
 /**
@@ -119,16 +144,20 @@ const pauseNotification = (id: string) => {
  */
 const resumeNotification = (id: string) => {
   const notification = notifications.value.find(n => n.id === id);
-  if (notification && notification.duration && notification.duration > 0) {
-    // 标记为未暂停状态
-    notification.paused = false;
-
-    // 重新设置定时器
-    const timer = setTimeout(() => {
-      removeNotification(notification.id);
-    }, notification.duration);
-    timers.set(notification.id, timer);
+  if (!notification || !notification.duration || notification.duration <= 0) {
+    return;
   }
+
+  // 标记为未暂停状态
+  notification.paused = false;
+
+  const remaining = remainingDurations.get(id) ?? notification.duration;
+  if (remaining <= 0) {
+    removeNotification(notification.id);
+    return;
+  }
+
+  startTimer(notification.id, remaining);
 };
 
 /**
@@ -142,10 +171,7 @@ const processQueue = () => {
 
       // 设置自动关闭定时器
       if (nextNotification.duration && nextNotification.duration > 0) {
-        const timer = setTimeout(() => {
-          removeNotification(nextNotification.id);
-        }, nextNotification.duration);
-        timers.set(nextNotification.id, timer);
+        startTimer(nextNotification.id, nextNotification.duration);
       }
     }
   }
@@ -158,6 +184,8 @@ const clearAll = () => {
   // 清除所有定时器
   timers.forEach(timer => clearTimeout(timer));
   timers.clear();
+  startedAt.clear();
+  remainingDurations.clear();
 
   // 清空列表和队列
   notifications.value = [];

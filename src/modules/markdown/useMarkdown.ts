@@ -37,15 +37,17 @@ function createRenderer() {
 
   // 自定义链接渲染
   renderer.link = ({ href, title, text }) => {
-    const titleAttr = title ? ` title="${title}"` : '';
-    return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    const safeHref = escapeHtmlAttribute(href || '');
+    const titleAttr = title ? ` title="${escapeHtmlAttribute(title)}"` : '';
+    return `<a href="${safeHref}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
   };
 
   // 自定义图片渲染
   renderer.image = ({ href, title, text }) => {
-    const titleAttr = title ? ` title="${title}"` : '';
-    const altAttr = text ? ` alt="${text}"` : '';
-    return `<img src="${href}"${altAttr}${titleAttr} loading="lazy" />`;
+    const safeSrc = escapeHtmlAttribute(href || '');
+    const titleAttr = title ? ` title="${escapeHtmlAttribute(title)}"` : '';
+    const altAttr = text ? ` alt="${escapeHtmlAttribute(text)}"` : '';
+    return `<img src="${safeSrc}"${altAttr}${titleAttr} loading="lazy" />`;
   };
 
   return renderer;
@@ -63,6 +65,13 @@ function escapeHtml(text: string): string {
     "'": '&#039;',
   };
   return text.replace(/[&<>"']/g, (char) => map[char] ?? char);
+}
+
+/**
+ * 转义 HTML 属性值
+ */
+function escapeHtmlAttribute(value: string): string {
+  return escapeHtml(value);
 }
 
 /**

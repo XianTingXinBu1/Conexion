@@ -19,6 +19,7 @@ export const STORAGE_KEYS = {
   MERGE_PROMPT_PRESETS: 'conexion_merge_prompt_presets', // 是否合并提示词预设到系统提示词
   PROMPT_MERGE_MODE: 'conexion_prompt_merge_mode', // 提示词合并模式: 'none' | 'adjacent' | 'all'
   DEBUG_MODE: 'conexion_debug_mode', // 调试模式开关
+  STORAGE_SCHEMA_VERSION: 'conexion_storage_schema_version', // 存储 schema 版本
 
   // IndexedDB: 大数据
   REGEX_SCRIPTS: 'conexion_regex_scripts',

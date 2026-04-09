@@ -33,6 +33,7 @@ const STORAGE_CONFIG: Record<string, StorageType> = {
   'conexion_merge_prompt_presets': 'local',
   'conexion_prompt_merge_mode': 'local',
   'conexion_debug_mode': 'local',
+  'conexion_storage_schema_version': 'local',
 
   // IndexedDB: 大数据
   'conexion_regex_scripts': 'indexeddb',

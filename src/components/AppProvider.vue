@@ -4,8 +4,8 @@ import { useTheme } from '@/composables/useTheme';
 import { useCharacters } from '@/composables/useCharacters';
 import { useDebugLogger } from '@/composables/useDebugLogger';
 import { useAppSettings } from '@/composables/useAppSettings';
-import { clearStorage, getStorage, setStorage } from '@/utils/storage';
-import { STORAGE_KEYS, DEFAULT_PROMPT_PRESETS } from '@/constants';
+import { clearStorage } from '@/utils/storage';
+import { ensureStorageSchema } from '@/utils/storageSchema';
 
 // 主题管理
 const { theme, toggleTheme } = useTheme();
@@ -41,19 +41,8 @@ const deleteAllData = async () => {
  * 初始化应用
  */
 const initializeApp = async () => {
-  initCharacters();
-
-  // 初始化提示词预设（如果不存在）
-  const existingPresets = await getStorage(STORAGE_KEYS.PROMPT_PRESETS, null);
-  if (!existingPresets) {
-    await setStorage(STORAGE_KEYS.PROMPT_PRESETS, DEFAULT_PROMPT_PRESETS);
-  }
-
-  // 初始化选中的提示词预设（如果不存在）
-  const existingSelected = await getStorage(STORAGE_KEYS.SELECTED_PROMPT_PRESET, null);
-  if (!existingSelected) {
-    await setStorage(STORAGE_KEYS.SELECTED_PROMPT_PRESET, 'default');
-  }
+  await ensureStorageSchema();
+  await initCharacters();
 };
 
 // 生命周期

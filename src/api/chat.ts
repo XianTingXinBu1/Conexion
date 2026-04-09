@@ -7,16 +7,23 @@
 import { ApiClient, type ApiClientConfig } from './base';
 import type { ChatCompletionRequest, ChatCompletionResponse, ChatMessage, Message } from '@/types';
 import { logApi, logApiError } from '@/modules/debug';
+import { parseStreamChunk } from './stream';
 
 /**
  * 聊天 API 服务
  */
 export class ChatApi extends ApiClient {
   private model: string;
+  private activeStreamCleanup: (() => void) | null = null;
 
   constructor(config: ApiClientConfig, model: string) {
     super(config);
     this.model = model;
+  }
+
+  cancelActiveStream(): void {
+    this.activeStreamCleanup?.();
+    this.activeStreamCleanup = null;
   }
 
   /**
@@ -90,7 +97,7 @@ export class ChatApi extends ApiClient {
       onError?: (error: string) => void;
     } = {}
   ): AsyncGenerator<string> {
-    const { systemPrompt, systemMessages, temperature, maxTokens, onChunk, onComplete } = options;
+    const { systemPrompt, systemMessages, temperature, maxTokens, onChunk, onComplete, onError } = options;
 
     try {
       this.validateUrl(this.baseURL);
@@ -108,7 +115,14 @@ export class ChatApi extends ApiClient {
 
       logApiRequest(requestBody);
 
-      const controller = this.createAbortController();
+      this.cancelActiveStream();
+
+      const { controller, cleanup } = this.createAbortController();
+      this.activeStreamCleanup = () => {
+        controller.abort();
+        cleanup();
+      };
+
       const headers = this.buildHeaders();
       const url = this.buildProxyUrl('/chat/completions');
 
@@ -118,6 +132,8 @@ export class ChatApi extends ApiClient {
         body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
+
+      cleanup();
 
       if (!response.ok) {
 
@@ -153,57 +169,44 @@ export class ChatApi extends ApiClient {
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
 
-        if (done) {
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (!trimmedLine || trimmedLine === 'data: [DONE]') {
-            continue;
+          if (done) {
+            break;
           }
 
-          if (trimmedLine.startsWith('data: ')) {
-            try {
-              const jsonStr = trimmedLine.slice(6);
-              const data = JSON.parse(jsonStr);
+          const parsed = parseStreamChunk(buffer, decoder.decode(value, { stream: true }));
+          buffer = parsed.remainder;
 
-              if (data.choices && data.choices.length > 0) {
-                const delta = data.choices[0]?.delta;
-                if (delta?.content) {
-                  if (onChunk) {
-                    onChunk(delta.content);
-                  }
-                  yield delta.content;
-                }
-              }
-            } catch {
-              // 忽略解析错误
+          for (const content of parsed.chunks) {
+            if (onChunk) {
+              onChunk(content);
             }
+            yield content;
           }
         }
-      }
 
-      logApi('流式响应完成');
+        logApi('流式响应完成');
 
-      if (onComplete) {
-        onComplete();
+        if (onComplete) {
+          onComplete();
+        }
+      } finally {
+        this.activeStreamCleanup = null;
+        reader.releaseLock();
       }
 
     } catch (error) {
       let errorMessage = '请求失败';
       if (error instanceof Error) {
-        errorMessage = error.message;
+        errorMessage = error.name === 'AbortError' ? '请求已取消' : error.message;
       }
 
       logApiError('流式请求异常', { error: errorMessage });
+      onError?.(errorMessage);
+      this.activeStreamCleanup = null;
 
       throw new Error(errorMessage);
     }

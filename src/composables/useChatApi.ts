@@ -23,6 +23,7 @@ export function useChatApi() {
   const isLoading = ref(false);
   const isStreaming = ref(false);
   const error = ref<string | null>(null);
+  let activeChatApi: ChatApi | null = null;
 
   // Token 使用统计
   const usage = ref<{
@@ -140,6 +141,7 @@ export function useChatApi() {
 
     try {
       const chatApi = createChatApi(preset);
+      activeChatApi = chatApi;
 
       const response = await chatApi.sendMessage(messages, {
         systemPrompt,
@@ -180,6 +182,7 @@ export function useChatApi() {
       logApiError('请求异常', { error: errorMessage });
       throw new Error(errorMessage);
     } finally {
+      activeChatApi = null;
       isLoading.value = false;
     }
   }
@@ -244,6 +247,7 @@ export function useChatApi() {
 
     try {
       const chatApi = createChatApi(preset);
+      activeChatApi = chatApi;
 
       let chunkCount = 0;
       let totalLength = 0;
@@ -284,6 +288,7 @@ export function useChatApi() {
       logApiError('请求异常', { error: errorMessage });
       onError(errorMessage);
     } finally {
+      activeChatApi = null;
       isLoading.value = false;
       isStreaming.value = false;
     }
@@ -293,8 +298,14 @@ export function useChatApi() {
    * 取消当前请求
    */
   function cancelRequest() {
-    // 如果需要支持取消请求，可以将 controller 暴露给外部
-    // ChatApi 已经支持 AbortSignal，这里暂时留空
+    if (!activeChatApi) {
+      return;
+    }
+
+    activeChatApi.cancelActiveStream();
+    isLoading.value = false;
+    isStreaming.value = false;
+    logApi('已取消当前流式请求');
   }
 
   return {

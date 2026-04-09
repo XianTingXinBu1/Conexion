@@ -38,6 +38,11 @@ export interface RequestOptions {
   retries?: number;
 }
 
+export interface AbortControllerHandle {
+  controller: AbortController;
+  cleanup: () => void;
+}
+
 /**
  * API 错误类
  */
@@ -154,10 +159,14 @@ export class ApiClient {
   /**
    * 创建 AbortController 和超时
    */
-  public createAbortController(): AbortController {
+  public createAbortController(): AbortControllerHandle {
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), this.timeout);
-    return controller;
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    return {
+      controller,
+      cleanup: () => clearTimeout(timeoutId),
+    };
   }
 
   /**
@@ -223,7 +232,7 @@ export class ApiClient {
         this.validateProxy();
 
         // 构建请求
-        const controller = this.createAbortController();
+        const { controller, cleanup } = this.createAbortController();
         const headers = this.buildHeaders(options.headers);
         const url = this.buildProxyUrl(path);
 
@@ -233,8 +242,10 @@ export class ApiClient {
           method,
           headers,
           body: body ? JSON.stringify(body) : undefined,
-          signal: controller.signal,
+          signal: options.signal ?? controller.signal,
         });
+
+        cleanup();
 
         // 检查响应状态
         if (!response.ok) {
@@ -268,6 +279,11 @@ export class ApiClient {
 
       } catch (error) {
         if (error instanceof Error) {
+          if (error.name === 'AbortError') {
+            logApiWarn('API 请求已取消或超时');
+            throw error;
+          }
+
           // 判断是否应该重试
           if (this.shouldRetry(error, attempt)) {
             logApiWarn(`请求失败，准备重试 (${attempt + 1}/${this.maxRetries})`, {

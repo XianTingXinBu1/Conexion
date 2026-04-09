@@ -107,7 +107,7 @@ export class ModelsApi extends ApiClient {
     this.validateUrl(this.baseURL);
     this.validateProxy();
 
-    const controller = this.createAbortController();
+    const { controller, cleanup } = this.createAbortController();
     const headers = this.buildHeaders();
     const url = this.buildProxyUrl(path);
 
@@ -116,6 +116,8 @@ export class ModelsApi extends ApiClient {
       headers,
       signal: controller.signal,
     });
+
+    cleanup();
 
     if (!response.ok) {
       throw new Error(`连接测试失败 (${response.status}): ${response.statusText}`);

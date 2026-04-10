@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Sun, Moon, MessageSquare, Zap, Settings, FileText, User, BookOpen, Hash } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
-import { inject } from 'vue';
+import { inject, onMounted } from 'vue';
+import { prefetchRouteComponents } from '@/router';
 import type { Theme } from '../types';
 
 // 获取路由实例
@@ -12,6 +13,37 @@ const appTheme = inject('app-theme') as { theme: Theme; toggleTheme: () => void 
 
 // 获取主题
 const theme = appTheme?.theme || 'light';
+
+const likelyNextRoutes = [
+  '/conversation-list',
+  '/role-management',
+  '/knowledge-base',
+  '/api-preset',
+] as const;
+
+const triggerLikelyRoutePrefetch = () => {
+  void prefetchRouteComponents([...likelyNextRoutes]);
+};
+
+onMounted(() => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const browserWindow = window as Window & {
+    requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  };
+
+  const runSoon = () => {
+    window.setTimeout(() => triggerLikelyRoutePrefetch(), 900);
+  };
+
+  if (typeof browserWindow.requestIdleCallback === 'function') {
+    browserWindow.requestIdleCallback(() => triggerLikelyRoutePrefetch(), { timeout: 1800 });
+  } else {
+    runSoon();
+  }
+});
 
 /**
  * 切换主题
@@ -88,7 +120,7 @@ const navigateToKnowledgeBase = () => {
     <main class="content">
       <!-- 主入口 -->
       <div class="hero-section">
-        <div class="hero-card" @click="navigateToConversationList">
+        <div class="hero-card" @click="navigateToConversationList" @pointerenter="triggerLikelyRoutePrefetch" @touchstart.passive="triggerLikelyRoutePrefetch">
           <div class="hero-icon">
             <MessageSquare :size="32" />
           </div>
@@ -108,13 +140,13 @@ const navigateToKnowledgeBase = () => {
       <section class="section">
         <h3 class="section-title">内容管理</h3>
         <div class="grid">
-          <div class="grid-card" @click="navigateToRoleManagement">
+          <div class="grid-card" @click="navigateToRoleManagement" @pointerenter="triggerLikelyRoutePrefetch">
             <div class="grid-icon role">
               <User :size="24" />
             </div>
             <span class="grid-label">角色卡</span>
           </div>
-          <div class="grid-card" @click="navigateToKnowledgeBase">
+          <div class="grid-card" @click="navigateToKnowledgeBase" @pointerenter="triggerLikelyRoutePrefetch">
             <div class="grid-icon knowledge">
               <BookOpen :size="24" />
             </div>
@@ -139,7 +171,7 @@ const navigateToKnowledgeBase = () => {
       <section class="section">
         <h3 class="section-title">配置</h3>
         <div class="list">
-          <div class="list-card" @click="navigateToApiPreset">
+          <div class="list-card" @click="navigateToApiPreset" @pointerenter="triggerLikelyRoutePrefetch">
             <div class="list-icon api">
               <Zap :size="20" />
             </div>

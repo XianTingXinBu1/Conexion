@@ -30,7 +30,7 @@ const prefetchedRouteNames = new Set<PrefetchableRouteName>();
 
 const normalizeRouteName = (target: RouteLocationRaw): PrefetchableRouteName | null => {
   if (typeof target === 'string') {
-    const [pathWithoutHash = ''] = target.split('?');
+    const pathWithoutHash = target.split('?')[0] ?? '/';
     const normalizedPath = pathWithoutHash.replace(/^#/, '') || '/';
 
     switch (normalizedPath) {

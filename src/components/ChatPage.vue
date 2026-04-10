@@ -304,7 +304,7 @@ const shouldAutoScrollOnStream = ref(true);
 
 const handleSendMessage = async (content: string) => {
   resetUsage();
-  loadRegexRules();
+  await loadRegexRules();
 
   let processedContent = applyRules(content, 'user', 'after-macro', regexRules.value);
 
@@ -314,14 +314,12 @@ const handleSendMessage = async (content: string) => {
     content: processedContent,
     timestamp: Date.now(),
   };
+
+  const chatHistoryBeforeSend = [...messages.value];
   messages.value.push(userMessage);
 
   if (!persistedConversationId.value) {
-    const conversation = await createNewConversation(userMessage);
-
-    if (conversation.id !== props.conversationId) {
-      await router.replace(`/chat/${conversation.id}`);
-    }
+    await createNewConversation(userMessage);
   } else {
     await saveConversation();
   }
@@ -338,7 +336,7 @@ const handleSendMessage = async (content: string) => {
   messages.value.push(assistantMessage);
   shouldAutoScrollOnStream.value = true;
 
-  const chatHistory = messages.value.filter(m => m.id !== assistantMessageId && m.id !== userMessage.id);
+  const chatHistory = chatHistoryBeforeSend;
 
   const currentPreset = getCurrentPromptPreset();
   let systemMessages: ChatMessage[] = [];

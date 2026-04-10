@@ -10,17 +10,29 @@ export function useChatViewport(messages: Ref<Message[]>, chatHistoryLimit: Ref<
     return loadedCount.value < messages.value.length;
   });
 
-  const loadMessages = () => {
+  const syncVisibleMessages = () => {
     const limit = chatHistoryLimit.value;
     const totalCount = messages.value.length;
+    const nextLoadedCount = Math.min(totalCount, Math.max(loadedCount.value, limit));
+    const nextDisplayMessages = totalCount <= nextLoadedCount
+      ? messages.value
+      : messages.value.slice(-nextLoadedCount);
 
-    if (totalCount <= limit) {
-      displayMessages.value = [...messages.value];
-      loadedCount.value = totalCount;
-    } else {
-      displayMessages.value = [...messages.value.slice(-limit)];
-      loadedCount.value = limit;
+    const sameLength = displayMessages.value.length === nextDisplayMessages.length;
+    const sameIds = sameLength && displayMessages.value.every((message, index) => {
+      const nextMessage = nextDisplayMessages[index];
+      return nextMessage && message.id === nextMessage.id;
+    });
+
+    if (!sameIds) {
+      displayMessages.value = [...nextDisplayMessages];
     }
+
+    loadedCount.value = nextLoadedCount;
+  };
+
+  const loadMessages = () => {
+    syncVisibleMessages();
   };
 
   const loadMoreMessages = () => {
@@ -49,9 +61,18 @@ export function useChatViewport(messages: Ref<Message[]>, chatHistoryLimit: Ref<
     });
   };
 
-  const scrollToBottom = async () => {
+  const isNearBottom = (threshold = 24) => {
+    if (!messagesContainer.value) {
+      return true;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
+    return scrollHeight - (scrollTop + clientHeight) <= threshold;
+  };
+
+  const scrollToBottom = async (force = false) => {
     await nextTick();
-    if (messagesContainer.value) {
+    if (messagesContainer.value && (force || isNearBottom())) {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
     }
   };
@@ -63,6 +84,8 @@ export function useChatViewport(messages: Ref<Message[]>, chatHistoryLimit: Ref<
     hasMoreMessages,
     loadMessages,
     loadMoreMessages,
+    syncVisibleMessages,
+    isNearBottom,
     scrollToBottom,
   };
 }

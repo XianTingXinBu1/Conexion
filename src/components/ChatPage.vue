@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, watchEffect } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { Message, AICharacter, RegexRule, Conversation, UserCharacter, PromptPreset, ChatMessage } from '../types';
@@ -233,14 +233,17 @@ const { selectedUser, init: initCharacters } = useCharacters();
 const { knowledgeBases, init: initKnowledgeBases } = useKnowledgeBases();
 const { currentPreset: currentApiPreset, loadPresets: loadApiPresets } = useApiPresets();
 
+const chatViewport = useChatViewport(messages, chatHistoryLimit);
 const {
   displayMessages,
   loadedCount,
   hasMoreMessages,
   loadMessages,
   loadMoreMessages,
+  syncVisibleMessages,
+  isNearBottom,
   scrollToBottom,
-} = useChatViewport(messages, chatHistoryLimit);
+} = chatViewport;
 
 const {
   currentContextCount,
@@ -296,6 +299,7 @@ const lastSystemMessages = ref<ChatMessage[]>([]);
 
 // 提示词预览模态框
 const showPromptPreview = ref(false);
+const shouldAutoScrollOnStream = ref(true);
 
 const handleSendMessage = async (content: string) => {
   resetUsage();
@@ -317,7 +321,7 @@ const handleSendMessage = async (content: string) => {
     await saveConversation();
   }
 
-  scrollToBottom();
+  await scrollToBottom(true);
 
   const assistantMessageId = (Date.now() + 1).toString();
   const assistantMessage: Message = {
@@ -327,6 +331,7 @@ const handleSendMessage = async (content: string) => {
     timestamp: Date.now(),
   };
   messages.value.push(assistantMessage);
+  shouldAutoScrollOnStream.value = true;
 
   const chatHistory = messages.value.filter(m => m.id !== assistantMessageId && m.id !== userMessage.id);
 
@@ -409,7 +414,9 @@ const handleSendMessage = async (content: string) => {
         if (msg) {
           msg.content += chunk;
           msg.content = applyRules(msg.content, 'assistant', 'after-macro', regexRules.value);
-          scrollToBottom();
+          if (shouldAutoScrollOnStream.value) {
+            scrollToBottom();
+          }
         }
       },
       () => {
@@ -456,22 +463,35 @@ onMounted(async () => {
 
   await loadRegexRules();
   await loadConversation();
-  loadMessages();
+  syncVisibleMessages();
   await loadPromptPresets();
   await loadApiPresets();
   initCharacters();
   initKnowledgeBases();
-  scrollToBottom();
+  await scrollToBottom(true);
 });
 
 onUnmounted(() => {
   // 清理资源
 });
 
-watch(() => messages.value, () => {
-  loadMessages();
-  scrollToBottom();
-}, { deep: true });
+watch(
+  [() => messages.value.length, chatHistoryLimit],
+  () => {
+    loadMessages();
+  },
+  { immediate: true }
+);
+
+watchEffect(() => {
+  for (const message of displayMessages.value) {
+    message.content;
+  }
+
+  if (displayMessages.value.length > 0 && messages.value.length > 0) {
+    shouldAutoScrollOnStream.value = isNearBottom();
+  }
+});
 </script>
 
 <template>
@@ -493,7 +513,7 @@ watch(() => messages.value, () => {
       />
     </header>
 
-    <div class="chat-messages">
+    <div :ref="(el) => { chatViewport.messagesContainer.value = el as HTMLElement | undefined; }" class="chat-messages">
       <button
         v-if="hasMoreMessages"
         class="load-more-btn"

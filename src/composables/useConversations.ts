@@ -1,7 +1,10 @@
 import { ref } from 'vue';
 import type { Conversation, Message, AICharacter } from '../types';
-import { STORAGE_KEYS } from '../constants';
-import { getStorage, setStorage } from '@/utils/storage';
+import {
+  createConversationRecord,
+  loadStoredConversations,
+  saveStoredConversations,
+} from '@/services/conversationRepository';
 
 /**
  * 会话管理 Composable
@@ -14,7 +17,7 @@ export function useConversations() {
    * 加载所有会话
    */
   const loadAllConversations = async (): Promise<Conversation[]> => {
-    const stored = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
+    const stored = await loadStoredConversations();
     conversations.value = stored;
     return conversations.value;
   };
@@ -24,7 +27,7 @@ export function useConversations() {
    */
   const saveAllConversations = async (convs: Conversation[]) => {
     conversations.value = convs;
-    await setStorage(STORAGE_KEYS.CONVERSATIONS, convs);
+    await saveStoredConversations(convs);
   };
 
   /**
@@ -41,36 +44,14 @@ export function useConversations() {
     firstMessage: Message,
     character?: AICharacter
   ): Promise<Conversation> => {
-    const now = Date.now();
+    const conversation = await createConversationRecord(firstMessage, character);
 
-    // 如果是临时会话（没有角色），不保存
     if (!character) {
-      const tempConversation: Conversation = {
-        id: `temp-${now}`,
-        title: '临时会话',
-        messages: [firstMessage],
-        createdAt: now,
-        updatedAt: now,
-      };
-      return tempConversation;
+      return conversation;
     }
 
-    const newConversation: Conversation = {
-      id: `conv-${now}`,
-      title: firstMessage.content.slice(0, 30) + (firstMessage.content.length > 30 ? '...' : ''),
-      characterId: character.id,
-      characterName: character.name,
-      messages: [firstMessage],
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    // 添加到会话列表
-    const allConversations = await loadAllConversations();
-    allConversations.push(newConversation);
-    await saveAllConversations(allConversations);
-
-    return newConversation;
+    conversations.value = [...conversations.value, conversation];
+    return conversation;
   };
 
   /**
@@ -78,22 +59,32 @@ export function useConversations() {
    */
   const updateConversation = async (id: string, updates: Partial<Conversation>): Promise<void> => {
     const index = conversations.value.findIndex(c => c.id === id);
-    if (index !== -1) {
-      conversations.value[index] = {
-        ...conversations.value[index]!,
-        ...updates,
-        updatedAt: Date.now(),
-      };
-      await saveAllConversations(conversations.value);
+    if (index === -1) {
+      return;
     }
+
+    const nextConversation: Conversation = {
+      ...conversations.value[index]!,
+      ...updates,
+      updatedAt: Date.now(),
+    };
+
+    conversations.value[index] = nextConversation;
+    await saveStoredConversations(conversations.value);
   };
 
   /**
    * 删除会话
    */
   const deleteConversation = async (id: string): Promise<void> => {
-    conversations.value = conversations.value.filter(c => c.id !== id);
-    await saveAllConversations(conversations.value);
+    const nextConversations = conversations.value.filter(c => c.id !== id);
+
+    if (nextConversations.length === conversations.value.length) {
+      return;
+    }
+
+    conversations.value = nextConversations;
+    await saveStoredConversations(nextConversations);
   };
 
   /**
@@ -101,14 +92,16 @@ export function useConversations() {
    */
   const renameConversation = async (id: string, newName: string): Promise<void> => {
     const index = conversations.value.findIndex(c => c.id === id);
-    if (index !== -1) {
-      conversations.value[index] = {
-        ...conversations.value[index]!,
-        title: newName,
-        updatedAt: Date.now(),
-      };
-      await saveAllConversations(conversations.value);
+    if (index === -1) {
+      return;
     }
+
+    conversations.value[index] = {
+      ...conversations.value[index]!,
+      title: newName,
+      updatedAt: Date.now(),
+    };
+    await saveStoredConversations(conversations.value);
   };
 
   /**

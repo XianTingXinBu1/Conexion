@@ -1,7 +1,13 @@
 import { ref } from 'vue';
 import type { Message, Conversation, AICharacter } from '../types';
-import { STORAGE_KEYS } from '../constants';
-import { getStorage, setStorage } from '@/utils/storage';
+import {
+  createConversationRecord,
+  deleteConversationMessage,
+  editConversationMessage,
+  getStoredConversation,
+  isTemporaryConversationId,
+  updateConversationMessages,
+} from '@/services/conversationRepository';
 
 export function useConversationManager(
   emitUpdateConversation: (conversation: Conversation) => void
@@ -21,9 +27,7 @@ export function useConversationManager(
       return [];
     }
 
-    const conversations = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
-
-    const conversation = conversations.find(c => c.id === id);
+    const conversation = await getStoredConversation(id);
     if (conversation) {
       currentConversation.value = conversation;
       return conversation.messages;
@@ -37,39 +41,14 @@ export function useConversationManager(
    * 创建新会话
    */
   const createNewConversation = async (firstMessage: Message, character?: AICharacter): Promise<Conversation> => {
-    const now = Date.now();
-
-    if (!character) {
-      const tempConversation: Conversation = {
-        id: `temp-${now}`,
-        title: '临时会话',
-        messages: [firstMessage],
-        createdAt: now,
-        updatedAt: now,
-      };
-      currentConversationId.value = tempConversation.id;
-      currentConversation.value = tempConversation;
-      return tempConversation;
-    }
-
-    const conversations = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
-
-    const newConversation: Conversation = {
-      id: `conv-${now}`,
-      title: firstMessage.content.slice(0, 30) + (firstMessage.content.length > 30 ? '...' : ''),
-      characterId: character.id,
-      characterName: character.name,
-      messages: [firstMessage],
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    conversations.push(newConversation);
-    await setStorage(STORAGE_KEYS.CONVERSATIONS, conversations);
+    const newConversation = await createConversationRecord(firstMessage, character);
 
     currentConversationId.value = newConversation.id;
     currentConversation.value = newConversation;
-    emitUpdateConversation(newConversation);
+
+    if (character) {
+      emitUpdateConversation(newConversation);
+    }
 
     return newConversation;
   };
@@ -83,27 +62,13 @@ export function useConversationManager(
     }
 
     // 临时会话不保存
-    if (currentConversationId.value.startsWith('temp-')) {
+    if (isTemporaryConversationId(currentConversationId.value)) {
       return;
     }
 
-    const conversations = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
+    const updated = await updateConversationMessages(currentConversationId.value, messages);
 
-    const index = conversations.findIndex(c => c.id === currentConversationId.value);
-
-    if (index !== -1) {
-      const existing = conversations[index]!;
-      const updated: Conversation = {
-        id: existing.id,
-        title: existing.title,
-        createdAt: existing.createdAt,
-        characterId: existing.characterId,
-        characterName: existing.characterName,
-        messages: messages,
-        updatedAt: Date.now(),
-      };
-      conversations[index] = updated;
-      await setStorage(STORAGE_KEYS.CONVERSATIONS, conversations);
+    if (updated) {
       currentConversation.value = updated;
       emitUpdateConversation(updated);
     }
@@ -138,38 +103,14 @@ export function useConversationManager(
       return false;
     }
 
-    // 临时会话不支持编辑
-    if (currentConversationId.value.startsWith('temp-')) {
+    const updated = await editConversationMessage(currentConversationId.value, messageId, newContent);
+
+    if (!updated) {
       return false;
     }
 
-    const conversations = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
-    const index = conversations.findIndex(c => c.id === currentConversationId.value);
-
-    if (index === -1) {
-      return false;
-    }
-
-    const conversation = conversations[index]!;
-    const messageIndex = conversation.messages.findIndex(m => m.id === messageId);
-
-    if (messageIndex === -1) {
-      return false;
-    }
-
-    const originalMessage = conversation.messages[messageIndex]!;
-    conversation.messages[messageIndex] = {
-      id: originalMessage.id,
-      type: originalMessage.type,
-      content: newContent,
-      timestamp: originalMessage.timestamp,
-    };
-    conversation.updatedAt = Date.now();
-
-    conversations[index] = conversation;
-    await setStorage(STORAGE_KEYS.CONVERSATIONS, conversations);
-    currentConversation.value = conversation;
-    emitUpdateConversation(conversation);
+    currentConversation.value = updated;
+    emitUpdateConversation(updated);
 
     return true;
   };
@@ -182,32 +123,14 @@ export function useConversationManager(
       return false;
     }
 
-    // 临时会话不支持删除
-    if (currentConversationId.value.startsWith('temp-')) {
+    const updated = await deleteConversationMessage(currentConversationId.value, messageId);
+
+    if (!updated) {
       return false;
     }
 
-    const conversations = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
-    const index = conversations.findIndex(c => c.id === currentConversationId.value);
-
-    if (index === -1) {
-      return false;
-    }
-
-    const conversation = conversations[index]!;
-    const messageIndex = conversation.messages.findIndex(m => m.id === messageId);
-
-    if (messageIndex === -1) {
-      return false;
-    }
-
-    conversation.messages.splice(messageIndex, 1);
-    conversation.updatedAt = Date.now();
-
-    conversations[index] = conversation;
-    await setStorage(STORAGE_KEYS.CONVERSATIONS, conversations);
-    currentConversation.value = conversation;
-    emitUpdateConversation(conversation);
+    currentConversation.value = updated;
+    emitUpdateConversation(updated);
 
     return true;
   };

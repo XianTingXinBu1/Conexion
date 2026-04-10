@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, watchEffect, defineAsyncComponent } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { Message, AICharacter, RegexRule, Conversation, UserCharacter, PromptPreset, ChatMessage } from '../types';
@@ -11,7 +11,7 @@ import {
   STORAGE_KEYS,
   DEFAULT_PROMPT_PRESETS,
 } from '../constants';
-import { ChatInput, MessageItem, ContextRing, TokenDetailsPanel, EditMessageModal, PromptPreviewModal } from './chat';
+import { ChatInput, MessageItem, ContextRing } from './chat';
 import { useChatApi } from '../composables/useChatApi';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useCharacters } from '../composables/useCharacters';
@@ -37,6 +37,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const TokenDetailsPanel = defineAsyncComponent(() => import('./chat/TokenDetailsPanel.vue'));
+const EditMessageModal = defineAsyncComponent(() => import('./chat/EditMessageModal.vue'));
+const PromptPreviewModal = defineAsyncComponent(() => import('./chat/PromptPreviewModal.vue'));
 
 // 获取应用设置和主题
 const {

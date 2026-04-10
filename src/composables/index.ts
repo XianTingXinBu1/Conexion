@@ -13,6 +13,8 @@ export { useFormDataManager } from './useFormDataManager';
 export { usePageLeaveGuard } from './usePageLeaveGuard';
 export { useListManager } from './useListManager';
 export { useAppSettings } from './useAppSettings';
+export { useChatStats } from './useChatStats';
+export { useChatViewport } from './useChatViewport';
 export type { PageLeaveGuardOptions } from './usePageLeaveGuard';
 export type { ListManagerOptions, ListItem } from './useListManager';
 export type { AppSettings } from './useAppSettings';

@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { Message, AICharacter, RegexRule, Conversation, UserCharacter, PromptPreset, ChatMessage } from '../types';
 import { applyRules, clearRegexCache } from '../utils/regexEngine';
-import { countMessagesTokens } from '../utils/tokenCounter';
 import { DEFAULT_REGEX_SCRIPTS, STORAGE_KEYS, DEFAULT_PROMPT_PRESETS } from '../constants';
 import { ChatInput, MessageItem, ContextRing, TokenDetailsPanel, EditMessageModal, PromptPreviewModal } from './chat';
 import { useChatApi } from '../composables/useChatApi';
@@ -18,6 +17,8 @@ import { logPrompt, logSystemPrompt } from '../modules/debug';
 import { useConversationManager } from '../composables/useConversationManager';
 import { useAppSettings } from '../composables/useAppSettings';
 import { useTheme } from '../composables/useTheme';
+import { useChatStats } from '../composables/useChatStats';
+import { useChatViewport } from '../composables/useChatViewport';
 
 import '../styles/common.css';
 import '../styles/chat.css';
@@ -55,10 +56,7 @@ const loadAICharacter = async (characterId: string): Promise<AICharacter | undef
 // 当前角色对象（可能是从 props 传入的，也可能是从 characterId 加载的）
 const currentCharacter = ref<AICharacter | undefined>(props.character);
 
-const messagesContainer = ref<HTMLElement>();
 const messages = ref<Message[]>([]);
-const displayMessages = ref<Message[]>([]);
-const loadedCount = ref(0);
 const regexRules = ref<RegexRule[]>([]);
 
 // 消息编辑和删除状态
@@ -111,102 +109,6 @@ const loadRegexRules = async () => {
   regexRules.value = stored;
 };
 
-const hasMoreMessages = computed(() => {
-  return loadedCount.value < messages.value.length;
-});
-
-const currentContextCount = computed(() => {
-  try {
-    const chatMessages = messages.value.map(msg => ({
-      role: msg.type === 'user' ? 'user' : 'assistant',
-      content: msg.content,
-    }));
-    return countMessagesTokens(chatMessages);
-  } catch {
-    return messages.value.length;
-  }
-});
-
-const maxContextLength = computed(() => {
-  return currentApiPreset.value?.maxTokens || 4096;
-});
-
-const userTokens = computed(() => {
-  try {
-    const userMessages = messages.value.filter(msg => msg.type === 'user');
-    const chatMessages = userMessages.map(msg => ({
-      role: 'user',
-      content: msg.content,
-    }));
-    return countMessagesTokens(chatMessages);
-  } catch {
-    return 0;
-  }
-});
-
-const aiTokens = computed(() => {
-  try {
-    const aiMessages = messages.value.filter(msg => msg.type === 'assistant');
-    const chatMessages = aiMessages.map(msg => ({
-      role: 'assistant',
-      content: msg.content,
-    }));
-    return countMessagesTokens(chatMessages);
-  } catch {
-    return 0;
-  }
-});
-
-const chatMessageCount = computed(() => {
-  return messages.value.length;
-});
-
-const userMessageCount = computed(() => {
-  return messages.value.filter(m => m.type === 'user').length;
-});
-
-const aiMessageCount = computed(() => {
-  return messages.value.filter(m => m.type === 'assistant').length;
-});
-
-const loadMessages = () => {
-  const limit = chatHistoryLimit.value;
-  const totalCount = messages.value.length;
-
-  if (totalCount <= limit) {
-    displayMessages.value = [...messages.value];
-    loadedCount.value = totalCount;
-  } else {
-    displayMessages.value = [...messages.value.slice(-limit)];
-    loadedCount.value = limit;
-  }
-};
-
-const loadMoreMessages = () => {
-  const limit = chatHistoryLimit.value;
-  const remaining = messages.value.length - loadedCount.value;
-
-  if (remaining <= 0) return;
-
-  const countToLoad = Math.min(limit, remaining);
-  const newMessages = messages.value.slice(
-    messages.value.length - loadedCount.value - countToLoad,
-    messages.value.length - loadedCount.value
-  );
-
-  const oldScrollTop = messagesContainer.value?.scrollTop || 0;
-  const oldScrollHeight = messagesContainer.value?.scrollHeight || 0;
-
-  displayMessages.value = [...newMessages, ...displayMessages.value];
-  loadedCount.value += countToLoad;
-
-  nextTick(() => {
-    if (messagesContainer.value) {
-      const newScrollHeight = messagesContainer.value.scrollHeight;
-      messagesContainer.value.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
-    }
-  });
-};
 
 const getChatTitle = () => {
   if (currentCharacter.value?.name) {
@@ -223,13 +125,6 @@ const getChatSubtitle = () => {
     return 'AI Character';
   }
   return 'TemporaryConversation';
-};
-
-const scrollToBottom = async () => {
-  await nextTick();
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-  }
 };
 
 // 消息编辑和删除处理函数
@@ -334,6 +229,26 @@ const { showSuccess, showError } = useNotifications();
 const { selectedUser, init: initCharacters } = useCharacters();
 const { knowledgeBases, init: initKnowledgeBases } = useKnowledgeBases();
 const { currentPreset: currentApiPreset, loadPresets: loadApiPresets } = useApiPresets();
+
+const {
+  messagesContainer,
+  displayMessages,
+  loadedCount,
+  hasMoreMessages,
+  loadMessages,
+  loadMoreMessages,
+  scrollToBottom,
+} = useChatViewport(messages, chatHistoryLimit);
+
+const {
+  currentContextCount,
+  maxContextLength,
+  userTokens,
+  aiTokens,
+  chatMessageCount,
+  userMessageCount,
+  aiMessageCount,
+} = useChatStats(messages, currentApiPreset);
 
 const promptPresets = ref<PromptPreset[]>([]);
 const selectedPromptPresetId = ref<string>('default');

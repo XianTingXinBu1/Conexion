@@ -1,15 +1,14 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router';
 
-// 导入页面组件
-import MainPage from '@/components/MainPage.vue';
-import ChatPage from '@/components/ChatPage.vue';
-import ApiPresetPage from '@/components/ApiPresetPage.vue';
-import SettingsPage from '@/components/SettingsPage.vue';
-import ConversationListPage from '@/components/ConversationListPage.vue';
-import RegexScriptPage from '@/components/RegexScriptPage.vue';
-import RoleManagementPage from '@/components/RoleManagementPage.vue';
-import PromptPresetPage from '@/components/PromptPresetPage.vue';
-import KnowledgeBasePage from '@/components/KnowledgeBasePage.vue';
+const MainPage = () => import('@/components/MainPage.vue');
+const ChatPage = () => import('@/components/ChatPage.vue');
+const ApiPresetPage = () => import('@/components/ApiPresetPage.vue');
+const SettingsPage = () => import('@/components/SettingsPage.vue');
+const ConversationListPage = () => import('@/components/ConversationListPage.vue');
+const RegexScriptPage = () => import('@/components/RegexScriptPage.vue');
+const RoleManagementPage = () => import('@/components/RoleManagementPage.vue');
+const PromptPresetPage = () => import('@/components/PromptPresetPage.vue');
+const KnowledgeBasePage = () => import('@/components/KnowledgeBasePage.vue');
 
 // 定义路由
 const routes: RouteRecordRaw[] = [
@@ -102,7 +101,9 @@ const router = createRouter({
 
 // 全局前置守卫 - 设置页面标题
 router.beforeEach((to, _from, next) => {
-  if (to.meta.title) {
+  if (to.name === 'main') {
+    document.title = 'Conexion';
+  } else if (to.meta.title) {
     document.title = `${to.meta.title} - Conexion`;
   }
   next();

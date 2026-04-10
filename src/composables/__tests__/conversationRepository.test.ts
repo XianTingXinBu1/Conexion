@@ -41,9 +41,9 @@ describe('conversationRepository', () => {
     const conversation = await createConversationRecord(firstMessage, {
       id: 'char-1',
       name: 'Assistant',
-      avatar: '',
-      prompt: '',
-      category: 'default',
+      description: 'Test assistant',
+      personality: 'Helpful',
+      createdAt: 1,
     });
 
     expect(conversation.id).toMatch(/^conv-/);

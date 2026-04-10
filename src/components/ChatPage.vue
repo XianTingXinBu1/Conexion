@@ -4,7 +4,13 @@ import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { Message, AICharacter, RegexRule, Conversation, UserCharacter, PromptPreset, ChatMessage } from '../types';
 import { applyRules, clearRegexCache } from '../utils/regexEngine';
-import { DEFAULT_REGEX_SCRIPTS, STORAGE_KEYS, DEFAULT_PROMPT_PRESETS } from '../constants';
+import { getStorage } from '@/utils/storage';
+import {
+  DEFAULT_AI_CHARACTERS,
+  DEFAULT_REGEX_SCRIPTS,
+  STORAGE_KEYS,
+  DEFAULT_PROMPT_PRESETS,
+} from '../constants';
 import { ChatInput, MessageItem, ContextRing, TokenDetailsPanel, EditMessageModal, PromptPreviewModal } from './chat';
 import { useChatApi } from '../composables/useChatApi';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
@@ -47,8 +53,6 @@ const router = useRouter();
 
 // 加载 AI 角色数据
 const loadAICharacter = async (characterId: string): Promise<AICharacter | undefined> => {
-  const { getStorage } = await import('@/utils/storage');
-  const { DEFAULT_AI_CHARACTERS, STORAGE_KEYS } = await import('../constants');
   const stored = await getStorage<AICharacter[]>(STORAGE_KEYS.AI_CHARACTERS, DEFAULT_AI_CHARACTERS);
   return stored.find(c => c.id === characterId);
 };
@@ -104,8 +108,7 @@ const saveConversation = async () => {
 const loadRegexRules = async () => {
   clearRegexCache();
 
-  const { getStorage } = await import('@/utils/storage');
-  const stored = await getStorage<RegexRule[]>('conexion_regex_scripts', [...DEFAULT_REGEX_SCRIPTS]);
+  const stored = await getStorage<RegexRule[]>(STORAGE_KEYS.REGEX_SCRIPTS, [...DEFAULT_REGEX_SCRIPTS]);
   regexRules.value = stored;
 };
 
@@ -253,7 +256,6 @@ const promptPresets = ref<PromptPreset[]>([]);
 const selectedPromptPresetId = ref<string>('default');
 
 const loadPromptPresets = async () => {
-  const { getStorage } = await import('@/utils/storage');
   const stored = await getStorage<PromptPreset[]>(STORAGE_KEYS.PROMPT_PRESETS, [...DEFAULT_PROMPT_PRESETS].map(p => ({
     ...p,
     items: [...p.items]

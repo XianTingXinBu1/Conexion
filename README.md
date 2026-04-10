@@ -1,97 +1,63 @@
 # Conexion
 
-移动端优先的 AI 聊天前端项目。
+一个移动端优先的 AI 聊天前端。
 
+支持角色、人设提示词、知识库、流式回复，以及 OpenAI 兼容接口。现在已经能正常跑，也还在继续慢慢收结构。
+
+## 在线体验
+
+- <https://conexion.venturoso.sbs>
 
 ## 技术栈
 
-Vue 3.5.25 | TypeScript 5.9.3 | Vite 7.3.1 | Tailwind CSS 4.1.18
+- Vue 3
+- TypeScript
+- Vite
+- Tailwind CSS
+- Vitest
 
-## 核心功能
+## 功能
 
-- **会话管理**: 临时/角色会话、持久化
-- **API**: OpenAI 兼容格式
-- **智能提示词**: 动态构建（角色/用户/知识库/预设）
-- **聊天**: Markdown 渲染、代码高亮、流式响应、Token 计数
-- **存储**: localStorage + IndexedDB 混合存储
-- **调试**: 浏览器控制台日志追踪
+- 会话管理（临时会话 / 持久化会话）
+- OpenAI 兼容 API 接入
+- Prompt 预设与动态 system prompt 构建
+- 角色 / 用户设定
+- 知识库注入
+- Markdown 渲染与流式输出
+- localStorage + IndexedDB 混合存储
 
-## 快速开始
-
-```bash
-npm install && npm run dev
-```
-或在线体验
-https://conexion.venturoso.sbs
-
-## 开发命令
+## 本地开发
 
 ```bash
+npm install
 npm run dev
+```
+
+```bash
 npm run build
 npm run test:run
 npm run test:coverage
 ```
 
-## 应用入口
-
-- `src/main.ts`: 创建 Vue 应用并挂载 Router
-- `src/App.vue`: 根壳层，包裹 `AppProvider`、`router-view` 与通知容器
-- `src/components/AppProvider.vue`: 初始化全局主题、角色、设置、默认提示词预设
-- `src/router/index.ts`: 使用 `createWebHashHistory()` 管理页面路由
-
-当前项目**已经实现 Vue Router**，并使用 **Hash 路由**。
-
-## 核心架构
-
-- `src/components/`: 页面与 UI 组件，`ChatPage.vue` 是聊天总控入口
-- `src/composables/`: 业务状态与持久化入口，如会话、角色、设置、知识库
-- `src/modules/`: 独立功能模块，如 system-prompt、notification、markdown、api-preset
-- `src/api/`: OpenAI 兼容接口调用、流式解析、错误处理
-- `src/utils/storage.ts`: 存储边界，按 key 分流到 localStorage / IndexedDB
-
-## 测试现状
-
-- 使用 **Vitest + happy-dom**
-- 当前优先覆盖纯逻辑模块：
-  - `src/modules/system-prompt/**`
-  - `src/utils/urlValidator.ts`
-- 运行 `npm run test:run` 可执行当前单元测试
-
-## 当前已知架构风险
-
-- `src/components/ChatPage.vue` 责任很多，是当前最臃肿、最容易牵连回归的文件
-- 会话、设置、确认弹窗存在重复/重叠实现，详见 `docs/project-audit.md`
-- 文档与代码曾有漂移，后续应以代码和测试为准
-
 ## 项目结构
 
-```
+```text
 src/
-├── components/    # Vue 组件
-├── composables/   # 业务逻辑复用
-├── modules/       # 功能模块
-├── styles/        # 模块化样式
-├── utils/         # 工具函数
-├── types.ts       # 类型定义
-└── constants.ts   # 常量/存储键
+├── components/   # 页面和 UI 组件
+├── composables/  # 状态与业务逻辑
+├── modules/      # 相对独立的功能模块
+├── api/          # 接口调用与流式处理
+├── utils/        # 工具函数
+├── styles/       # 样式
+├── constants.ts
+└── types.ts
 ```
 
-## 已知限制
+## 详细文档
 
-- 正则仅支持 'after-macro'
-- 未实现宏系统
-- 暂无完整端到端测试
+- `docs/project-audit.md`
+- `docs/chatpage-refactor-blueprint.md`
 
-## 架构审计
+## License
 
-- 重复实现、热点模块、测试系统审计见：`docs/project-audit.md`
-
-
-## 许可证
-
-[暂无]
-
-## 仓库
-
-https://github.com/XianTingXinBu1/Conexion
+MIT

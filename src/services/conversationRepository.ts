@@ -66,7 +66,14 @@ export async function createConversationRecord(
 
   const conversations = await loadStoredConversations();
   const newConversation = createStoredConversation(firstMessage, character);
-  conversations.push(newConversation);
+
+  const existingIndex = conversations.findIndex(conversation => conversation.id === newConversation.id);
+  if (existingIndex !== -1) {
+    conversations[existingIndex] = newConversation;
+  } else {
+    conversations.push(newConversation);
+  }
+
   await saveStoredConversations(conversations);
 
   return cloneConversation(newConversation);

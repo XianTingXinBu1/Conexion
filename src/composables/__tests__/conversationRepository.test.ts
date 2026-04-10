@@ -13,6 +13,7 @@ describe('conversationRepository', () => {
   beforeEach(() => {
     getStorageMock.mockReset();
     setStorageMock.mockReset();
+    vi.restoreAllMocks();
   });
 
   it('creates a temporary conversation without persisting when no character is provided', async () => {
@@ -51,6 +52,46 @@ describe('conversationRepository', () => {
     expect(setStorageMock).toHaveBeenCalledTimes(1);
     expect(setStorageMock.mock.calls[0]?.[1]).toHaveLength(1);
     expect(setStorageMock.mock.calls[0]?.[1][0].title).toContain('...');
+  });
+
+  it('replaces an existing stored conversation instead of appending a duplicate when ids collide', async () => {
+    const existingConversation = {
+      id: 'conv-123',
+      title: 'Old title',
+      characterId: 'char-1',
+      characterName: 'Assistant',
+      messages: [{ id: 'old-msg', type: 'user', content: 'Old content', timestamp: 1 }],
+      createdAt: 123,
+      updatedAt: 123,
+    };
+
+    getStorageMock.mockResolvedValue([existingConversation]);
+    vi.spyOn(Date, 'now').mockReturnValue(123);
+
+    const { createConversationRecord } = await import('@/services/conversationRepository');
+    const firstMessage: Message = {
+      id: 'msg-1',
+      type: 'user',
+      content: 'New content',
+      timestamp: 123,
+    };
+
+    const conversation = await createConversationRecord(firstMessage, {
+      id: 'char-1',
+      name: 'Assistant',
+      description: 'Test assistant',
+      personality: 'Helpful',
+      createdAt: 1,
+    });
+
+    expect(conversation.id).toBe('conv-123');
+    expect(setStorageMock).toHaveBeenCalledTimes(1);
+    expect(setStorageMock.mock.calls[0]?.[1]).toHaveLength(1);
+    expect(setStorageMock.mock.calls[0]?.[1][0]).toMatchObject({
+      id: 'conv-123',
+      title: 'New content',
+      messages: [firstMessage],
+    });
   });
 
   it('blocks message edits for temporary conversations', async () => {

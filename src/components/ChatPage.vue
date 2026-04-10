@@ -231,7 +231,6 @@ const { knowledgeBases, init: initKnowledgeBases } = useKnowledgeBases();
 const { currentPreset: currentApiPreset, loadPresets: loadApiPresets } = useApiPresets();
 
 const {
-  messagesContainer,
   displayMessages,
   loadedCount,
   hasMoreMessages,
@@ -492,7 +491,7 @@ watch(() => messages.value, () => {
       />
     </header>
 
-    <div class="chat-messages" ref="messagesContainer">
+    <div class="chat-messages">
       <button
         v-if="hasMoreMessages"
         class="load-more-btn"

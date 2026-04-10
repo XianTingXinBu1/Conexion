@@ -27,7 +27,15 @@ import { NotificationContainer } from '@/modules/notification';
   --text-main: #2D2D44;
   --text-muted: #8E8E93;
   --border-color: rgba(157, 141, 241, 0.1);
+  --border: var(--border-color);
+  --card: var(--bg-secondary);
+  --card-hover: #F1EEFF;
   --shadow: 0 8px 30px rgba(157, 141, 241, 0.08);
+  --shadow-color: rgba(157, 141, 241, 0.18);
+  --accent-gradient-start: #9D8DF1;
+  --accent-gradient-end: #7D8FE8;
+  --text-on-accent: #FFFFFF;
+  --text-on-accent-muted: rgba(255, 255, 255, 0.88);
   --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -39,7 +47,15 @@ import { NotificationContainer } from '@/modules/notification';
   --text-main: #E6E6FA;
   --text-muted: #A0A0B8;
   --border-color: rgba(183, 163, 227, 0.1);
+  --border: var(--border-color);
+  --card: var(--bg-secondary);
+  --card-hover: #262633;
   --shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
+  --shadow-color: rgba(0, 0, 0, 0.28);
+  --accent-gradient-start: #B7A3E3;
+  --accent-gradient-end: #7D8FE8;
+  --text-on-accent: #FFFFFF;
+  --text-on-accent-muted: rgba(255, 255, 255, 0.85);
 }
 
 * {

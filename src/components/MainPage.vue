@@ -272,7 +272,7 @@ const navigateToKnowledgeBase = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--text-on-accent, #FFFFFF);
   flex-shrink: 0;
 }
 
@@ -284,21 +284,21 @@ const navigateToKnowledgeBase = () => {
 .hero-title {
   font-size: 20px;
   font-weight: 600;
-  color: white;
+  color: var(--text-on-accent, #FFFFFF);
   margin: 0 0 6px 0;
   letter-spacing: -0.3px;
 }
 
 .hero-subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-on-accent-muted, rgba(255, 255, 255, 0.85));
   margin: 0;
   font-weight: 400;
   line-height: 1.4;
 }
 
 .hero-arrow {
-  color: white;
+  color: var(--text-on-accent, #FFFFFF);
   opacity: 0.7;
   transition: all 0.3s ease;
   flex-shrink: 0;
@@ -467,24 +467,5 @@ const navigateToKnowledgeBase = () => {
   background: var(--accent-purple);
   border-radius: 3px;
   opacity: 0.25;
-}
-
-/* ==================== 主页面特定变量 ==================== */
-[data-theme='light'] {
-  --card: #FFFFFF;
-  --card-hover: #FAF8FF;
-  --accent-gradient-start: #9D8DF1;
-  --accent-gradient-end: #8B79D9;
-  --border: rgba(157, 141, 241, 0.12);
-  --shadow-color: rgba(157, 141, 241, 0.25);
-}
-
-[data-theme='dark'] {
-  --card: #1C1C26;
-  --card-hover: #262632;
-  --accent-gradient-start: #B7A3E3;
-  --accent-gradient-end: #9D8DF1;
-  --border: rgba(183, 163, 227, 0.15);
-  --shadow-color: rgba(183, 163, 227, 0.2);
 }
 </style>

@@ -1,14 +1,43 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import AppProvider from './components/AppProvider.vue';
 import { NotificationContainer } from '@/modules/notification';
+import { prefetchRouteComponents } from '@/router';
+
+const queueIdlePrefetch = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const browserWindow = window as Window & {
+    requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  };
+
+  const runPrefetch = () => {
+    void prefetchRouteComponents(['/conversation-list', '/settings']);
+  };
+
+  if (typeof browserWindow.requestIdleCallback === 'function') {
+    browserWindow.requestIdleCallback(() => runPrefetch(), { timeout: 1500 });
+    return;
+  }
+
+  window.setTimeout(runPrefetch, 700);
+};
+
+onMounted(() => {
+  queueIdlePrefetch();
+});
 </script>
 
 <template>
   <AppProvider>
     <div class="app">
       <router-view v-slot="{ Component, route }">
-        <Transition :name="(route.meta.transitionName as string) || 'fade'" mode="out-in">
-          <component :is="Component" :key="route.path" />
+        <Transition :name="(route.meta.transitionName as string) || 'route-shell'" mode="out-in" appear>
+          <div :key="route.fullPath" class="route-shell">
+            <component :is="Component" />
+          </div>
         </Transition>
       </router-view>
 
@@ -89,21 +118,71 @@ body {
   overflow: hidden;
 }
 
-/* 页面过渡动画 - 淡入淡出效果 */
+.route-shell {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* 页面过渡动画：轻微淡入 + 上浮，减少懒加载切页的突兀感 */
+.route-shell-enter-active,
+.route-shell-leave-active,
 .slide-forward-enter-active,
 .slide-forward-leave-active,
 .slide-back-enter-active,
 .slide-back-leave-active {
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 220ms ease;
+  will-change: opacity, transform;
 }
 
+.route-shell-enter-from,
 .slide-forward-enter-from,
 .slide-back-enter-from {
   opacity: 0;
+  transform: translateY(8px) scale(0.997);
+  filter: blur(2px);
 }
 
+.route-shell-leave-to,
 .slide-forward-leave-to,
 .slide-back-leave-to {
   opacity: 0;
+  transform: translateY(-4px) scale(0.998);
+  filter: blur(1px);
+}
+
+.route-shell-enter-to,
+.route-shell-leave-from,
+.slide-forward-enter-to,
+.slide-forward-leave-from,
+.slide-back-enter-to,
+.slide-back-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-shell-enter-active,
+  .route-shell-leave-active,
+  .slide-forward-enter-active,
+  .slide-forward-leave-active,
+  .slide-back-enter-active,
+  .slide-back-leave-active {
+    transition: opacity 120ms ease;
+  }
+
+  .route-shell-enter-from,
+  .route-shell-leave-to,
+  .slide-forward-enter-from,
+  .slide-forward-leave-to,
+  .slide-back-enter-from,
+  .slide-back-leave-to {
+    transform: none;
+    filter: none;
+  }
 }
 </style>

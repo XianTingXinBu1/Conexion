@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router';
+import { createRouter, createWebHashHistory, type RouteLocationRaw, type RouteRecordRaw } from 'vue-router';
 
 const MainPage = () => import('@/components/MainPage.vue');
 const ChatPage = () => import('@/components/ChatPage.vue');
@@ -9,6 +9,88 @@ const RegexScriptPage = () => import('@/components/RegexScriptPage.vue');
 const RoleManagementPage = () => import('@/components/RoleManagementPage.vue');
 const PromptPresetPage = () => import('@/components/PromptPresetPage.vue');
 const KnowledgeBasePage = () => import('@/components/KnowledgeBasePage.vue');
+
+const routePrefetchers = {
+  main: MainPage,
+  'conversation-list': ConversationListPage,
+  chat: ChatPage,
+  'chat-character': ChatPage,
+  'chat-conversation': ChatPage,
+  'api-preset': ApiPresetPage,
+  settings: SettingsPage,
+  'regex-script': RegexScriptPage,
+  'role-management': RoleManagementPage,
+  'prompt-preset': PromptPresetPage,
+  'knowledge-base': KnowledgeBasePage,
+} as const;
+
+type PrefetchableRouteName = keyof typeof routePrefetchers;
+
+const prefetchedRouteNames = new Set<PrefetchableRouteName>();
+
+const normalizeRouteName = (target: RouteLocationRaw): PrefetchableRouteName | null => {
+  if (typeof target === 'string') {
+    const [pathWithoutHash = ''] = target.split('?');
+    const normalizedPath = pathWithoutHash.replace(/^#/, '') || '/';
+
+    switch (normalizedPath) {
+      case '/':
+        return 'main';
+      case '/conversation-list':
+        return 'conversation-list';
+      case '/chat':
+        return 'chat';
+      case '/api-preset':
+        return 'api-preset';
+      case '/settings':
+        return 'settings';
+      case '/regex-script':
+        return 'regex-script';
+      case '/role-management':
+        return 'role-management';
+      case '/prompt-preset':
+        return 'prompt-preset';
+      case '/knowledge-base':
+        return 'knowledge-base';
+      default:
+        return null;
+    }
+  }
+
+  if ('name' in target && target.name && target.name in routePrefetchers) {
+    return target.name as PrefetchableRouteName;
+  }
+
+  if ('path' in target && typeof target.path === 'string') {
+    return normalizeRouteName(target.path);
+  }
+
+  return null;
+};
+
+export const prefetchRouteComponents = async (targets: RouteLocationRaw[]) => {
+  const uniqueTargets = targets
+    .map(normalizeRouteName)
+    .filter((name): name is PrefetchableRouteName => Boolean(name))
+    .filter((name, index, names) => names.indexOf(name) === index);
+
+  await Promise.all(
+    uniqueTargets.map(async (name) => {
+      if (prefetchedRouteNames.has(name)) {
+        return;
+      }
+
+      prefetchedRouteNames.add(name);
+
+      try {
+        await routePrefetchers[name]();
+      } catch (error) {
+        prefetchedRouteNames.delete(name);
+        console.warn(`[router] Failed to prefetch route component for "${name}"`, error);
+      }
+    }),
+  );
+};
 
 // 定义路由
 const routes: RouteRecordRaw[] = [

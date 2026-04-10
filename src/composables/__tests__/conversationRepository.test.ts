@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
 import type { Message } from '@/types';
 
 const getStorageMock = vi.fn();
@@ -122,5 +123,50 @@ describe('conversationRepository', () => {
     expect(updated?.messages[0]?.content).toBe('New');
     expect(setStorageMock).toHaveBeenCalledTimes(1);
     expect(setStorageMock.mock.calls[0]?.[1][0].messages[0].content).toBe('New');
+  });
+
+  it('tracks the persisted conversation id after first creation so later sends update instead of creating again', async () => {
+    getStorageMock.mockResolvedValue([]);
+
+    const { useConversationManager } = await import('@/composables/useConversationManager');
+    const emitUpdateConversation = vi.fn();
+    const manager = useConversationManager(emitUpdateConversation);
+
+    expect(manager.currentConversation.value).toBeUndefined();
+    expect(manager.currentConversationId.value).toBeUndefined();
+
+    const firstMessage: Message = {
+      id: 'msg-1',
+      type: 'user',
+      content: 'Hello',
+      timestamp: 1,
+    };
+
+    const created = await manager.createNewConversation(firstMessage, {
+      id: 'char-1',
+      name: 'Assistant',
+      description: 'Test assistant',
+      personality: 'Helpful',
+      createdAt: 1,
+    });
+
+    expect(created.id).toMatch(/^conv-/);
+    expect(manager.currentConversationId.value).toBe(created.id);
+    expect(manager.currentConversation.value?.id).toBe(created.id);
+
+    const nextMessages: Message[] = [
+      firstMessage,
+      { id: 'msg-2', type: 'assistant', content: 'Hi', timestamp: 2 },
+    ];
+
+    await manager.saveConversation(nextMessages);
+    await nextTick();
+
+    expect(setStorageMock).toHaveBeenCalledTimes(2);
+    expect(setStorageMock.mock.calls[1]?.[1]).toHaveLength(1);
+    expect(setStorageMock.mock.calls[1]?.[1][0]).toMatchObject({
+      id: created.id,
+      messages: nextMessages,
+    });
   });
 });

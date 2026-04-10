@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, watchEffect } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { Message, AICharacter, RegexRule, Conversation, UserCharacter, PromptPreset, ChatMessage } from '../types';
@@ -50,6 +50,7 @@ const {
 const { theme } = useTheme();
 
 const router = useRouter();
+const persistedConversationId = computed(() => currentConversation.value?.id);
 
 // 加载 AI 角色数据
 const loadAICharacter = async (characterId: string): Promise<AICharacter | undefined> => {
@@ -315,8 +316,12 @@ const handleSendMessage = async (content: string) => {
   };
   messages.value.push(userMessage);
 
-  if (!props.conversationId) {
-    await createNewConversation(userMessage);
+  if (!persistedConversationId.value) {
+    const conversation = await createNewConversation(userMessage);
+
+    if (conversation.id !== props.conversationId) {
+      await router.replace(`/chat/${conversation.id}`);
+    }
   } else {
     await saveConversation();
   }

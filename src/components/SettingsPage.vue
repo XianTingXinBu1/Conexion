@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-vue-next';
 import { STORAGE_KEYS } from '../constants';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import { clearStorage, getStorage } from '@/utils/storage';
-import { useAppSettings } from '../composables/useAppSettings';
+import { useAppSettings, APP_SETTINGS_DEFAULTS, writeAppSettingsDefaults } from '../composables/useAppSettings';
 import ChatSettingsSection from './settings/ChatSettingsSection.vue';
 import DataManagementSection from './settings/DataManagementSection.vue';
 
@@ -28,7 +28,6 @@ const {
   updateShowMessageIndex,
   updateChatHistoryLimit,
   updatePromptMergeMode,
-  applyDefaults,
 } = appSettings;
 
 const debugMode = appDebug?.debugMode ?? ref(false);
@@ -62,7 +61,13 @@ const handleDeleteAllData = async () => {
 };
 
 const handleRestoreDefaults = async () => {
-  await applyDefaults();
+  await writeAppSettingsDefaults();
+  updateEnterToSend(APP_SETTINGS_DEFAULTS.enterToSend);
+  updateShowWordCount(APP_SETTINGS_DEFAULTS.showWordCount);
+  updateEnableMarkdown(APP_SETTINGS_DEFAULTS.enableMarkdown);
+  updateShowMessageIndex(APP_SETTINGS_DEFAULTS.showMessageIndex);
+  updateChatHistoryLimit(APP_SETTINGS_DEFAULTS.chatHistoryLimit);
+  updatePromptMergeMode(APP_SETTINGS_DEFAULTS.promptMergeMode);
   debugMode.value = false;
   const msg = getNotificationMessage('SETTINGS_RESTORE_SUCCESS');
   showSuccess(msg.title, msg.message);

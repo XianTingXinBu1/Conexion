@@ -1,9 +1,53 @@
 import { ref, computed, watch } from 'vue';
 import type { Preset, PresetFormData } from './types';
-import { STORAGE_KEYS, DEFAULT_API_PRESETS } from '../../constants';
+import { STORAGE_KEYS, DEFAULT_API_PRESETS, DEFAULTS } from '../../constants';
 import { useConfirmDialog } from '../../composables/useConfirmDialog';
 import { useNotifications } from '../notification';
 import { getStorage, setStorage } from '@/utils/storage';
+
+const DEFAULT_PRESET_FORM_DATA: PresetFormData = {
+  url: '',
+  apiKey: '',
+  model: '',
+  streamEnabled: DEFAULTS.STREAM_ENABLED,
+  temperature: DEFAULTS.TEMPERATURE,
+  maxTokens: DEFAULTS.MAX_TOKENS,
+  maxOutputTokens: DEFAULTS.MAX_OUTPUT_TOKENS,
+  proxy: {
+    enabled: false,
+    url: '',
+    type: 'query',
+    targetEndpoint: '',
+  },
+};
+
+function cloneDefaultPresetFormData(): PresetFormData {
+  return {
+    ...DEFAULT_PRESET_FORM_DATA,
+    proxy: { ...DEFAULT_PRESET_FORM_DATA.proxy },
+  };
+}
+
+function mapPresetToFormData(preset: Preset): PresetFormData {
+  return {
+    ...cloneDefaultPresetFormData(),
+    url: preset.url,
+    apiKey: preset.apiKey,
+    model: preset.model,
+    streamEnabled: preset.streamEnabled,
+    temperature: preset.temperature,
+    maxTokens: preset.maxTokens,
+    maxOutputTokens: preset.maxOutputTokens,
+    proxy: preset.proxy
+      ? {
+          enabled: preset.proxy.enabled,
+          url: preset.proxy.url,
+          type: preset.proxy.type,
+          targetEndpoint: preset.proxy.targetEndpoint || '',
+        }
+      : cloneDefaultPresetFormData().proxy,
+  };
+}
 
 /**
  * API 预设管理 Composable
@@ -124,7 +168,7 @@ export function useApiPresets() {
   }
 
   // 创建新预设
-  async function createNewPreset(formData: PresetFormData) {
+  async function createNewPreset(formData: PresetFormData = cloneDefaultPresetFormData()) {
     if (!newPresetName.value.trim()) {
       return;
     }
@@ -226,26 +270,7 @@ export function useApiPresets() {
 
   // 加载预设到表单
   function loadPresetToForm(preset: Preset): PresetFormData {
-    return {
-      url: preset.url,
-      apiKey: preset.apiKey,
-      model: preset.model,
-      streamEnabled: preset.streamEnabled,
-      temperature: preset.temperature,
-      maxTokens: preset.maxTokens,
-      maxOutputTokens: preset.maxOutputTokens,
-      proxy: preset.proxy ? {
-        enabled: preset.proxy.enabled,
-        url: preset.proxy.url,
-        type: preset.proxy.type,
-        targetEndpoint: preset.proxy.targetEndpoint || '',
-      } : {
-        enabled: false,
-        url: '',
-        type: 'query' as const,
-        targetEndpoint: '',
-      },
-    };
+    return mapPresetToFormData(preset);
   }
 
   // 监听预设变化
@@ -283,6 +308,7 @@ export function useApiPresets() {
     renamePreset,
     openCreateNewDialog,
     loadPresetToForm,
+    createDefaultPresetFormData: cloneDefaultPresetFormData,
     cancelDelete,
     onPresetChange,
   };

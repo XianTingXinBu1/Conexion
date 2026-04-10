@@ -25,7 +25,10 @@ export interface AppSettings {
   promptMergeMode: MergeMode;
 }
 
-export const APP_SETTINGS_DEFAULTS = {
+export const APP_SETTINGS_DEFAULTS: AppSettings & {
+  mergePromptPresets: typeof DEFAULTS.MERGE_PROMPT_PRESETS;
+  debugMode: boolean;
+} = {
   enterToSend: true,
   showWordCount: false,
   enableMarkdown: true,
@@ -35,6 +38,17 @@ export const APP_SETTINGS_DEFAULTS = {
   mergePromptPresets: DEFAULTS.MERGE_PROMPT_PRESETS,
   debugMode: DEFAULTS.DEBUG_MODE,
 } as const;
+
+export function getAppSettingsSnapshot(): AppSettings {
+  return {
+    enterToSend: APP_SETTINGS_DEFAULTS.enterToSend,
+    showWordCount: APP_SETTINGS_DEFAULTS.showWordCount,
+    enableMarkdown: APP_SETTINGS_DEFAULTS.enableMarkdown,
+    showMessageIndex: APP_SETTINGS_DEFAULTS.showMessageIndex,
+    chatHistoryLimit: APP_SETTINGS_DEFAULTS.chatHistoryLimit,
+    promptMergeMode: APP_SETTINGS_DEFAULTS.promptMergeMode,
+  };
+}
 
 export async function writeAppSettingsDefaults(
   write: typeof setStorage = setStorage,
@@ -54,16 +68,16 @@ export async function writeAppSettingsDefaults(
  */
 export function useAppSettings() {
   // 聊天设置
-  const { value: enterToSend } = useLocalStorage(STORAGE_KEYS.ENTER_TO_SEND, true);
-  const { value: showWordCount } = useLocalStorage(STORAGE_KEYS.SHOW_WORD_COUNT, false);
-  const { value: enableMarkdown } = useLocalStorage(STORAGE_KEYS.ENABLE_MARKDOWN, true);
-  const { value: showMessageIndex } = useLocalStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, false);
-  const { value: chatHistoryLimit } = useLocalStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, DEFAULTS.CHAT_HISTORY_LIMIT);
+  const { value: enterToSend } = useLocalStorage(STORAGE_KEYS.ENTER_TO_SEND, APP_SETTINGS_DEFAULTS.enterToSend);
+  const { value: showWordCount } = useLocalStorage(STORAGE_KEYS.SHOW_WORD_COUNT, APP_SETTINGS_DEFAULTS.showWordCount);
+  const { value: enableMarkdown } = useLocalStorage(STORAGE_KEYS.ENABLE_MARKDOWN, APP_SETTINGS_DEFAULTS.enableMarkdown);
+  const { value: showMessageIndex } = useLocalStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, APP_SETTINGS_DEFAULTS.showMessageIndex);
+  const { value: chatHistoryLimit } = useLocalStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, APP_SETTINGS_DEFAULTS.chatHistoryLimit);
 
   // 提示词设置
   const { value: promptMergeMode } = useLocalStorage<MergeMode>(
     STORAGE_KEYS.PROMPT_MERGE_MODE,
-    DEFAULTS.PROMPT_MERGE_MODE
+    APP_SETTINGS_DEFAULTS.promptMergeMode
   );
 
   // 设置更新方法
@@ -116,14 +130,15 @@ export function useAppSettings() {
   /**
    * 获取所有设置（只读）
    */
-  const settings = ref<AppSettings>({
+  const settings = ref<AppSettings>(getAppSettingsSnapshot());
+  settings.value = {
     enterToSend: enterToSend.value,
     showWordCount: showWordCount.value,
     enableMarkdown: enableMarkdown.value,
     showMessageIndex: showMessageIndex.value,
     chatHistoryLimit: chatHistoryLimit.value,
     promptMergeMode: promptMergeMode.value,
-  });
+  };
 
   return {
     // 聊天设置

@@ -37,6 +37,7 @@ const {
   renamePreset,
   openCreateNewDialog,
   loadPresetToForm,
+  createDefaultPresetFormData,
   cancelDelete,
   onPresetChange,
 } = useApiPresets();
@@ -116,77 +117,43 @@ const {
   cancelText: '取消',
 });
 
+function applyPresetToForm(preset: NonNullable<typeof currentPreset.value>) {
+  const formData = loadPresetToForm(preset);
+  loadFormData(formData);
+
+  selectedModel.value = formData.model;
+  modelInput.value = formData.model;
+  updateModelInput();
+  updateOriginalData();
+}
+
+function initializePresetForm() {
+  const preset = currentPreset.value;
+  if (!preset) {
+    loadFormData(createDefaultPresetFormData());
+    updateModelInput();
+    updateOriginalData();
+    return;
+  }
+
+  if (shouldClearModels(selectedPreset.value, preset.url)) {
+    clearModels();
+  }
+
+  applyPresetToForm(preset);
+}
+
 // 初始化
 onMounted(() => {
   loadPresets();
   loadSelectedPreset();
   loadModels();
-
-  // 检查模型列表是否与当前预设和 URL 匹配
-  const preset = currentPreset.value;
-  if (preset) {
-    if (shouldClearModels(selectedPreset.value, preset.url)) {
-      clearModels();
-    }
-
-    // 加载预设数据到表单
-    const formData = loadPresetToForm(preset);
-    loadFormData({
-      url: formData.url,
-      apiKey: formData.apiKey,
-      model: formData.model,
-      streamEnabled: formData.streamEnabled,
-      temperature: formData.temperature,
-      maxTokens: formData.maxTokens,
-      maxOutputTokens: formData.maxOutputTokens,
-      proxy: formData.proxy || {
-        enabled: false,
-        url: '',
-        type: 'query',
-        targetEndpoint: '',
-      },
-    });
-
-    // 更新模型选择
-    selectedModel.value = formData.model;
-    modelInput.value = formData.model || selectedModel.value;
-    updateModelInput();
-
-    // 更新原始数据
-    updateOriginalData();
-  } else {
-    // 如果没有预设，确保 modelInput 初始化
-    updateModelInput();
-    updateOriginalData();
-  }
+  initializePresetForm();
 });
 
 // 监听当前预设变化
 onPresetChange((preset) => {
-  const formData = loadPresetToForm(preset);
-  loadFormData({
-    url: formData.url,
-    apiKey: formData.apiKey,
-    model: formData.model,
-    streamEnabled: formData.streamEnabled,
-    temperature: formData.temperature,
-    maxTokens: formData.maxTokens,
-    maxOutputTokens: formData.maxOutputTokens,
-    proxy: formData.proxy || {
-      enabled: false,
-      url: '',
-      type: 'query',
-      targetEndpoint: '',
-    },
-  });
-
-  // 更新模型选择
-  selectedModel.value = formData.model;
-  modelInput.value = selectedModel.value;
-  updateModelInput();
-
-  // 更新原始数据
-  updateOriginalData();
+  applyPresetToForm(preset);
 
   // 切换预设时清空模型列表
   clearModels();
@@ -212,21 +179,7 @@ function handleSaveCurrentPreset() {
 
 // 创建新预设
 function handleCreateNewPreset() {
-  createNewPreset({
-    url: '',
-    apiKey: '',
-    model: '',
-    streamEnabled: DEFAULTS.STREAM_ENABLED,
-    temperature: DEFAULTS.TEMPERATURE,
-    maxTokens: DEFAULTS.MAX_TOKENS,
-    maxOutputTokens: DEFAULTS.MAX_OUTPUT_TOKENS,
-    proxy: {
-      enabled: false,
-      url: '',
-      type: 'query',
-      targetEndpoint: '',
-    },
-  });
+  createNewPreset();
 }
 
 // 处理返回按钮点击

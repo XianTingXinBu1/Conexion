@@ -66,7 +66,7 @@ describe('useChatApi', () => {
             };
           },
         },
-      } as Response;
+      } as unknown as Response;
     }) as typeof fetch;
 
     const api = useChatApi();

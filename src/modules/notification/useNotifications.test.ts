@@ -18,11 +18,17 @@ describe('useNotifications', () => {
     expect(notifications.notifications.value).toHaveLength(3);
     expect(notifications.queue.value).toHaveLength(1);
 
-    notifications.removeNotification(ids[0]);
+    const firstId = ids[0];
+    const queuedId = ids[3];
+
+    expect(firstId).toBeDefined();
+    expect(queuedId).toBeDefined();
+
+    notifications.removeNotification(firstId!);
 
     expect(notifications.notifications.value).toHaveLength(3);
     expect(notifications.queue.value).toHaveLength(0);
-    expect(notifications.notifications.value.some(item => item.id === ids[3])).toBe(true);
+    expect(notifications.notifications.value.some(item => item.id === queuedId)).toBe(true);
   });
 
   it('resumes auto close using remaining time instead of resetting full duration', () => {

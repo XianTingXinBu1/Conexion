@@ -19,6 +19,14 @@ interface UsageStats {
   totalTokens: number;
 }
 
+interface ResponseMetrics {
+  startedAt: number;
+  firstChunkAt: number | null;
+  completedAt: number | null;
+  timeToFirstChunkMs: number | null;
+  totalDurationMs: number | null;
+}
+
 interface Props {
   currentContextCount: number;
   maxContextLength: number;
@@ -30,10 +38,36 @@ interface Props {
   lastSystemPromptResult: SystemPromptResult | null;
   currentApiPreset: Preset | null;
   usage: UsageStats | null;
+  responseMetrics: ResponseMetrics | null;
   theme: Theme;
 }
 
 const props = defineProps<Props>();
+
+const formatDuration = (durationMs: number | null): string => {
+  if (durationMs === null || Number.isNaN(durationMs)) {
+    return '—';
+  }
+
+  if (durationMs < 1000) {
+    return `${durationMs} ms`;
+  }
+
+  return `${(durationMs / 1000).toFixed(2)} s`;
+};
+
+const formatTimestamp = (timestamp: number | null): string => {
+  if (!timestamp) {
+    return '—';
+  }
+
+  return new Date(timestamp).toLocaleTimeString('zh-CN', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+};
 
 const emit = defineEmits<{
   close: [];
@@ -116,6 +150,40 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
               </div>
             </div>
           </Transition>
+        </div>
+
+        <!-- 本次请求 -->
+        <div class="token-card" v-if="usage || responseMetrics">
+          <div class="card-header">
+            <span class="card-title">本次请求</span>
+            <span class="card-badge">MVP</span>
+          </div>
+          <div class="card-content">
+            <div class="stat-row" v-if="usage">
+              <span class="stat-label">Prompt</span>
+              <span class="stat-value">{{ usage.promptTokens.toLocaleString() }}</span>
+            </div>
+            <div class="stat-row" v-if="usage">
+              <span class="stat-label">Completion</span>
+              <span class="stat-value">{{ usage.completionTokens.toLocaleString() }}</span>
+            </div>
+            <div class="stat-row" v-if="usage">
+              <span class="stat-label">Total</span>
+              <span class="stat-value token-details-total">{{ usage.totalTokens.toLocaleString() }}</span>
+            </div>
+            <div class="stat-row" v-if="responseMetrics">
+              <span class="stat-label">开始时间</span>
+              <span class="stat-value">{{ formatTimestamp(responseMetrics.startedAt) }}</span>
+            </div>
+            <div class="stat-row" v-if="responseMetrics">
+              <span class="stat-label">首 Token</span>
+              <span class="stat-value">{{ formatDuration(responseMetrics.timeToFirstChunkMs) }}</span>
+            </div>
+            <div class="stat-row" v-if="responseMetrics">
+              <span class="stat-label">完整回复</span>
+              <span class="stat-value">{{ formatDuration(responseMetrics.totalDurationMs) }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- 系统提示词 -->

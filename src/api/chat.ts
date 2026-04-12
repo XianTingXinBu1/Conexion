@@ -7,7 +7,7 @@
 import { ApiClient, type ApiClientConfig } from './base';
 import type { ChatCompletionRequest, ChatCompletionResponse, ChatMessage, Message } from '@/types';
 import { logApi, logApiError } from '@/modules/debug';
-import { parseStreamChunk } from './stream';
+import { parseStreamChunk, type StreamUsagePayload } from './stream';
 
 /**
  * 聊天 API 服务
@@ -93,7 +93,7 @@ export class ChatApi extends ApiClient {
       temperature?: number;
       maxTokens?: number;
       onChunk?: (chunk: string) => void;
-      onComplete?: () => void;
+      onComplete?: (meta?: { usage?: StreamUsagePayload | null }) => void;
       onError?: (error: string) => void;
     } = {}
   ): AsyncGenerator<string> {
@@ -168,6 +168,7 @@ export class ChatApi extends ApiClient {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let latestUsage: StreamUsagePayload | null = null;
 
       try {
         while (true) {
@@ -179,6 +180,9 @@ export class ChatApi extends ApiClient {
 
           const parsed = parseStreamChunk(buffer, decoder.decode(value, { stream: true }));
           buffer = parsed.remainder;
+          if (parsed.usage) {
+            latestUsage = parsed.usage;
+          }
 
           for (const content of parsed.chunks) {
             if (onChunk) {
@@ -191,7 +195,7 @@ export class ChatApi extends ApiClient {
         logApi('流式响应完成');
 
         if (onComplete) {
-          onComplete();
+          onComplete({ usage: latestUsage });
         }
       } finally {
         this.activeStreamCleanup = null;

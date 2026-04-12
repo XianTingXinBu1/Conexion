@@ -47,6 +47,7 @@ interface SendFlowDeps {
 
 export function useChatSendFlow(deps: SendFlowDeps) {
   const shouldAutoScrollOnStream = ref(true);
+  const STREAM_FLUSH_INTERVAL_MS = 50;
 
   const handleSendMessage = async (content: string) => {
     deps.resetUsage();
@@ -91,20 +92,56 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       mergeMode: deps.promptMergeMode.value,
     });
 
+    let streamBuffer = '';
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushBufferedContent = () => {
+      if (!streamBuffer) return;
+
+      const msg = deps.messages.value.find(m => m.id === assistantMessageId);
+      if (!msg) {
+        streamBuffer = '';
+        return;
+      }
+
+      msg.content = applyRules(
+        msg.content + streamBuffer,
+        'assistant',
+        'after-macro',
+        deps.regexRules.value
+      );
+      streamBuffer = '';
+
+      if (shouldAutoScrollOnStream.value) {
+        deps.scrollToBottom();
+      }
+    };
+
+    const clearFlushTimer = () => {
+      if (!flushTimer) return;
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    };
+
+    const scheduleFlush = () => {
+      if (flushTimer) return;
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        flushBufferedContent();
+      }, STREAM_FLUSH_INTERVAL_MS);
+    };
+
     try {
       await deps.sendStreamChatRequest(
         chatHistoryBeforeSend,
         (chunk: string) => {
-          const msg = deps.messages.value.find(m => m.id === assistantMessageId);
-          if (!msg) return;
-
-          msg.content += chunk;
-          msg.content = applyRules(msg.content, 'assistant', 'after-macro', deps.regexRules.value);
-          if (shouldAutoScrollOnStream.value) {
-            deps.scrollToBottom();
-          }
+          streamBuffer += chunk;
+          scheduleFlush();
         },
         () => {
+          clearFlushTimer();
+          flushBufferedContent();
+
           const msg = deps.messages.value.find(m => m.id === assistantMessageId);
           if (!msg) return;
 
@@ -114,6 +151,9 @@ export function useChatSendFlow(deps: SendFlowDeps) {
           deps.showSuccess(notificationMsg.title, notificationMsg.message);
         },
         (error: string) => {
+          clearFlushTimer();
+          streamBuffer = '';
+
           const msg = deps.messages.value.find(m => m.id === assistantMessageId);
           if (!msg) return;
 
@@ -126,6 +166,8 @@ export function useChatSendFlow(deps: SendFlowDeps) {
         systemMessages.length > 0 ? systemMessages : undefined
       );
     } catch (err) {
+      clearFlushTimer();
+      streamBuffer = '';
       const msg = deps.messages.value.find(m => m.id === assistantMessageId);
       if (!msg) return;
 

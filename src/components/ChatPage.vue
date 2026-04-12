@@ -120,7 +120,15 @@ const { chatTitle, chatSubtitle } = useChatSessionMeta({
   currentConversation,
 });
 
-const { sendStreamChatRequest, usage, resetUsage } = useChatApi();
+const {
+  sendStreamChatRequest,
+  cancelRequest,
+  usage,
+  responseMetrics,
+  resetUsage,
+  requestStatus,
+  isRequestActive,
+} = useChatApi();
 const { showSuccess, showError } = useNotifications();
 const { selectedUser, init: initCharacters } = useCharacters();
 const { knowledgeBases, init: initKnowledgeBases } = useKnowledgeBases();
@@ -171,7 +179,12 @@ const {
   showPromptAssistant,
 });
 
-const { shouldAutoScrollOnStream, handleSendMessage } = useChatSendFlow({
+const {
+  shouldAutoScrollOnStream,
+  isSending,
+  handleSendMessage,
+  handleCancelSend,
+} = useChatSendFlow({
   messages,
   regexRules,
   currentCharacter,
@@ -185,6 +198,7 @@ const { shouldAutoScrollOnStream, handleSendMessage } = useChatSendFlow({
   saveConversation,
   scrollToBottom,
   sendStreamChatRequest,
+  cancelRequest,
   buildSystemMessages,
   showSuccess,
   showError,
@@ -285,13 +299,18 @@ useChatPageInit({
       :last-system-prompt-result="lastSystemPromptResult"
       :current-api-preset="currentApiPreset || null"
       :usage="usage"
+      :response-metrics="responseMetrics"
       :theme="theme"
       @close="closeTokenDetails"
     />
 
     <ChatInput
       :enter-to-send="enterToSend"
+      :is-sending="isSending"
+      :is-request-active="isRequestActive"
+      :request-status="requestStatus"
       @send="handleSendMessage"
+      @cancel="handleCancelSend"
       @show-prompt-assistant="openPromptAssistant"
     />
 

@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { ref, nextTick, watch } from 'vue';
-import { Send, Plus, Sparkles } from 'lucide-vue-next';
+import { Send, Plus, Sparkles, Square } from 'lucide-vue-next';
+import type { ChatRequestStatus } from '@/composables/useChatApi';
 
 interface Props {
   enterToSend: boolean;
+  isSending?: boolean;
+  isRequestActive?: boolean;
+  requestStatus?: ChatRequestStatus;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  isSending: false,
+  isRequestActive: false,
+  requestStatus: 'idle',
+});
 
 const emit = defineEmits<{
   send: [message: string];
+  cancel: [];
   showPromptAssistant: [];
 }>();
 
@@ -28,16 +37,30 @@ const adjustTextareaHeight = () => {
 
 const sendMessage = () => {
   const content = messageInput.value.trim();
-  if (!content) return;
+  if (!content || props.isRequestActive) return;
 
   emit('send', content);
   messageInput.value = '';
   adjustTextareaHeight();
 };
 
+const cancelMessage = () => {
+  if (!props.isRequestActive) {
+    return;
+  }
+
+  emit('cancel');
+};
+
 const handleEnterKey = (event: KeyboardEvent) => {
   if (props.enterToSend) {
     event.preventDefault();
+
+    if (props.isRequestActive) {
+      cancelMessage();
+      return;
+    }
+
     sendMessage();
   }
 };
@@ -90,15 +113,26 @@ defineExpose({
         ref="messageInputRef"
         v-model="messageInput"
         class="message-input"
-        placeholder="输入消息..."
+        :placeholder="isRequestActive ? '正在生成，可点击停止...' : '输入消息...'"
+        :disabled="isRequestActive"
         @keydown.enter="handleEnterKey"
         rows="1"
       />
 
       <button
+        v-if="isRequestActive"
+        class="send-btn stop-btn"
+        @click="cancelMessage"
+        title="停止生成"
+      >
+        <Square :size="18" />
+      </button>
+      <button
+        v-else
         class="send-btn"
         @click="sendMessage"
         :disabled="!messageInput.trim()"
+        :title="requestStatus === 'cancelled' ? '重新输入后发送' : '发送'"
       >
         <Send :size="18" />
       </button>
@@ -197,7 +231,7 @@ defineExpose({
 /* 输入容器 */
 .input-container {
   display: flex;
-  align-items: flex-end; /* 确保多行输入时按钮居底 */
+  align-items: flex-end;
   gap: 12px;
   background: var(--bg-primary);
   border-radius: 24px;
@@ -226,7 +260,7 @@ defineExpose({
   justify-content: center;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
-  margin-bottom: 2px; /* 微调与底部的间距 */
+  margin-bottom: 2px;
 }
 
 .toolbar-toggle-btn:hover {
@@ -255,35 +289,26 @@ defineExpose({
   overflow-y: auto;
   font-family: inherit;
   font-weight: 400;
-  height: 40px; /* 基础高度 */
+  height: 40px;
   transition: height 0.1s ease;
 }
 
 .message-input::placeholder {
   color: var(--text-muted);
-  opacity: 0.8;
 }
 
-.message-input::-webkit-scrollbar {
-  width: 4px;
-}
-
-.message-input::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.message-input::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
+.message-input:disabled {
+  cursor: default;
+  opacity: 0.85;
 }
 
 /* 发送按钮 */
 .send-btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: none;
-  background: var(--accent-purple);
+  background: linear-gradient(135deg, var(--accent-purple), #8b7cf6);
   color: white;
   cursor: pointer;
   display: flex;
@@ -291,23 +316,28 @@ defineExpose({
   justify-content: center;
   transition: all 0.2s ease;
   flex-shrink: 0;
-  margin-bottom: 2px;
+}
+
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(157, 141, 241, 0.35);
+}
+
+.send-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .send-btn:disabled {
-  background: var(--bg-tertiary);
-  color: var(--text-muted);
+  opacity: 0.45;
   cursor: not-allowed;
-  opacity: 0.6;
+  box-shadow: none;
 }
 
-.send-btn:not(:disabled):hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(157, 141, 241, 0.3);
-  filter: brightness(1.05);
+.stop-btn {
+  background: linear-gradient(135deg, #f97316, #ef4444);
 }
 
-.send-btn:not(:disabled):active {
-  transform: translateY(0);
+.stop-btn:hover {
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.28);
 }
 </style>

@@ -33,6 +33,7 @@ interface SendFlowDeps {
     systemPrompt?: string,
     systemMessages?: ChatMessage[]
   ) => Promise<void>;
+  cancelRequest: () => void;
   buildSystemMessages: (context: {
     aiCharacter?: AICharacter;
     userCharacter?: UserCharacter;
@@ -48,8 +49,21 @@ interface SendFlowDeps {
 export function useChatSendFlow(deps: SendFlowDeps) {
   const shouldAutoScrollOnStream = ref(true);
   const STREAM_FLUSH_INTERVAL_MS = 50;
+  const isSending = ref(false);
+
+  const handleCancelSend = () => {
+    if (!isSending.value) {
+      return;
+    }
+
+    deps.cancelRequest();
+  };
 
   const handleSendMessage = async (content: string) => {
+    if (isSending.value) {
+      return;
+    }
+
     deps.resetUsage();
     await deps.loadRegexRules();
 
@@ -82,6 +96,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
     };
     deps.messages.value.push(assistantMessage);
     shouldAutoScrollOnStream.value = true;
+    isSending.value = true;
 
     const systemMessages = deps.buildSystemMessages({
       aiCharacter: deps.currentCharacter.value,
@@ -94,6 +109,8 @@ export function useChatSendFlow(deps: SendFlowDeps) {
 
     let streamBuffer = '';
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    let isCancelled = false;
+    let hasCompleted = false;
 
     const flushBufferedContent = () => {
       if (!streamBuffer) return;
@@ -131,6 +148,13 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       }, STREAM_FLUSH_INTERVAL_MS);
     };
 
+    const finalizeSend = async () => {
+      clearFlushTimer();
+      flushBufferedContent();
+      isSending.value = false;
+      await deps.saveConversation();
+    };
+
     try {
       await deps.sendStreamChatRequest(
         chatHistoryBeforeSend,
@@ -138,27 +162,32 @@ export function useChatSendFlow(deps: SendFlowDeps) {
           streamBuffer += chunk;
           scheduleFlush();
         },
-        () => {
-          clearFlushTimer();
-          flushBufferedContent();
+        async () => {
+          hasCompleted = true;
+          await finalizeSend();
 
           const msg = deps.messages.value.find(m => m.id === assistantMessageId);
           if (!msg) return;
 
           msg.content = applyRules(msg.content, 'assistant', 'after-macro', deps.regexRules.value);
-          deps.saveConversation();
           const notificationMsg = getNotificationMessage('CHAT_SEND_SUCCESS');
           deps.showSuccess(notificationMsg.title, notificationMsg.message);
         },
-        (error: string) => {
-          clearFlushTimer();
-          streamBuffer = '';
+        async (error: string) => {
+          isCancelled = error === '请求已取消';
+          await finalizeSend();
 
           const msg = deps.messages.value.find(m => m.id === assistantMessageId);
           if (!msg) return;
 
+          if (isCancelled) {
+            if (!msg.content.trim()) {
+              msg.content = '已停止生成';
+            }
+            return;
+          }
+
           msg.content = `错误: ${error}`;
-          deps.saveConversation();
           const notificationMsg = getNotificationMessage('CHAT_SEND_FAILED', { error });
           deps.showError(notificationMsg.title, notificationMsg.message);
         },
@@ -166,14 +195,27 @@ export function useChatSendFlow(deps: SendFlowDeps) {
         systemMessages.length > 0 ? systemMessages : undefined
       );
     } catch (err) {
+      if (hasCompleted || isCancelled) {
+        return;
+      }
+
       clearFlushTimer();
       streamBuffer = '';
+      isSending.value = false;
       const msg = deps.messages.value.find(m => m.id === assistantMessageId);
       if (!msg) return;
 
       const errorMessage = err instanceof Error ? err.message : '发送失败';
-      msg.content = errorMessage;
-      deps.saveConversation();
+      if (errorMessage === '请求已取消') {
+        if (!msg.content.trim()) {
+          msg.content = '已停止生成';
+        }
+        await deps.saveConversation();
+        return;
+      }
+
+      msg.content = `错误: ${errorMessage}`;
+      await deps.saveConversation();
       const notificationMsg = getNotificationMessage('CHAT_SEND_FAILED', { error: errorMessage });
       deps.showError(notificationMsg.title, notificationMsg.message);
     }
@@ -181,6 +223,8 @@ export function useChatSendFlow(deps: SendFlowDeps) {
 
   return {
     shouldAutoScrollOnStream,
+    isSending,
     handleSendMessage,
+    handleCancelSend,
   };
 }

@@ -87,6 +87,8 @@ describe('useChatApi', () => {
 
     expect(api.isStreaming.value).toBe(false);
     expect(api.isLoading.value).toBe(false);
+    expect(api.requestStatus.value).toBe('cancelled');
+    expect(api.wasCancelled.value).toBe(true);
     expect(onError).toHaveBeenCalledWith('请求已取消');
   });
 });

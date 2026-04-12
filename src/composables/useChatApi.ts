@@ -4,7 +4,7 @@
  * 使用新的 API 服务层提供聊天功能
  */
 
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import type {
   ChatMessage,
   Message,
@@ -19,18 +19,54 @@ import {
 import { getStorage, setStorage } from '@/utils/storage';
 import { ChatApi, type ApiClientConfig } from '@/api';
 
+export type ChatRequestStatus = 'idle' | 'sending' | 'streaming' | 'cancelled' | 'error' | 'completed';
+
+interface UsageStats {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+interface RequestTelemetry {
+  startedAt: number;
+  firstChunkAt: number | null;
+  completedAt: number | null;
+}
+
 export function useChatApi() {
   const isLoading = ref(false);
   const isStreaming = ref(false);
   const error = ref<string | null>(null);
+  const requestStatus = ref<ChatRequestStatus>('idle');
+  const wasCancelled = ref(false);
   let activeChatApi: ChatApi | null = null;
 
+  const isRequestActive = computed(() => requestStatus.value === 'sending' || requestStatus.value === 'streaming');
+
+  const setRequestStatus = (status: ChatRequestStatus) => {
+    requestStatus.value = status;
+    isLoading.value = status === 'sending' || status === 'streaming';
+    isStreaming.value = status === 'streaming';
+  };
+
   // Token 使用统计
-  const usage = ref<{
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  } | null>(null);
+  const usage = ref<UsageStats | null>(null);
+  const requestTelemetry = ref<RequestTelemetry | null>(null);
+
+  const responseMetrics = computed(() => {
+    const telemetry = requestTelemetry.value;
+    if (!telemetry) {
+      return null;
+    }
+
+    return {
+      startedAt: telemetry.startedAt,
+      firstChunkAt: telemetry.firstChunkAt,
+      completedAt: telemetry.completedAt,
+      timeToFirstChunkMs: telemetry.firstChunkAt !== null ? telemetry.firstChunkAt - telemetry.startedAt : null,
+      totalDurationMs: telemetry.completedAt !== null ? telemetry.completedAt - telemetry.startedAt : null,
+    };
+  });
 
   /**
    * 创建 ChatApi 实例
@@ -112,29 +148,35 @@ export function useChatApi() {
     systemPrompt?: string,
     systemMessages?: ChatMessage[]
   ): Promise<string> {
-    isLoading.value = true;
     error.value = null;
+    wasCancelled.value = false;
+    requestTelemetry.value = {
+      startedAt: Date.now(),
+      firstChunkAt: null,
+      completedAt: null,
+    };
+    setRequestStatus('sending');
 
     logApi('开始发送聊天请求（非流式）', { messageCount: messages.length });
 
     const preset = await loadCurrentPreset();
     if (!preset) {
       error.value = '请先配置 API 预设';
-      isLoading.value = false;
+      setRequestStatus('error');
       logApiError(error.value);
       throw new Error(error.value);
     }
 
     if (!preset.url || !preset.model) {
       error.value = 'API URL 和模型不能为空';
-      isLoading.value = false;
+      setRequestStatus('error');
       logApiError(error.value);
       throw new Error(error.value);
     }
 
     if (preset.proxy.enabled && !preset.proxy.url) {
       error.value = '请先配置代理 URL';
-      isLoading.value = false;
+      setRequestStatus('error');
       logApiError(error.value);
       throw new Error(error.value);
     }
@@ -168,6 +210,12 @@ export function useChatApi() {
 
       if (response.choices && response.choices.length > 0) {
         const content = response.choices[0]!.message.content;
+        requestTelemetry.value = {
+          startedAt: requestTelemetry.value?.startedAt ?? Date.now(),
+          firstChunkAt: requestTelemetry.value?.startedAt ?? Date.now(),
+          completedAt: Date.now(),
+        };
+        setRequestStatus('completed');
         return content;
       }
 
@@ -179,11 +227,14 @@ export function useChatApi() {
       }
 
       error.value = errorMessage;
+      setRequestStatus('error');
       logApiError('请求异常', { error: errorMessage });
       throw new Error(errorMessage);
     } finally {
       activeChatApi = null;
-      isLoading.value = false;
+      if (requestStatus.value === 'sending') {
+        setRequestStatus('idle');
+      }
     }
   }
 
@@ -198,9 +249,14 @@ export function useChatApi() {
     systemPrompt?: string,
     systemMessages?: ChatMessage[]
   ): Promise<void> {
-    isLoading.value = true;
-    isStreaming.value = true;
     error.value = null;
+    wasCancelled.value = false;
+    requestTelemetry.value = {
+      startedAt: Date.now(),
+      firstChunkAt: null,
+      completedAt: null,
+    };
+    setRequestStatus('sending');
 
     logApi('开始发送聊天请求（流式）', { messageCount: messages.length });
 
@@ -208,8 +264,7 @@ export function useChatApi() {
     if (!preset) {
       const errorMsg = '请先配置 API 预设（包括 URL 和模型名称）并保存';
       error.value = errorMsg;
-      isLoading.value = false;
-      isStreaming.value = false;
+      setRequestStatus('error');
       logApiError(errorMsg);
       onError(errorMsg);
       return;
@@ -218,8 +273,7 @@ export function useChatApi() {
     if (!preset.url) {
       const errorMsg = 'API URL 不能为空，请在 API 预设页面输入 API URL 并保存';
       error.value = errorMsg;
-      isLoading.value = false;
-      isStreaming.value = false;
+      setRequestStatus('error');
       logApiError(errorMsg);
       onError(errorMsg);
       return;
@@ -228,8 +282,7 @@ export function useChatApi() {
     if (!preset.model) {
       const errorMsg = '模型名称不能为空，请在 API 预设页面输入或选择模型名称并保存';
       error.value = errorMsg;
-      isLoading.value = false;
-      isStreaming.value = false;
+      setRequestStatus('error');
       logApiError(errorMsg);
       onError(errorMsg);
       return;
@@ -238,8 +291,7 @@ export function useChatApi() {
     if (preset.proxy.enabled && !preset.proxy.url) {
       const errorMsg = '请先配置代理 URL';
       error.value = errorMsg;
-      isLoading.value = false;
-      isStreaming.value = false;
+      setRequestStatus('error');
       logApiError(errorMsg);
       onError(errorMsg);
       return;
@@ -251,6 +303,7 @@ export function useChatApi() {
 
       let chunkCount = 0;
       let totalLength = 0;
+      setRequestStatus('streaming');
 
       for await (const _chunk of chatApi.sendStreamMessage(messages, {
         systemPrompt,
@@ -258,6 +311,14 @@ export function useChatApi() {
         temperature: preset.temperature,
         maxTokens: preset.maxOutputTokens,
         onChunk: (content) => {
+          if (!requestTelemetry.value?.firstChunkAt) {
+            requestTelemetry.value = {
+              startedAt: requestTelemetry.value?.startedAt ?? Date.now(),
+              firstChunkAt: Date.now(),
+              completedAt: null,
+            };
+          }
+
           chunkCount++;
           totalLength += content.length;
           onChunk(content);
@@ -266,11 +327,33 @@ export function useChatApi() {
             logApi('接收进度', { chunks: chunkCount, length: totalLength });
           }
         },
-        onComplete: () => {
+        onComplete: (meta) => {
+          if (meta?.usage) {
+            usage.value = {
+              promptTokens: meta.usage.prompt_tokens,
+              completionTokens: meta.usage.completion_tokens,
+              totalTokens: meta.usage.total_tokens,
+            };
+            logApi('流式 Token 使用量', {
+              prompt: meta.usage.prompt_tokens,
+              completion: meta.usage.completion_tokens,
+              total: meta.usage.total_tokens,
+            });
+          }
+
+          requestTelemetry.value = {
+            startedAt: requestTelemetry.value?.startedAt ?? Date.now(),
+            firstChunkAt: requestTelemetry.value?.firstChunkAt ?? null,
+            completedAt: Date.now(),
+          };
+          setRequestStatus('completed');
           logApi('流式响应完成', { totalChunks: chunkCount, totalLength });
           onComplete();
         },
         onError: (errorMessage) => {
+          if (!wasCancelled.value) {
+            setRequestStatus('error');
+          }
           logApiError('流式请求异常', { error: errorMessage });
           onError(errorMessage);
         },
@@ -284,13 +367,17 @@ export function useChatApi() {
         errorMessage = err.message;
       }
 
-      error.value = errorMessage;
-      logApiError('请求异常', { error: errorMessage });
-      onError(errorMessage);
+      if (!wasCancelled.value) {
+        error.value = errorMessage;
+        setRequestStatus('error');
+        logApiError('请求异常', { error: errorMessage });
+        onError(errorMessage);
+      }
     } finally {
       activeChatApi = null;
-      isLoading.value = false;
-      isStreaming.value = false;
+      if (requestStatus.value === 'sending' || requestStatus.value === 'streaming') {
+        setRequestStatus(wasCancelled.value ? 'cancelled' : 'idle');
+      }
     }
   }
 
@@ -302,22 +389,32 @@ export function useChatApi() {
       return;
     }
 
+    wasCancelled.value = true;
+    error.value = null;
+    setRequestStatus('cancelled');
     activeChatApi.cancelActiveStream();
-    isLoading.value = false;
-    isStreaming.value = false;
     logApi('已取消当前流式请求');
   }
 
   return {
     isLoading,
     isStreaming,
+    isRequestActive,
     error,
     usage,
+    requestTelemetry,
+    responseMetrics,
+    requestStatus,
+    wasCancelled,
     sendChatRequest,
     sendStreamChatRequest,
     cancelRequest,
     resetUsage: () => {
       usage.value = null;
+      requestTelemetry.value = null;
+      error.value = null;
+      wasCancelled.value = false;
+      setRequestStatus('idle');
     },
   };
 }

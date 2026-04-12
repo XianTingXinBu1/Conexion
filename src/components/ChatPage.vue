@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect, defineAsyncComponent } from 'vue';
+import { ref, computed, defineAsyncComponent } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
-import type { Message, AICharacter, RegexRule, Conversation, UserCharacter, PromptPreset, ChatMessage } from '../types';
-import { applyRules, clearRegexCache } from '../utils/regexEngine';
+import type { Message, AICharacter, RegexRule, Conversation, UserCharacter } from '../types';
+import { clearRegexCache } from '../utils/regexEngine';
 import { getStorage } from '@/utils/storage';
 import {
   DEFAULT_AI_CHARACTERS,
   DEFAULT_REGEX_SCRIPTS,
   STORAGE_KEYS,
-  DEFAULT_PROMPT_PRESETS,
 } from '../constants';
 import { ChatInput, MessageItem, ContextRing } from './chat';
 import { useChatApi } from '../composables/useChatApi';
@@ -17,14 +16,18 @@ import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useCharacters } from '../composables/useCharacters';
 import { useKnowledgeBases } from '../composables/useKnowledgeBases';
 import { useApiPresets } from '../modules/api-preset';
-import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { buildSystemPrompt } from '../modules/system-prompt';
-import { logPrompt, logSystemPrompt } from '../modules/debug';
+import { useNotifications } from '../modules/notification';
 import { useConversationManager } from '../composables/useConversationManager';
 import { useAppSettings } from '../composables/useAppSettings';
 import { useTheme } from '../composables/useTheme';
 import { useChatStats } from '../composables/useChatStats';
 import { useChatViewport } from '../composables/useChatViewport';
+import { useChatMessageActions } from '../composables/useChatMessageActions';
+import { useChatPromptBuilder } from '../composables/useChatPromptBuilder';
+import { useChatSendFlow } from '../composables/useChatSendFlow';
+import { useChatPageInit } from '../composables/useChatPageInit';
+import { useChatSessionMeta } from '../composables/useChatSessionMeta';
+import { useChatPageController } from '../composables/useChatPageController';
 
 import '../styles/common.css';
 import '../styles/chat.css';
@@ -67,11 +70,6 @@ const currentCharacter = ref<AICharacter | undefined>(props.character);
 
 const messages = ref<Message[]>([]);
 const regexRules = ref<RegexRule[]>([]);
-
-// 消息编辑和删除状态
-const showEditModal = ref(false);
-const editingMessageId = ref<string>('');
-const editingMessageContent = ref('');
 
 // 使用确认对话框 composable
 const {
@@ -117,120 +115,10 @@ const loadRegexRules = async () => {
   regexRules.value = stored;
 };
 
-
-const getChatTitle = () => {
-  if (currentCharacter.value?.name) {
-    return currentCharacter.value.name;
-  }
-  if (currentConversation.value?.characterName) {
-    return currentConversation.value.characterName;
-  }
-  return '临时会话';
-};
-
-const getChatSubtitle = () => {
-  if (currentCharacter.value || currentConversation.value?.characterName) {
-    return 'AI Character';
-  }
-  return 'TemporaryConversation';
-};
-
-// 消息编辑和删除处理函数
-const handleEditMessage = (messageId: string) => {
-  const message = messages.value.find(m => m.id === messageId);
-  if (message) {
-    editingMessageId.value = messageId;
-    editingMessageContent.value = message.content;
-    showEditModal.value = true;
-  }
-};
-
-const handleSaveEdit = async (messageId: string, newContent: string) => {
-  const success = await editMessage(messageId, newContent);
-  if (success) {
-    const message = messages.value.find(m => m.id === messageId);
-    if (message) {
-      message.content = newContent;
-    }
-    showSuccess('编辑成功', '消息已更新');
-  } else {
-    showError('编辑失败', '无法编辑临时会话的消息');
-  }
-};
-
-const handleDeleteMessage = (messageId: string) => {
-  const message = messages.value.find(m => m.id === messageId);
-  if (message) {
-    showDeleteConfirmDialog(messageId, `消息 #${message.content.slice(0, 20)}...`, '这条消息');
-  }
-};
-
-const confirmDelete = async () => {
-  const messageId = confirmDeleteMessage();
-  if (messageId) {
-    const success = await deleteMessage(messageId);
-    if (success) {
-      const index = messages.value.findIndex(m => m.id === messageId);
-      if (index !== -1) {
-        messages.value.splice(index, 1);
-      }
-      showSuccess('删除成功', '消息已删除');
-    } else {
-      showError('删除失败', '无法删除临时会话的消息');
-    }
-  }
-};
-
-const handleShowPromptAssistant = () => {
-  // 实时构建提示词
-  const currentPreset = getCurrentPromptPreset();
-  let systemMessages: ChatMessage[] = [];
-
-  if (currentPreset) {
-    logPrompt('实时构建提示词预览', { presetName: currentPreset.name, itemCount: currentPreset.items.length });
-    const result = buildSystemPrompt({
-      preset: currentPreset,
-      aiCharacter: currentCharacter.value || undefined,
-      userCharacter: selectedUser.value || undefined,
-      knowledgeBases: knowledgeBases.value.filter(kb => kb.globallyEnabled),
-      chatHistory: messages.value.filter(m => m.type !== 'system'),
-      userInstruction: '',
-      mergeMode: promptMergeMode.value,
-    });
-    systemMessages = result.messages;
-
-    lastSystemPromptResult.value = {
-      estimatedTokens: result.estimatedTokens,
-      metadata: result.metadata,
-    };
-  } else {
-    logPrompt('实时构建提示词预览（默认）');
-    if (currentCharacter.value) {
-      const parts: string[] = [];
-      if (currentCharacter.value.name) {
-        parts.push(`你的名字是：${currentCharacter.value.name}`);
-      }
-      if (currentCharacter.value.description) {
-        parts.push(`你的描述：${currentCharacter.value.description}`);
-      }
-      if (currentCharacter.value.personality) {
-        parts.push(`你的性格：${currentCharacter.value.personality}`);
-      }
-      if (parts.length > 0) {
-        systemMessages.push({
-          role: 'system' as const,
-          content: parts.join('\n')
-        });
-      }
-    }
-    lastSystemPromptResult.value = {
-      estimatedTokens: systemMessages.reduce((sum, msg) => sum + msg.content.length, 0),
-    };
-  }
-
-  lastSystemMessages.value = systemMessages;
-  showPromptPreview.value = true;
-};
+const { chatTitle, chatSubtitle } = useChatSessionMeta({
+  currentCharacter,
+  currentConversation,
+});
 
 const { sendStreamChatRequest, usage, resetUsage } = useChatApi();
 const { showSuccess, showError } = useNotifications();
@@ -260,244 +148,84 @@ const {
   aiMessageCount,
 } = useChatStats(messages, currentApiPreset);
 
-const promptPresets = ref<PromptPreset[]>([]);
-const selectedPromptPresetId = ref<string>('default');
+const {
+  lastSystemPromptResult,
+  lastSystemMessages,
+  showPromptPreview,
+  loadPromptPresets,
+  showPromptAssistant,
+  buildSystemMessages,
+} = useChatPromptBuilder();
 
-const loadPromptPresets = async () => {
-  const stored = await getStorage<PromptPreset[]>(STORAGE_KEYS.PROMPT_PRESETS, [...DEFAULT_PROMPT_PRESETS].map(p => ({
-    ...p,
-    items: [...p.items]
-  })));
-  if (stored) {
-    promptPresets.value = stored;
-  }
-
-  const selectedId = await getStorage<string>(STORAGE_KEYS.SELECTED_PROMPT_PRESET, '');
-  if (selectedId) {
-    const exists = promptPresets.value.some(p => p.id === selectedId);
-    if (exists) {
-      selectedPromptPresetId.value = selectedId;
-    }
-  }
-};
-
-const getCurrentPromptPreset = (): PromptPreset | null => {
-  return promptPresets.value.find(p => p.id === selectedPromptPresetId.value) || null;
-};
-
-const showTokenDetails = ref(false);
-const toggleTokenDetails = () => {
-  showTokenDetails.value = !showTokenDetails.value;
-};
-
-const lastSystemPromptResult = ref<{
-  estimatedTokens: number;
-  metadata?: {
-    filledPlaceholders?: Record<string, { contentLength: number }>;
-    totalItems: number;
-    enabledItems: number;
-  };
-} | null>(null);
-
-// 保存上一次构建的系统消息
-const lastSystemMessages = ref<ChatMessage[]>([]);
-
-// 提示词预览模态框
-const showPromptPreview = ref(false);
-const shouldAutoScrollOnStream = ref(true);
-
-const handleSendMessage = async (content: string) => {
-  resetUsage();
-  await loadRegexRules();
-
-  let processedContent = applyRules(content, 'user', 'after-macro', regexRules.value);
-
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    type: 'user',
-    content: processedContent,
-    timestamp: Date.now(),
-  };
-
-  const chatHistoryBeforeSend = [...messages.value];
-  messages.value.push(userMessage);
-
-  if (!persistedConversationId.value) {
-    await createNewConversation(userMessage);
-  } else {
-    await saveConversation();
-  }
-
-  await scrollToBottom(true);
-
-  const assistantMessageId = (Date.now() + 1).toString();
-  const assistantMessage: Message = {
-    id: assistantMessageId,
-    type: 'assistant',
-    content: '',
-    timestamp: Date.now(),
-  };
-  messages.value.push(assistantMessage);
-  shouldAutoScrollOnStream.value = true;
-
-  const chatHistory = chatHistoryBeforeSend;
-
-  const currentPreset = getCurrentPromptPreset();
-  let systemMessages: ChatMessage[] = [];
-
-  if (currentPreset) {
-    logPrompt('使用提示词预设', { presetName: currentPreset.name, itemCount: currentPreset.items.length });
-    const result = buildSystemPrompt({
-      preset: currentPreset,
-      aiCharacter: currentCharacter.value || undefined,
-      userCharacter: selectedUser.value || undefined,
-      knowledgeBases: knowledgeBases.value.filter(kb => kb.globallyEnabled),
-      chatHistory: chatHistory,
-      userInstruction: processedContent,
-      mergeMode: promptMergeMode.value,
-    });
-    systemMessages = result.messages;
-    lastSystemMessages.value = systemMessages;
-
-    lastSystemPromptResult.value = {
-      estimatedTokens: result.estimatedTokens,
-      metadata: result.metadata,
-    };
-
-    logSystemPrompt({
-      presetName: currentPreset.name,
-      messageCount: result.messages.length,
-      usedItems: result.usedItemIds.length,
-      skippedItems: result.skippedItemIds.length,
-      estimatedTokens: result.estimatedTokens,
-      userInstructionIncluded: result.userInstructionIncluded,
-      allItems: currentPreset.items.map(item => ({
-        id: item.id,
-        name: item.name,
-        enabled: item.enabled,
-        insertPosition: item.insertPosition,
-      })),
-      enabledItems: currentPreset.items.filter(item => item.enabled).map(item => ({
-        id: item.id,
-        name: item.name,
-        insertPosition: item.insertPosition,
-      })),
-      messages: result.messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      })),
-    });
-  } else {
-    logPrompt('未找到提示词预设，使用默认构建');
-    if (currentCharacter.value) {
-      const parts: string[] = [];
-      if (currentCharacter.value.name) {
-        parts.push(`你的名字是：${currentCharacter.value.name}`);
-      }
-      if (currentCharacter.value.description) {
-        parts.push(`你的描述：${currentCharacter.value.description}`);
-      }
-      if (currentCharacter.value.personality) {
-        parts.push(`你的性格：${currentCharacter.value.personality}`);
-      }
-      if (parts.length > 0) {
-        systemMessages.push({
-          role: 'system' as const,
-          content: parts.join('\n')
-        });
-      }
-    }
-    lastSystemMessages.value = systemMessages;
-    lastSystemPromptResult.value = {
-      estimatedTokens: systemMessages.reduce((sum, msg) => sum + msg.content.length, 0),
-    };
-  }
-
-  try {
-    await sendStreamChatRequest(
-      chatHistory,
-      (chunk: string) => {
-        const msg = messages.value.find(m => m.id === assistantMessageId);
-        if (msg) {
-          msg.content += chunk;
-          msg.content = applyRules(msg.content, 'assistant', 'after-macro', regexRules.value);
-          if (shouldAutoScrollOnStream.value) {
-            scrollToBottom();
-          }
-        }
-      },
-      () => {
-        const msg = messages.value.find(m => m.id === assistantMessageId);
-        if (msg) {
-          msg.content = applyRules(msg.content, 'assistant', 'after-macro', regexRules.value);
-          saveConversation();
-          const notificationMsg = getNotificationMessage('CHAT_SEND_SUCCESS');
-          showSuccess(notificationMsg.title, notificationMsg.message);
-        }
-      },
-      (error: string) => {
-        const msg = messages.value.find(m => m.id === assistantMessageId);
-        if (msg) {
-          msg.content = `错误: ${error}`;
-          saveConversation();
-          const notificationMsg = getNotificationMessage('CHAT_SEND_FAILED', { error });
-          showError(notificationMsg.title, notificationMsg.message);
-        }
-      },
-      undefined,
-      systemMessages.length > 0 ? systemMessages : undefined
-    );
-  } catch (err) {
-    const msg = messages.value.find(m => m.id === assistantMessageId);
-    if (msg) {
-      const errorMessage = err instanceof Error ? err.message : '发送失败';
-      msg.content = errorMessage;
-      saveConversation();
-      const notificationMsg = getNotificationMessage('CHAT_SEND_FAILED', { error: errorMessage });
-      showError(notificationMsg.title, notificationMsg.message);
-    }
-  }
-};
-
-onMounted(async () => {
-  // 如果通过 characterId 参数传入了角色ID，则加载角色数据
-  if (props.characterId && !props.character) {
-    const loadedCharacter = await loadAICharacter(props.characterId);
-    if (loadedCharacter) {
-      currentCharacter.value = loadedCharacter;
-    }
-  }
-
-  await loadRegexRules();
-  await loadConversation();
-  syncVisibleMessages();
-  await loadPromptPresets();
-  await loadApiPresets();
-  initCharacters();
-  initKnowledgeBases();
-  await scrollToBottom(true);
+const {
+  showTokenDetails,
+  closeTokenDetails,
+  toggleTokenDetails,
+  openPromptAssistant,
+} = useChatPageController({
+  currentCharacter,
+  selectedUser,
+  knowledgeBases,
+  messages,
+  promptMergeMode,
+  showPromptAssistant,
 });
 
-onUnmounted(() => {
-  // 清理资源
+const { shouldAutoScrollOnStream, handleSendMessage } = useChatSendFlow({
+  messages,
+  regexRules,
+  currentCharacter,
+  selectedUser,
+  knowledgeBases,
+  promptMergeMode,
+  persistedConversationId,
+  resetUsage,
+  loadRegexRules,
+  createNewConversation,
+  saveConversation,
+  scrollToBottom,
+  sendStreamChatRequest,
+  buildSystemMessages,
+  showSuccess,
+  showError,
 });
 
-watch(
-  [() => messages.value.length, chatHistoryLimit],
-  () => {
-    loadMessages();
-  },
-  { immediate: true }
-);
+const {
+  showEditModal,
+  editingMessageId,
+  editingMessageContent,
+  handleEditMessage,
+  handleSaveEdit,
+  handleDeleteMessage,
+  confirmDelete,
+} = useChatMessageActions({
+  messages,
+  editMessage,
+  deleteMessage,
+  showDeleteConfirmDialog,
+  confirmDeleteMessage,
+  showSuccess,
+  showError,
+});
 
-watchEffect(() => {
-  for (const message of displayMessages.value) {
-    message.content;
-  }
-
-  if (displayMessages.value.length > 0 && messages.value.length > 0) {
-    shouldAutoScrollOnStream.value = isNearBottom();
-  }
+useChatPageInit({
+  props,
+  messages,
+  displayMessages,
+  currentCharacter,
+  chatHistoryLimit,
+  shouldAutoScrollOnStream,
+  loadAICharacter,
+  loadRegexRules,
+  loadConversation,
+  syncVisibleMessages,
+  loadPromptPresets,
+  loadApiPresets,
+  initCharacters,
+  initKnowledgeBases,
+  scrollToBottom,
+  loadMessages,
+  isNearBottom,
 });
 </script>
 
@@ -508,8 +236,8 @@ watchEffect(() => {
         <ArrowLeft :size="22" />
       </button>
       <div class="header-content">
-        <div class="chat-title">{{ getChatTitle() }}</div>
-        <div class="chat-subtitle">{{ getChatSubtitle() }}</div>
+        <div class="chat-title">{{ chatTitle }}</div>
+        <div class="chat-subtitle">{{ chatSubtitle }}</div>
       </div>
       <ContextRing
         :current="currentContextCount"
@@ -558,13 +286,13 @@ watchEffect(() => {
       :current-api-preset="currentApiPreset || null"
       :usage="usage"
       :theme="theme"
-      @close="toggleTokenDetails"
+      @close="closeTokenDetails"
     />
 
     <ChatInput
       :enter-to-send="enterToSend"
       @send="handleSendMessage"
-      @show-prompt-assistant="handleShowPromptAssistant"
+      @show-prompt-assistant="openPromptAssistant"
     />
 
     <!-- 编辑消息模态框 -->
@@ -583,7 +311,7 @@ watchEffect(() => {
       :estimated-tokens="lastSystemPromptResult?.estimatedTokens"
       :theme="theme"
       @update:show="showPromptPreview = false"
-      @refresh="handleShowPromptAssistant"
+      @refresh="openPromptAssistant"
     />
 
     <!-- 删除确认对话框 -->

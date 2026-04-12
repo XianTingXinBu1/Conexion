@@ -12,9 +12,15 @@ const emit = defineEmits<{
   click: [conversation: Conversation];
   edit: [conversation: Conversation];
   delete: [conversation: Conversation];
+  prepare: [conversation: Conversation];
 }>();
 
+const handlePrepare = () => {
+  emit('prepare', props.conversation);
+};
+
 const handleClick = () => {
+  handlePrepare();
   emit('click', props.conversation);
 };
 
@@ -57,7 +63,7 @@ const getConversationPreview = (conversation: Conversation) => {
 </script>
 
 <template>
-  <div class="conversation-item" @click="handleClick">
+  <div class="conversation-item" @click="handleClick" @pointerenter="handlePrepare" @touchstart.passive="handlePrepare" @focusin="handlePrepare">
     <div class="conversation-icon">
       <Bot :size="20" />
     </div>

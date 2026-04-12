@@ -9,12 +9,23 @@ import ConfirmDialog from './ConfirmDialog.vue';
 import Modal from './common/Modal.vue';
 import EmptyState from './common/EmptyState.vue';
 import PageHeader from './common/PageHeader.vue';
+import { prefetchRouteComponent } from '@/router';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import { getStorage } from '@/utils/storage';
 import { useConversations } from '../composables/useConversations';
 import '../styles/conversation-list.css';
 
 const router = useRouter();
+const prefetchedRoutes = new Set<string>();
+
+const prepareRoute = (target: string) => {
+  if (prefetchedRoutes.has(target)) {
+    return;
+  }
+
+  prefetchedRoutes.add(target);
+  void prefetchRouteComponent(target);
+};
 
 // 使用通知 composable
 const { showSuccess, showInfo, showError } = useNotifications();
@@ -148,6 +159,7 @@ const confirmRename = async () => {
 
 // 打开会话
 const openConversation = (conversation: Conversation) => {
+  prepareRoute('/chat');
   router.push(`/chat/${conversation.id}`);
 };
 
@@ -164,11 +176,13 @@ const openCharacterSelector = async () => {
 
 // 选择临时会话
 const handleTempChatClick = () => {
+  prepareRoute('/chat');
   router.push('/chat');
 };
 
 // 选择角色并进入会话
 const selectCharacter = (character: AICharacter) => {
+  prepareRoute('/chat');
   router.push(`/chat/character/${character.id}`);
   showCharacterSelector.value = false;
 };
@@ -187,7 +201,7 @@ const selectCharacter = (character: AICharacter) => {
     </PageHeader>
 
     <!-- 临时会话按钮 -->
-    <div class="temp-chat-banner" @click="handleTempChatClick">
+    <div class="temp-chat-banner" @click="handleTempChatClick" @pointerenter="prepareRoute('/chat')" @touchstart.passive="prepareRoute('/chat')" @focusin="prepareRoute('/chat')">
       <div class="temp-chat-icon">
         <Clock :size="24" />
       </div>
@@ -232,6 +246,7 @@ const selectCharacter = (character: AICharacter) => {
             v-for="conversation in filteredConversations"
             :key="conversation.id"
             :conversation="conversation"
+            @prepare="prepareRoute('/chat')"
             @click="openConversation"
             @edit="openRenameDialog"
             @delete="handleDeleteConversation"

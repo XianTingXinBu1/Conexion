@@ -1,6 +1,21 @@
 <script setup lang="ts">
+import { defineAsyncComponent, type Component } from 'vue';
 import AppProvider from './components/AppProvider.vue';
+import RouteLoadingFallback from './components/common/RouteLoadingFallback.vue';
 import { NotificationContainer } from '@/modules/notification';
+
+const getRouteComponent = (component: unknown) => {
+  if (typeof component !== 'function') {
+    return component;
+  }
+
+  return defineAsyncComponent({
+    loader: component as () => Promise<Component>,
+    loadingComponent: RouteLoadingFallback,
+    delay: 120,
+    suspensible: false,
+  });
+};
 </script>
 
 <template>
@@ -9,7 +24,7 @@ import { NotificationContainer } from '@/modules/notification';
       <router-view v-slot="{ Component, route }">
         <Transition :name="(route.meta.transitionName as string) || 'route-shell'" mode="out-in" appear>
           <div :key="route.fullPath" class="route-shell">
-            <component :is="Component" />
+            <component :is="getRouteComponent(Component)" />
           </div>
         </Transition>
       </router-view>
@@ -39,6 +54,8 @@ import { NotificationContainer } from '@/modules/notification';
   --text-on-accent: #FFFFFF;
   --text-on-accent-muted: rgba(255, 255, 255, 0.88);
   --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --route-loading-surface: rgba(157, 141, 241, 0.14);
+  --route-loading-shimmer: rgba(255, 255, 255, 0.48);
 }
 
 [data-theme='dark'] {
@@ -58,6 +75,8 @@ import { NotificationContainer } from '@/modules/notification';
   --accent-gradient-end: #7D8FE8;
   --text-on-accent: #FFFFFF;
   --text-on-accent-muted: rgba(255, 255, 255, 0.85);
+  --route-loading-surface: rgba(183, 163, 227, 0.18);
+  --route-loading-shimmer: rgba(255, 255, 255, 0.18);
 }
 
 * {

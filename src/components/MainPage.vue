@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Sun, Moon, MessageSquare, Zap, Settings, FileText, User, BookOpen, Hash } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
-import { inject, onMounted } from 'vue';
-import { prefetchRouteComponents } from '@/router';
+import { inject } from 'vue';
+import { prefetchRouteComponent } from '@/router';
 import type { Theme } from '../types';
 
 // 获取路由实例
@@ -14,38 +14,16 @@ const appTheme = inject('app-theme') as { theme: Theme; toggleTheme: () => void 
 // 获取主题
 const theme = appTheme?.theme || 'light';
 
-const likelyNextRoutes = ['/conversation-list', '/settings'] as const;
+const prefetchedRoutes = new Set<string>();
 
-let hasLikelyRoutePrefetched = false;
-
-const triggerLikelyRoutePrefetch = () => {
-  if (hasLikelyRoutePrefetched) {
+const prepareRoute = (target: string) => {
+  if (prefetchedRoutes.has(target)) {
     return;
   }
 
-  hasLikelyRoutePrefetched = true;
-  void prefetchRouteComponents([...likelyNextRoutes]);
+  prefetchedRoutes.add(target);
+  void prefetchRouteComponent(target);
 };
-
-onMounted(() => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const browserWindow = window as Window & {
-    requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
-  };
-
-  const runSoon = () => {
-    window.setTimeout(() => triggerLikelyRoutePrefetch(), 1400);
-  };
-
-  if (typeof browserWindow.requestIdleCallback === 'function') {
-    browserWindow.requestIdleCallback(() => triggerLikelyRoutePrefetch(), { timeout: 2500 });
-  } else {
-    runSoon();
-  }
-});
 
 /**
  * 切换主题
@@ -58,6 +36,7 @@ const handleToggleTheme = () => {
  * 导航到会话列表
  */
 const navigateToConversationList = () => {
+  prepareRoute('/conversation-list');
   router.push('/conversation-list');
 };
 
@@ -65,6 +44,7 @@ const navigateToConversationList = () => {
  * 导航到 API 预设
  */
 const navigateToApiPreset = () => {
+  prepareRoute('/api-preset');
   router.push('/api-preset');
 };
 
@@ -72,6 +52,7 @@ const navigateToApiPreset = () => {
  * 导航到设置
  */
 const navigateToSettings = () => {
+  prepareRoute('/settings');
   router.push('/settings');
 };
 
@@ -79,6 +60,7 @@ const navigateToSettings = () => {
  * 导航到正则脚本
  */
 const navigateToRegexScript = () => {
+  prepareRoute('/regex-script');
   router.push('/regex-script');
 };
 
@@ -86,6 +68,7 @@ const navigateToRegexScript = () => {
  * 导航到角色管理
  */
 const navigateToRoleManagement = () => {
+  prepareRoute('/role-management');
   router.push('/role-management');
 };
 
@@ -93,6 +76,7 @@ const navigateToRoleManagement = () => {
  * 导航到提示词预设
  */
 const navigateToPromptPreset = () => {
+  prepareRoute('/prompt-preset');
   router.push('/prompt-preset');
 };
 
@@ -100,6 +84,7 @@ const navigateToPromptPreset = () => {
  * 导航到知识库
  */
 const navigateToKnowledgeBase = () => {
+  prepareRoute('/knowledge-base');
   router.push('/knowledge-base');
 };
 </script>
@@ -122,7 +107,7 @@ const navigateToKnowledgeBase = () => {
     <main class="content">
       <!-- 主入口 -->
       <div class="hero-section">
-        <div class="hero-card" @click="navigateToConversationList" @pointerenter="triggerLikelyRoutePrefetch" @touchstart.passive="triggerLikelyRoutePrefetch">
+        <div class="hero-card" @click="navigateToConversationList" @pointerenter="prepareRoute('/conversation-list')" @touchstart.passive="prepareRoute('/conversation-list')" @focusin="prepareRoute('/conversation-list')">
           <div class="hero-icon">
             <MessageSquare :size="32" />
           </div>
@@ -142,25 +127,25 @@ const navigateToKnowledgeBase = () => {
       <section class="section">
         <h3 class="section-title">内容管理</h3>
         <div class="grid">
-          <div class="grid-card" @click="navigateToRoleManagement" @pointerenter="triggerLikelyRoutePrefetch">
+          <div class="grid-card" @click="navigateToRoleManagement" @pointerenter="prepareRoute('/role-management')" @touchstart.passive="prepareRoute('/role-management')" @focusin="prepareRoute('/role-management')">
             <div class="grid-icon role">
               <User :size="24" />
             </div>
             <span class="grid-label">角色卡</span>
           </div>
-          <div class="grid-card" @click="navigateToKnowledgeBase" @pointerenter="triggerLikelyRoutePrefetch">
+          <div class="grid-card" @click="navigateToKnowledgeBase" @pointerenter="prepareRoute('/knowledge-base')" @touchstart.passive="prepareRoute('/knowledge-base')" @focusin="prepareRoute('/knowledge-base')">
             <div class="grid-icon knowledge">
               <BookOpen :size="24" />
             </div>
             <span class="grid-label">知识库</span>
           </div>
-          <div class="grid-card" @click="navigateToPromptPreset">
+          <div class="grid-card" @click="navigateToPromptPreset" @pointerenter="prepareRoute('/prompt-preset')" @touchstart.passive="prepareRoute('/prompt-preset')" @focusin="prepareRoute('/prompt-preset')">
             <div class="grid-icon prompt">
               <FileText :size="24" />
             </div>
             <span class="grid-label">提示词</span>
           </div>
-          <div class="grid-card" @click="navigateToRegexScript">
+          <div class="grid-card" @click="navigateToRegexScript" @pointerenter="prepareRoute('/regex-script')" @touchstart.passive="prepareRoute('/regex-script')" @focusin="prepareRoute('/regex-script')">
             <div class="grid-icon regex">
               <Hash :size="24" />
             </div>
@@ -173,7 +158,7 @@ const navigateToKnowledgeBase = () => {
       <section class="section">
         <h3 class="section-title">配置</h3>
         <div class="list">
-          <div class="list-card" @click="navigateToApiPreset" @pointerenter="triggerLikelyRoutePrefetch">
+          <div class="list-card" @click="navigateToApiPreset" @pointerenter="prepareRoute('/api-preset')" @touchstart.passive="prepareRoute('/api-preset')" @focusin="prepareRoute('/api-preset')">
             <div class="list-icon api">
               <Zap :size="20" />
             </div>
@@ -185,7 +170,7 @@ const navigateToKnowledgeBase = () => {
               <path d="M9 18l6-6-6-6" />
             </svg>
           </div>
-          <div class="list-card" @click="navigateToSettings">
+          <div class="list-card" @click="navigateToSettings" @pointerenter="prepareRoute('/settings')" @touchstart.passive="prepareRoute('/settings')" @focusin="prepareRoute('/settings')">
             <div class="list-icon settings">
               <Settings :size="20" />
             </div>

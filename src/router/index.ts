@@ -92,6 +92,10 @@ export const prefetchRouteComponents = async (targets: RouteLocationRaw[]) => {
   );
 };
 
+export const prefetchRouteComponent = async (target: RouteLocationRaw) => {
+  await prefetchRouteComponents([target]);
+};
+
 // 定义路由
 const routes: RouteRecordRaw[] = [
   {

@@ -1,33 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
 import AppProvider from './components/AppProvider.vue';
 import { NotificationContainer } from '@/modules/notification';
-import { prefetchRouteComponents } from '@/router';
-
-const queueIdlePrefetch = () => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const browserWindow = window as Window & {
-    requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
-  };
-
-  const runPrefetch = () => {
-    void prefetchRouteComponents(['/conversation-list', '/settings']);
-  };
-
-  if (typeof browserWindow.requestIdleCallback === 'function') {
-    browserWindow.requestIdleCallback(() => runPrefetch(), { timeout: 1500 });
-    return;
-  }
-
-  window.setTimeout(runPrefetch, 700);
-};
-
-onMounted(() => {
-  queueIdlePrefetch();
-});
 </script>
 
 <template>

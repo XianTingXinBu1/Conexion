@@ -14,14 +14,16 @@ const appTheme = inject('app-theme') as { theme: Theme; toggleTheme: () => void 
 // 获取主题
 const theme = appTheme?.theme || 'light';
 
-const likelyNextRoutes = [
-  '/conversation-list',
-  '/role-management',
-  '/knowledge-base',
-  '/api-preset',
-] as const;
+const likelyNextRoutes = ['/conversation-list', '/settings'] as const;
+
+let hasLikelyRoutePrefetched = false;
 
 const triggerLikelyRoutePrefetch = () => {
+  if (hasLikelyRoutePrefetched) {
+    return;
+  }
+
+  hasLikelyRoutePrefetched = true;
   void prefetchRouteComponents([...likelyNextRoutes]);
 };
 
@@ -35,11 +37,11 @@ onMounted(() => {
   };
 
   const runSoon = () => {
-    window.setTimeout(() => triggerLikelyRoutePrefetch(), 900);
+    window.setTimeout(() => triggerLikelyRoutePrefetch(), 1400);
   };
 
   if (typeof browserWindow.requestIdleCallback === 'function') {
-    browserWindow.requestIdleCallback(() => triggerLikelyRoutePrefetch(), { timeout: 1800 });
+    browserWindow.requestIdleCallback(() => triggerLikelyRoutePrefetch(), { timeout: 2500 });
   } else {
     runSoon();
   }

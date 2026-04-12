@@ -51,7 +51,8 @@ const formatTime = (timestamp: number) => {
 const getConversationPreview = (conversation: Conversation) => {
   if (conversation.messages.length === 0) return '暂无消息';
   const lastMessage = conversation.messages[conversation.messages.length - 1]!;
-  return lastMessage.content.slice(0, 50) + (lastMessage.content.length > 50 ? '...' : '');
+  const preview = lastMessage.content.trim();
+  return preview.slice(0, 50) + (preview.length > 50 ? '...' : '');
 };
 </script>
 

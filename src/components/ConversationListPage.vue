@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ArrowLeft, Plus, Clock, MessageSquare } from 'lucide-vue-next';
+import { ArrowLeft, Plus, Clock, MessageSquare, Search, XCircle, SearchX } from 'lucide-vue-next';
 import type { AICharacter, Conversation } from '../types';
 import { STORAGE_KEYS, DEFAULT_AI_CHARACTERS } from '../constants';
 import { CharacterSelector, ConversationItem } from './conversation';
@@ -39,6 +39,49 @@ const conversationToDelete = ref<Conversation | null>(null);
 const showRenameDialog = ref(false);
 const conversationToRename = ref<Conversation | null>(null);
 const newConversationName = ref('');
+
+// 搜索
+const searchQuery = ref('');
+
+const normalizeSearchText = (value?: string) => (value ?? '').trim().toLocaleLowerCase();
+
+const getConversationPreview = (conversation: Conversation) => {
+  if (conversation.messages.length === 0) return '';
+  const lastMessage = conversation.messages[conversation.messages.length - 1];
+  return lastMessage?.content ?? '';
+};
+
+const filteredConversations = computed(() => {
+  const keyword = normalizeSearchText(searchQuery.value);
+
+  if (!keyword) {
+    return conversations.value;
+  }
+
+  return conversations.value.filter((conversation: Conversation) => {
+    const targets = [
+      conversation.title,
+      conversation.characterName,
+      getConversationPreview(conversation),
+    ];
+
+    return targets.some(target => normalizeSearchText(target).includes(keyword));
+  });
+});
+
+const hasSearchQuery = computed(() => searchQuery.value.trim().length > 0);
+
+const searchResultText = computed(() => {
+  if (!hasSearchQuery.value) {
+    return '';
+  }
+
+  return `搜索结果 ${filteredConversations.value.length}/${conversations.value.length}`;
+});
+
+const clearSearch = () => {
+  searchQuery.value = '';
+};
 
 // 加载AI角色列表
 const loadAICharacters = async () => {
@@ -164,12 +207,29 @@ const selectCharacter = (character: AICharacter) => {
         <div class="section-title">
           <span>历史会话</span>
           <span v-if="conversations.length > 0" class="conversation-count">{{ conversations.length }}</span>
+          <span v-if="hasSearchQuery" class="search-result-count">{{ searchResultText }}</span>
+        </div>
+
+        <div v-if="conversations.length > 0" class="search-container">
+          <Search :size="16" class="search-icon" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            class="search-input"
+            placeholder="搜索会话标题、角色名或消息预览..."
+          />
+          <XCircle
+            v-if="hasSearchQuery"
+            :size="16"
+            class="clear-icon"
+            @click="clearSearch"
+          />
         </div>
 
         <!-- 会话列表 -->
-        <div v-if="conversations.length > 0">
+        <div v-if="filteredConversations.length > 0">
           <ConversationItem
-            v-for="conversation in conversations"
+            v-for="conversation in filteredConversations"
             :key="conversation.id"
             :conversation="conversation"
             @click="openConversation"
@@ -177,6 +237,14 @@ const selectCharacter = (character: AICharacter) => {
             @delete="handleDeleteConversation"
           />
         </div>
+
+        <!-- 搜索空结果 -->
+        <EmptyState
+          v-else-if="conversations.length > 0"
+          :icon="SearchX"
+          title="未找到匹配的会话"
+          :subtitle="`请尝试其他关键词：${searchQuery.trim()}`"
+        />
 
         <!-- 空状态 -->
         <EmptyState
@@ -297,5 +365,56 @@ const selectCharacter = (character: AICharacter) => {
 
 .form-input:focus {
   border-color: var(--accent-purple);
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  transition: all 0.25s ease;
+}
+
+.search-container:focus-within {
+  border-color: var(--accent-purple);
+  background: var(--bg-primary);
+  box-shadow: 0 0 0 4px rgba(157, 141, 241, 0.1);
+}
+
+.search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 14px;
+  padding: 0;
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.clear-icon {
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.search-result-count {
+  font-size: 11px;
+  color: var(--accent-purple);
 }
 </style>

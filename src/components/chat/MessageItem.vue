@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { Message, Theme } from '../../types';
 import { MarkdownRenderer } from '@/modules/markdown';
 import { Edit2, Trash2 } from 'lucide-vue-next';
@@ -14,12 +15,14 @@ interface Props {
   showMessageIndex: boolean;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   'edit': [messageId: string];
   'delete': [messageId: string];
 }>();
+
+const isStreamingMessage = computed(() => props.index === props.displayCount - 1);
 
 const getWordCount = (text: string) => {
   return text.length;
@@ -29,7 +32,11 @@ const getWordCount = (text: string) => {
 <template>
   <div :class="['message-item', `message-${message.type}`]">
     <div class="message-content">
-      <MarkdownRenderer v-if="enableMarkdown" :key="message.content" :content="message.content" />
+      <MarkdownRenderer
+        v-if="enableMarkdown"
+        :content="message.content"
+        :streaming="isStreamingMessage"
+      />
       <span v-else>{{ message.content }}</span>
     </div>
     <div class="message-meta">

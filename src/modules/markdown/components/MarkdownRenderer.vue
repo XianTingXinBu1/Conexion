@@ -10,8 +10,11 @@ import { useMarkdown } from '../useMarkdown';
 import { useNotifications, getNotificationMessage } from '../../notification';
 import type { MarkdownRendererProps } from '../types';
 
+const STREAM_RENDER_DEBOUNCE_MS = 80;
+
 const props = withDefaults(defineProps<MarkdownRendererProps>(), {
   enabled: true,
+  streaming: false,
   config: () => ({}),
   class: '',
 });
@@ -22,13 +25,52 @@ const { showSuccess, showError } = useNotifications();
 
 // 引用 DOM 元素
 const containerRef = ref<HTMLElement>();
+const debouncedContent = ref(props.content);
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+const clearDebounceTimer = () => {
+  if (!debounceTimer) {
+    return;
+  }
+
+  clearTimeout(debounceTimer);
+  debounceTimer = null;
+};
+
+watch(
+  () => props.content,
+  (content) => {
+    if (!props.streaming) {
+      clearDebounceTimer();
+      debouncedContent.value = content;
+      return;
+    }
+
+    clearDebounceTimer();
+    debounceTimer = setTimeout(() => {
+      debouncedContent.value = content;
+      debounceTimer = null;
+    }, STREAM_RENDER_DEBOUNCE_MS);
+  },
+  { immediate: true }
+);
+
+watch(
+  () => props.streaming,
+  (isStreaming) => {
+    if (!isStreaming) {
+      clearDebounceTimer();
+      debouncedContent.value = props.content;
+    }
+  }
+);
 
 // 计算渲染结果
 const renderedHtml = computed(() => {
-  if (!props.enabled || !props.content) {
+  if (!props.enabled || !debouncedContent.value) {
     return '';
   }
-  return renderSafe(props.content);
+  return renderSafe(debouncedContent.value);
 });
 
 // 降级复制方法（使用 execCommand）
@@ -146,11 +188,15 @@ watch(renderedHtml, () => {
 });
 
 // 组件挂载后添加复制按钮
-import { onMounted } from 'vue';
+import { onMounted, onBeforeUnmount } from 'vue';
 onMounted(() => {
   nextTick(() => {
     addCopyButtons();
   });
+});
+
+onBeforeUnmount(() => {
+  clearDebounceTimer();
 });
 </script>
 

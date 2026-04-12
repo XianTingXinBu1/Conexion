@@ -60,6 +60,8 @@ export interface MarkdownRendererProps {
   content: string;
   /** 是否启用渲染（false 时直接显示原文） */
   enabled?: boolean;
+  /** 标记当前内容是否处于高频流式更新中 */
+  streaming?: boolean;
   /** 运行时配置（覆盖默认配置） */
   config?: Partial<MarkdownConfig>;
   /** 自定义 CSS 类名 */

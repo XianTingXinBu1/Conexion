@@ -38,6 +38,9 @@ lerna-debug.log*
 coverage/
 *.lcov
 
+# CodeGraph database
+.codegraph/
+
 # Cache
 .cache/
 .parcel-cache/

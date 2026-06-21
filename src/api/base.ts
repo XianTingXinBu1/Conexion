@@ -1,32 +1,18 @@
 /**
  * API 客户端基类
  *
- * 提供统一的错误处理、重试机制、超时控制和代理支持
+ * 提供统一的错误处理、重试机制、超时控制
  */
 
 import { logApi, logApiError, logApiWarn } from '@/modules/debug';
 import { validateUrl } from '@/utils';
 
-/**
- * 代理配置
- */
-export interface ProxyConfig {
-  enabled: boolean;
-  url: string;
-  type: 'query' | 'header';
-  targetEndpoint?: string;
-}
-
-/**
- * API 客户端配置
- */
 export interface ApiClientConfig {
   baseURL: string;
   apiKey?: string;
   timeout?: number;
   maxRetries?: number;
   retryDelay?: number;
-  proxy?: ProxyConfig;
 }
 
 /**
@@ -71,15 +57,15 @@ export class ApiClient {
   public timeout: number;
   public maxRetries: number;
   public retryDelay: number;
-  public proxy?: ProxyConfig;
+  public backendBaseURL: string;
 
   constructor(config: ApiClientConfig) {
     this.baseURL = config.baseURL.replace(/\/$/, '');
     this.apiKey = config.apiKey;
-    this.timeout = config.timeout ?? 60000; // 默认 60 秒
+    this.timeout = config.timeout ?? 60000;
     this.maxRetries = config.maxRetries ?? 3;
     this.retryDelay = config.retryDelay ?? 1000;
-    this.proxy = config.proxy;
+    this.backendBaseURL = '/api';
   }
 
   /**
@@ -92,68 +78,15 @@ export class ApiClient {
     }
   }
 
-  /**
-   * 验证代理配置
-   */
-  public validateProxy(): void {
-    if (!this.proxy?.enabled) {
-      return;
-    }
-
-    if (!this.proxy.url) {
-      throw new Error('请先配置代理 URL');
-    }
-
-    const proxyUrlValidation = validateUrl(this.proxy.url);
-    if (!proxyUrlValidation.valid) {
-      throw new Error(`代理 URL 无效：${proxyUrlValidation.error || '格式错误'}`);
-    }
-
-    if (this.proxy.targetEndpoint) {
-      const targetValidation = validateUrl(this.proxy.targetEndpoint);
-      if (!targetValidation.valid) {
-        throw new Error(`目标端点无效：${targetValidation.error || '格式错误'}`);
-      }
-    }
+  public buildBackendUrl(path: string): string {
+    return `${this.backendBaseURL}${path}`;
   }
 
-  /**
-   * 构建代理请求的 URL
-   */
-  public buildProxyUrl(path: string): string {
-    if (!this.proxy?.enabled) {
-      return `${this.baseURL}${path}`;
-    }
-
-    const proxyUrl = this.proxy.url.replace(/\/$/, '');
-    const targetEndpoint = this.proxy.targetEndpoint || this.baseURL;
-
-    if (this.proxy.type === 'query') {
-      return `${proxyUrl}${path}?endpoint=${encodeURIComponent(targetEndpoint)}`;
-    } else {
-      return `${proxyUrl}${path}`;
-    }
-  }
-
-  /**
-   * 构建请求头
-   */
   public buildHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
-    const headers: Record<string, string> = {
+    return {
       'Content-Type': 'application/json',
       ...customHeaders,
     };
-
-    if (this.apiKey) {
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
-    }
-
-    if (this.proxy?.enabled && this.proxy.type === 'header') {
-      const targetEndpoint = this.proxy.targetEndpoint || this.baseURL;
-      headers['X-Target-Endpoint'] = targetEndpoint;
-    }
-
-    return headers;
   }
 
   /**
@@ -227,14 +160,11 @@ export class ApiClient {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        // 验证配置
         this.validateUrl(this.baseURL);
-        this.validateProxy();
 
-        // 构建请求
         const { controller, cleanup } = this.createAbortController();
         const headers = this.buildHeaders(options.headers);
-        const url = this.buildProxyUrl(path);
+        const url = this.buildBackendUrl(path);
 
         logApi(`API 请求 [${method}] ${url}`, { attempt: attempt + 1, maxAttempts });
 

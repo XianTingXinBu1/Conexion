@@ -75,15 +75,9 @@ export function useChatApi() {
     const config: ApiClientConfig = {
       baseURL: preset.url,
       apiKey: preset.apiKey,
-      timeout: preset.streamEnabled ? 120000 : 60000, // 流式 120 秒，非流式 60 秒
+      timeout: preset.streamEnabled ? 120000 : 60000,
       maxRetries: 3,
       retryDelay: 1000,
-      proxy: preset.proxy.enabled ? {
-        enabled: preset.proxy.enabled,
-        url: preset.proxy.url,
-        type: preset.proxy.type,
-        targetEndpoint: preset.proxy.targetEndpoint,
-      } : undefined,
     };
 
     return new ChatApi(config, preset.model);
@@ -169,13 +163,6 @@ export function useChatApi() {
 
     if (!preset.url || !preset.model) {
       error.value = 'API URL 和模型不能为空';
-      setRequestStatus('error');
-      logApiError(error.value);
-      throw new Error(error.value);
-    }
-
-    if (preset.proxy.enabled && !preset.proxy.url) {
-      error.value = '请先配置代理 URL';
       setRequestStatus('error');
       logApiError(error.value);
       throw new Error(error.value);
@@ -281,15 +268,6 @@ export function useChatApi() {
 
     if (!preset.model) {
       const errorMsg = '模型名称不能为空，请在 API 预设页面输入或选择模型名称并保存';
-      error.value = errorMsg;
-      setRequestStatus('error');
-      logApiError(errorMsg);
-      onError(errorMsg);
-      return;
-    }
-
-    if (preset.proxy.enabled && !preset.proxy.url) {
-      const errorMsg = '请先配置代理 URL';
       error.value = errorMsg;
       setRequestStatus('error');
       logApiError(errorMsg);

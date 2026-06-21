@@ -101,7 +101,6 @@ export class ChatApi extends ApiClient {
 
     try {
       this.validateUrl(this.baseURL);
-      this.validateProxy();
 
       const apiMessages = this.convertMessages(messages, systemPrompt, systemMessages);
 
@@ -124,12 +123,16 @@ export class ChatApi extends ApiClient {
       };
 
       const headers = this.buildHeaders();
-      const url = this.buildProxyUrl('/chat/completions');
+      const url = this.buildBackendUrl('/chat/completions');
 
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          ...requestBody,
+          baseURL: this.baseURL,
+          apiKey: this.apiKey,
+        }),
         signal: controller.signal,
       });
 

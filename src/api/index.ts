@@ -6,7 +6,7 @@
 
 // 基类
 export { ApiClient, ApiError } from './base';
-export type { ApiClientConfig, ProxyConfig, RequestOptions } from './base';
+export type { ApiClientConfig, RequestOptions } from './base';
 
 // 聊天 API
 export { ChatApi } from './chat';

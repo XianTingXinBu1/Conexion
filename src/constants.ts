@@ -112,12 +112,6 @@ export const DEFAULT_API_PRESETS = [
     temperature: 0.7,
     maxTokens: 2048,
     maxOutputTokens: 4096,
-    proxy: {
-      enabled: false,
-      url: '',
-      type: 'query' as const,
-      targetEndpoint: '',
-    },
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },

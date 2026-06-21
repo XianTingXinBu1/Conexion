@@ -37,7 +37,6 @@ export interface Preset {
   temperature: number;
   maxTokens: number;
   maxOutputTokens: number;
-  proxy: ProxyConfig;
   /** 模型的上下文长度限制（token 数） */
   contextLength?: number;
   createdAt: number;
@@ -47,18 +46,6 @@ export interface Preset {
 /**
  * 代理类型
  */
-export type ProxyType = 'query' | 'header';
-
-/**
- * 代理配置接口
- */
-export interface ProxyConfig {
-  enabled: boolean;
-  url: string;
-  type: ProxyType;
-  targetEndpoint?: string;
-}
-
 /**
  * API 配置接口
  */
@@ -70,7 +57,6 @@ export interface ApiConfig {
   temperature: number;
   maxTokens: number;
   maxOutputTokens: number;
-  proxy: ProxyConfig;
 }
 
 /**

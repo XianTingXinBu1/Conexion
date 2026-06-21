@@ -45,6 +45,7 @@ coverage/
 .nuxt/
 .vuepress/dist/
 .server/
+.runtime/
 
 # OS files
 Thumbs.db

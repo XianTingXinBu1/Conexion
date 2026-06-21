@@ -68,10 +68,6 @@ const {
   temperature,
   maxTokens,
   maxOutputTokens,
-  proxyEnabled,
-  proxyUrl,
-  proxyType,
-  proxyTargetEndpoint,
   hasUnsavedChanges,
   updateOriginalData,
   getFormData: getFormDataInternal,
@@ -82,12 +78,6 @@ const {
     temperature: DEFAULTS.TEMPERATURE,
     maxTokens: DEFAULTS.MAX_TOKENS,
     maxOutputTokens: DEFAULTS.MAX_OUTPUT_TOKENS,
-    proxy: {
-      enabled: false,
-      url: '',
-      type: 'query',
-      targetEndpoint: '',
-    },
   },
 });
 
@@ -209,12 +199,7 @@ function onCancelExit() {
 // 获取模型列表
 async function handleFetchModels() {
   try {
-    const count = await fetchModels(urlInput.value, apiKeyInput.value, {
-      enabled: proxyEnabled.value,
-      proxyUrl: proxyUrl.value,
-      type: proxyType.value,
-      targetEndpoint: proxyTargetEndpoint.value,
-    });
+    const count = await fetchModels(urlInput.value, apiKeyInput.value);
     if (count !== undefined) {
       saveModels(selectedPreset.value, urlInput.value);
       const msg = getNotificationMessage('API_PRESET_LOAD_SUCCESS', { count });
@@ -231,12 +216,7 @@ async function handleFetchModels() {
 // 测试连接
 async function handleTestConnection() {
   try {
-    const latency = await testConnection(urlInput.value, apiKeyInput.value, {
-      enabled: proxyEnabled.value,
-      proxyUrl: proxyUrl.value,
-      type: proxyType.value,
-      targetEndpoint: proxyTargetEndpoint.value,
-    });
+    const latency = await testConnection(urlInput.value, apiKeyInput.value);
     const msg = getNotificationMessage('API_PRESET_CONNECTION_SUCCESS', { latency });
     showSuccess(msg.title, msg.message);
   } catch (error) {
@@ -277,20 +257,8 @@ async function handleTestConnection() {
       <ApiConfigForm
         :url="urlInput"
         :api-key="apiKeyInput"
-        :proxy="{
-          enabled: proxyEnabled,
-          url: proxyUrl,
-          type: proxyType,
-          targetEndpoint: proxyTargetEndpoint,
-        }"
         @update:url="urlInput = $event"
         @update:api-key="apiKeyInput = $event"
-        @update:proxy="($event) => {
-          proxyEnabled = $event.enabled;
-          proxyUrl = $event.url;
-          proxyType = $event.type;
-          proxyTargetEndpoint = $event.targetEndpoint || '';
-        }"
       />
 
       <!-- 模型配置 -->

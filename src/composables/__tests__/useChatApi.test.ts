@@ -20,12 +20,6 @@ function createPreset() {
     temperature: 0.7,
     maxOutputTokens: 256,
     streamEnabled: true,
-    proxy: {
-      enabled: false,
-      url: '',
-      type: 'query' as const,
-      targetEndpoint: '',
-    },
   };
 }
 

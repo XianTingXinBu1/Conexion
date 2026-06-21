@@ -1,34 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Server, Shield, AlertCircle } from 'lucide-vue-next';
-import FormToggle from '../../../components/form/FormToggle.vue';
-import type { ProxyConfig, ProxyType } from '../types';
 import { validateUrl } from '../../../utils';
 
 interface Props {
   url: string;
   apiKey: string;
-  proxy: ProxyConfig;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 const emit = defineEmits<{
   'update:url': [value: string];
   'update:apiKey': [value: string];
-  'update:proxy': [value: ProxyConfig];
 }>();
 
-// URL 验证错误
 const urlError = ref('');
-const proxyUrlError = ref('');
-const targetEndpointError = ref('');
 
-function updateProxy<K extends keyof ProxyConfig>(key: K, value: ProxyConfig[K]) {
-  emit('update:proxy', { ...props.proxy, [key]: value });
-}
-
-// 验证 URL
 function handleUrlInput(value: string) {
   emit('update:url', value);
   if (value) {
@@ -38,33 +26,6 @@ function handleUrlInput(value: string) {
     urlError.value = '';
   }
 }
-
-// 验证代理 URL
-function handleProxyUrlInput(value: string) {
-  updateProxy('url', value);
-  if (value) {
-    const result = validateUrl(value);
-    proxyUrlError.value = result.valid ? '' : (result.error || '');
-  } else {
-    proxyUrlError.value = '';
-  }
-}
-
-// 验证目标端点
-function handleTargetEndpointInput(value: string) {
-  updateProxy('targetEndpoint', value);
-  if (value) {
-    const result = validateUrl(value);
-    targetEndpointError.value = result.valid ? '' : (result.error || '');
-  } else {
-    targetEndpointError.value = '';
-  }
-}
-
-const proxyTypes: { value: ProxyType; label: string; description: string }[] = [
-  { value: 'query', label: '查询参数', description: '通过 URL 参数传递目标端点' },
-  { value: 'header', label: '请求头', description: '通过 HTTP 请求头传递目标端点' },
-];
 </script>
 
 <template>
@@ -103,71 +64,14 @@ const proxyTypes: { value: ProxyType; label: string; description: string }[] = [
   <div class="section">
     <div class="section-title">
       <Shield :size="18" />
-      <span>代理服务器配置</span>
+      <span>连接方式</span>
     </div>
     <div class="proxy-info">
-      <div class="info-title">CF Workers 跨域代理</div>
+      <div class="info-title">已启用内建后端代理</div>
       <div class="info-text">
-        使用 Cloudflare Workers 解决 API 跨域问题，支持动态指定目标端点。
-        <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer">前往 CF Workers 创建</a>
+        当前版本会通过项目内置后端转发请求并处理跨域，无需再手动配置外部代理服务。
       </div>
     </div>
-    <div class="toggle-item">
-      <div>
-        <div class="toggle-label">启用代理</div>
-        <div class="toggle-description">通过 CF Workers 转发请求</div>
-      </div>
-      <FormToggle
-        :model-value="proxy.enabled"
-        @update:model-value="updateProxy('enabled', $event)"
-      />
-    </div>
-    <template v-if="proxy.enabled">
-      <div class="form-group">
-        <label class="form-label">代理 URL</label>
-        <input
-          :value="proxy.url"
-          type="text"
-          class="form-input"
-          :class="{ 'input-error': proxyUrlError }"
-          placeholder="https://your-worker.workers.dev"
-          @input="handleProxyUrlInput(($event.target as HTMLInputElement).value)"
-        />
-        <div v-if="proxyUrlError" class="form-error">
-          <AlertCircle :size="14" />
-          <span>{{ proxyUrlError }}</span>
-        </div>
-        <div v-else class="form-hint">CF Workers 地址，不需要 /v1 路径</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">代理类型</label>
-        <select
-          :value="proxy.type"
-          class="form-select"
-          @change="updateProxy('type', ($event.target as HTMLSelectElement).value as ProxyType)"
-        >
-          <option v-for="type in proxyTypes" :key="type.value" :value="type.value">
-            {{ type.label }} - {{ type.description }}
-          </option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">目标端点 <span class="optional">(可选)</span></label>
-        <input
-          :value="proxy.targetEndpoint || ''"
-          type="text"
-          class="form-input"
-          :class="{ 'input-error': targetEndpointError }"
-          placeholder="https://api.openai.com"
-          @input="handleTargetEndpointInput(($event.target as HTMLInputElement).value)"
-        />
-        <div v-if="targetEndpointError" class="form-error">
-          <AlertCircle :size="14" />
-          <span>{{ targetEndpointError }}</span>
-        </div>
-        <div v-else class="form-hint">不填则使用上方 API 配置中的 URL</div>
-      </div>
-    </template>
   </div>
 </template>
 
@@ -221,26 +125,6 @@ const proxyTypes: { value: ProxyType; label: string; description: string }[] = [
 
 .info-text a:hover {
   text-decoration: underline;
-}
-
-.toggle-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
-  margin-bottom: 14px;
-}
-
-.toggle-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.toggle-description {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 2px;
 }
 
 .form-group {

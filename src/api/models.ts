@@ -23,7 +23,10 @@ export class ModelsApi extends ApiClient {
     try {
       logApi('获取模型列表');
 
-      const data = await this.get<any>('/models');
+      const data = await this.post<any>('/models', {
+        baseURL: this.baseURL,
+        apiKey: this.apiKey,
+      });
 
       // 支持多种响应格式
       let modelList: any[] = [];
@@ -105,15 +108,18 @@ export class ModelsApi extends ApiClient {
    */
   private async head(path: string): Promise<void> {
     this.validateUrl(this.baseURL);
-    this.validateProxy();
 
     const { controller, cleanup } = this.createAbortController();
     const headers = this.buildHeaders();
-    const url = this.buildProxyUrl(path);
+    const url = this.buildBackendUrl('/connection-test');
 
     const response = await fetch(url, {
-      method: 'HEAD',
+      method: 'POST',
       headers,
+      body: JSON.stringify({
+        baseURL: this.baseURL,
+        apiKey: this.apiKey,
+      }),
       signal: controller.signal,
     });
 

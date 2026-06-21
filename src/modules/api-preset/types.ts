@@ -2,18 +2,6 @@
  * API 预设模块 - 类型定义
  */
 
-export type ProxyType = 'query' | 'header';
-
-/**
- * 代理配置接口
- */
-export interface ProxyConfig {
-  enabled: boolean;
-  url: string;
-  type: ProxyType;
-  targetEndpoint?: string;
-}
-
 /**
  * API 配置接口
  */
@@ -25,7 +13,6 @@ export interface ApiConfig {
   temperature: number;
   maxTokens: number;
   maxOutputTokens: number;
-  proxy: ProxyConfig;
 }
 
 /**
@@ -41,7 +28,6 @@ export interface Preset {
   temperature: number;
   maxTokens: number;
   maxOutputTokens: number;
-  proxy: ProxyConfig;
   createdAt: number;
   updatedAt: number;
 }
@@ -57,10 +43,4 @@ export interface PresetFormData {
   temperature: number;
   maxTokens: number;
   maxOutputTokens: number;
-  proxy: {
-    enabled: boolean;
-    url: string;
-    type: ProxyType;
-    targetEndpoint: string;
-  };
 }

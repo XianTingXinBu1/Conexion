@@ -6,7 +6,6 @@
 
 import { ref } from 'vue';
 import { ModelsApi, type ApiClientConfig } from '@/api';
-import type { ProxyConfig } from '@/api';
 
 export function useApiConnection() {
   const isTestingConnection = ref(false);
@@ -17,22 +16,13 @@ export function useApiConnection() {
   async function testConnection(
     url: string,
     apiKey: string,
-    proxy?: { enabled: boolean; proxyUrl: string; type: 'query' | 'header'; targetEndpoint?: string }
   ): Promise<number> {
-    const proxyConfig: ProxyConfig | undefined = proxy?.enabled ? {
-      enabled: proxy.enabled,
-      url: proxy.proxyUrl,
-      type: proxy.type,
-      targetEndpoint: proxy.targetEndpoint,
-    } : undefined;
-
     const config: ApiClientConfig = {
       baseURL: url,
       apiKey,
-      timeout: 15000, // 15 秒超时
-      maxRetries: 1, // 连接测试只重试 1 次
+      timeout: 15000,
+      maxRetries: 1,
       retryDelay: 500,
-      proxy: proxyConfig,
     };
 
     const modelsApi = new ModelsApi(config);

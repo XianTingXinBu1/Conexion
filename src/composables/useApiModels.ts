@@ -8,7 +8,7 @@ import { ref } from 'vue';
 import type { Model } from '../types';
 import { DEFAULT_MODELS, getModelById } from '../data/modelData';
 import { STORAGE_KEYS, DEFAULTS } from '../constants';
-import { ModelsApi, type ApiClientConfig, type ProxyConfig } from '@/api';
+import { ModelsApi, type ApiClientConfig } from '@/api';
 import { getStorage, setStorage } from '@/utils/storage';
 
 export function useApiModels() {
@@ -91,22 +91,13 @@ export function useApiModels() {
   async function fetchModels(
     url: string,
     apiKey: string,
-    proxy?: { enabled: boolean; proxyUrl: string; type: 'query' | 'header'; targetEndpoint?: string }
   ): Promise<number> {
-    const proxyConfig: ProxyConfig | undefined = proxy?.enabled ? {
-      enabled: proxy.enabled,
-      url: proxy.proxyUrl,
-      type: proxy.type,
-      targetEndpoint: proxy.targetEndpoint,
-    } : undefined;
-
     const config: ApiClientConfig = {
       baseURL: url,
       apiKey,
-      timeout: 30000, // 30 秒超时
-      maxRetries: 2, // 获取模型列表重试 2 次
+      timeout: 30000,
+      maxRetries: 2,
       retryDelay: 1000,
-      proxy: proxyConfig,
     };
 
     const modelsApi = new ModelsApi(config);

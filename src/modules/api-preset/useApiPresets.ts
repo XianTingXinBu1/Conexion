@@ -13,18 +13,11 @@ const DEFAULT_PRESET_FORM_DATA: PresetFormData = {
   temperature: DEFAULTS.TEMPERATURE,
   maxTokens: DEFAULTS.MAX_TOKENS,
   maxOutputTokens: DEFAULTS.MAX_OUTPUT_TOKENS,
-  proxy: {
-    enabled: false,
-    url: '',
-    type: 'query',
-    targetEndpoint: '',
-  },
 };
 
 function cloneDefaultPresetFormData(): PresetFormData {
   return {
     ...DEFAULT_PRESET_FORM_DATA,
-    proxy: { ...DEFAULT_PRESET_FORM_DATA.proxy },
   };
 }
 
@@ -38,14 +31,6 @@ function mapPresetToFormData(preset: Preset): PresetFormData {
     temperature: preset.temperature,
     maxTokens: preset.maxTokens,
     maxOutputTokens: preset.maxOutputTokens,
-    proxy: preset.proxy
-      ? {
-          enabled: preset.proxy.enabled,
-          url: preset.proxy.url,
-          type: preset.proxy.type,
-          targetEndpoint: preset.proxy.targetEndpoint || '',
-        }
-      : cloneDefaultPresetFormData().proxy,
   };
 }
 
@@ -133,10 +118,6 @@ export function useApiPresets() {
       temperature: formData.temperature,
       maxTokens: formData.maxTokens,
       maxOutputTokens: formData.maxOutputTokens,
-      proxyEnabled: formData.proxy.enabled,
-      proxyUrl: formData.proxy.url,
-      proxyType: formData.proxy.type,
-      proxyTargetEndpoint: formData.proxy.targetEndpoint
     });
 
     const presetIndex = presets.value.findIndex(p => p.id === selectedPreset.value);
@@ -153,7 +134,6 @@ export function useApiPresets() {
         temperature: formData.temperature,
         maxTokens: formData.maxTokens,
         maxOutputTokens: formData.maxOutputTokens,
-        proxy: formData.proxy,
         updatedAt: Date.now(),
       };
       await savePresets();
@@ -183,7 +163,6 @@ export function useApiPresets() {
       temperature: formData.temperature,
       maxTokens: formData.maxTokens,
       maxOutputTokens: formData.maxOutputTokens,
-      proxy: formData.proxy,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };

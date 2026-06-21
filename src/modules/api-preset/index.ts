@@ -5,7 +5,7 @@
  */
 
 // 类型定义
-export type { ProxyType, ProxyConfig, ApiConfig, Preset, PresetFormData } from './types';
+export type { ApiConfig, Preset, PresetFormData } from './types';
 
 // Composable
 export { useApiPresets } from './useApiPresets';

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:client": "vite",
+    "dev:server": "tsx server/index.ts",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest",

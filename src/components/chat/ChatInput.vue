@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   send: [message: string];
   cancel: [];
+  focus: [];
   showPromptAssistant: [];
 }>();
 
@@ -74,6 +75,8 @@ const handlePromptAssistant = () => {
   isToolbarExpanded.value = false;
 };
 
+// handleTextareaFocus 已迁移至 useChatScrollPolicy
+
 watch(messageInput, () => {
   nextTick(() => {
     adjustTextareaHeight();
@@ -116,6 +119,8 @@ defineExpose({
         :placeholder="isRequestActive ? '正在生成，可点击停止...' : '输入消息...'"
         :disabled="isRequestActive"
         @keydown.enter="handleEnterKey"
+        @pointerdown="emit('focus')"
+        @focus="emit('focus')"
         rows="1"
       />
 

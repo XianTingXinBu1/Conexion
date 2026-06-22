@@ -78,7 +78,7 @@ export class ModelsApi extends ApiClient {
       // 使用 HEAD 请求测试连接（如果服务器支持）
       // 否则使用 GET /models 请求
       try {
-        await this.head('/');
+        await this.head();
       } catch {
         // 如果 HEAD 不支持，使用 GET /models
         await this.get('/models');
@@ -106,7 +106,7 @@ export class ModelsApi extends ApiClient {
   /**
    * HEAD 请求（用于测试连接）
    */
-  private async head(path: string): Promise<void> {
+  private async head(): Promise<void> {
     this.validateUrl(this.baseURL);
 
     const { controller, cleanup } = this.createAbortController();

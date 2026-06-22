@@ -134,9 +134,9 @@ function initializePresetForm() {
 }
 
 // 初始化
-onMounted(() => {
-  loadPresets();
-  loadSelectedPreset();
+onMounted(async () => {
+  await loadPresets();
+  await loadSelectedPreset();
   loadModels();
   initializePresetForm();
 });

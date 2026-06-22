@@ -24,7 +24,8 @@ interface SendFlowDeps {
   loadRegexRules: () => Promise<void>;
   createNewConversation: (firstMessage: Message) => Promise<unknown>;
   saveConversation: () => Promise<void>;
-  scrollToBottom: (force?: boolean) => Promise<void> | void;
+  onStreamFlush: () => void;
+  onMessageSend: () => void;
   sendStreamChatRequest: (
     messages: Message[],
     onChunk: (chunk: string) => void,
@@ -47,7 +48,6 @@ interface SendFlowDeps {
 }
 
 export function useChatSendFlow(deps: SendFlowDeps) {
-  const shouldAutoScrollOnStream = ref(true);
   const STREAM_FLUSH_INTERVAL_MS = 50;
   const isSending = ref(false);
 
@@ -85,7 +85,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       await deps.saveConversation();
     }
 
-    await deps.scrollToBottom(true);
+    await deps.onMessageSend();
 
     const assistantMessageId = (Date.now() + 1).toString();
     const assistantMessage: Message = {
@@ -95,7 +95,6 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       timestamp: Date.now(),
     };
     deps.messages.value.push(assistantMessage);
-    shouldAutoScrollOnStream.value = true;
     isSending.value = true;
 
     const systemMessages = deps.buildSystemMessages({
@@ -129,9 +128,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       );
       streamBuffer = '';
 
-      if (shouldAutoScrollOnStream.value) {
-        deps.scrollToBottom();
-      }
+      deps.onStreamFlush();
     };
 
     const clearFlushTimer = () => {
@@ -222,7 +219,6 @@ export function useChatSendFlow(deps: SendFlowDeps) {
   };
 
   return {
-    shouldAutoScrollOnStream,
     isSending,
     handleSendMessage,
     handleCancelSend,

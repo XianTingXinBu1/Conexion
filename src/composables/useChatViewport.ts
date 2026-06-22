@@ -61,22 +61,6 @@ export function useChatViewport(messages: Ref<Message[]>, chatHistoryLimit: Ref<
     });
   };
 
-  const isNearBottom = (threshold = 24) => {
-    if (!messagesContainer.value) {
-      return true;
-    }
-
-    const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
-    return scrollHeight - (scrollTop + clientHeight) <= threshold;
-  };
-
-  const scrollToBottom = async (force = false) => {
-    await nextTick();
-    if (messagesContainer.value && (force || isNearBottom())) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-    }
-  };
-
   return {
     messagesContainer,
     displayMessages,
@@ -85,7 +69,5 @@ export function useChatViewport(messages: Ref<Message[]>, chatHistoryLimit: Ref<
     loadMessages,
     loadMoreMessages,
     syncVisibleMessages,
-    isNearBottom,
-    scrollToBottom,
   };
 }

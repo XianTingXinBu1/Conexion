@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, watch, watchEffect, type Ref } from 'vue';
+import { onMounted, watch, type Ref } from 'vue';
 import type { AICharacter, Message } from '../types';
 
 interface UseChatPageInitOptions {
@@ -8,10 +8,9 @@ interface UseChatPageInitOptions {
     conversationId?: string;
   };
   messages: Ref<Message[]>;
-  displayMessages: Ref<Message[]>;
   currentCharacter: Ref<AICharacter | undefined>;
   chatHistoryLimit: Ref<number>;
-  shouldAutoScrollOnStream: Ref<boolean>;
+  onPageLoad: () => void;
   loadAICharacter: (characterId: string) => Promise<AICharacter | undefined>;
   loadRegexRules: () => Promise<void>;
   loadConversation: () => Promise<void>;
@@ -20,19 +19,16 @@ interface UseChatPageInitOptions {
   loadApiPresets: () => Promise<void>;
   initCharacters: () => void;
   initKnowledgeBases: () => void;
-  scrollToBottom: (force?: boolean) => Promise<void>;
   loadMessages: () => void;
-  isNearBottom: () => boolean;
 }
 
 export function useChatPageInit(options: UseChatPageInitOptions) {
   const {
     props,
     messages,
-    displayMessages,
     currentCharacter,
     chatHistoryLimit,
-    shouldAutoScrollOnStream,
+    onPageLoad,
     loadAICharacter,
     loadRegexRules,
     loadConversation,
@@ -41,9 +37,7 @@ export function useChatPageInit(options: UseChatPageInitOptions) {
     loadApiPresets,
     initCharacters,
     initKnowledgeBases,
-    scrollToBottom,
     loadMessages,
-    isNearBottom,
   } = options;
 
   onMounted(async () => {
@@ -61,11 +55,7 @@ export function useChatPageInit(options: UseChatPageInitOptions) {
     await loadApiPresets();
     initCharacters();
     initKnowledgeBases();
-    await scrollToBottom(true);
-  });
-
-  onUnmounted(() => {
-    // 清理资源
+    onPageLoad();
   });
 
   watch(
@@ -75,14 +65,4 @@ export function useChatPageInit(options: UseChatPageInitOptions) {
     },
     { immediate: true }
   );
-
-  watchEffect(() => {
-    for (const message of displayMessages.value) {
-      message.content;
-    }
-
-    if (displayMessages.value.length > 0 && messages.value.length > 0) {
-      shouldAutoScrollOnStream.value = isNearBottom();
-    }
-  });
 }

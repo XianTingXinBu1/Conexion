@@ -22,6 +22,7 @@ import { useAppSettings } from '../composables/useAppSettings';
 import { useTheme } from '../composables/useTheme';
 import { useChatStats } from '../composables/useChatStats';
 import { useChatViewport } from '../composables/useChatViewport';
+import { useChatScrollPolicy } from '../composables/useChatScrollPolicy';
 import { useChatMessageActions } from '../composables/useChatMessageActions';
 import { useChatPromptBuilder } from '../composables/useChatPromptBuilder';
 import { useChatSendFlow } from '../composables/useChatSendFlow';
@@ -142,9 +143,9 @@ const {
   loadMessages,
   loadMoreMessages,
   syncVisibleMessages,
-  isNearBottom,
-  scrollToBottom,
 } = chatViewport;
+
+const scrollPolicy = useChatScrollPolicy(chatViewport.messagesContainer);
 
 const {
   currentContextCount,
@@ -180,7 +181,6 @@ const {
 });
 
 const {
-  shouldAutoScrollOnStream,
   isSending,
   handleSendMessage,
   handleCancelSend,
@@ -196,7 +196,8 @@ const {
   loadRegexRules,
   createNewConversation,
   saveConversation,
-  scrollToBottom,
+  onStreamFlush: scrollPolicy.onStreamFlush,
+  onMessageSend: scrollPolicy.onMessageSend,
   sendStreamChatRequest,
   cancelRequest,
   buildSystemMessages,
@@ -225,10 +226,9 @@ const {
 useChatPageInit({
   props,
   messages,
-  displayMessages,
   currentCharacter,
   chatHistoryLimit,
-  shouldAutoScrollOnStream,
+  onPageLoad: scrollPolicy.onPageLoad,
   loadAICharacter,
   loadRegexRules,
   loadConversation,
@@ -237,9 +237,7 @@ useChatPageInit({
   loadApiPresets,
   initCharacters,
   initKnowledgeBases,
-  scrollToBottom,
   loadMessages,
-  isNearBottom,
 });
 </script>
 
@@ -311,6 +309,7 @@ useChatPageInit({
       :request-status="requestStatus"
       @send="handleSendMessage"
       @cancel="handleCancelSend"
+      @focus="scrollPolicy.onInputFocus"
       @show-prompt-assistant="openPromptAssistant"
     />
 

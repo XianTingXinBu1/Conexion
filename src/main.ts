@@ -1,8 +1,15 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
+import { ensureStorageSchema } from './utils/storageSchema';
 
-const app = createApp(App);
+async function bootstrap() {
+  await ensureStorageSchema();
 
-app.use(router);
-app.mount('#app');
+  const app = createApp(App);
+
+  app.use(router);
+  app.mount('#app');
+}
+
+void bootstrap();

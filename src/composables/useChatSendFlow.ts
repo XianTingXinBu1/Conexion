@@ -42,6 +42,7 @@ interface SendFlowDeps {
     chatHistory: Message[];
     userInstruction: string;
     mergeMode: MergeMode;
+    includeUserInstructionMessage?: boolean;
   }) => ChatMessage[];
   showSuccess: (title: string, message?: string) => void;
   showError: (title: string, message?: string) => void;
@@ -77,6 +78,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
     };
 
     const chatHistoryBeforeSend = [...deps.messages.value];
+    const messagesForRequest = [...chatHistoryBeforeSend, userMessage];
     deps.messages.value.push(userMessage);
 
     if (!deps.persistedConversationId.value) {
@@ -104,9 +106,11 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       chatHistory: chatHistoryBeforeSend,
       userInstruction: processedContent,
       mergeMode: deps.promptMergeMode.value,
+      includeUserInstructionMessage: false,
     });
 
     let streamBuffer = '';
+    let assistantRawContent = '';
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     let isCancelled = false;
     let hasCompleted = false;
@@ -120,8 +124,9 @@ export function useChatSendFlow(deps: SendFlowDeps) {
         return;
       }
 
+      assistantRawContent += streamBuffer;
       msg.content = applyRules(
-        msg.content + streamBuffer,
+        assistantRawContent,
         'assistant',
         'after-macro',
         deps.regexRules.value
@@ -154,7 +159,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
 
     try {
       await deps.sendStreamChatRequest(
-        chatHistoryBeforeSend,
+        messagesForRequest,
         (chunk: string) => {
           streamBuffer += chunk;
           scheduleFlush();
@@ -163,10 +168,6 @@ export function useChatSendFlow(deps: SendFlowDeps) {
           hasCompleted = true;
           await finalizeSend();
 
-          const msg = deps.messages.value.find(m => m.id === assistantMessageId);
-          if (!msg) return;
-
-          msg.content = applyRules(msg.content, 'assistant', 'after-macro', deps.regexRules.value);
           const notificationMsg = getNotificationMessage('CHAT_SEND_SUCCESS');
           deps.showSuccess(notificationMsg.title, notificationMsg.message);
         },

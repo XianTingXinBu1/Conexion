@@ -22,6 +22,7 @@ interface BuildPromptContext {
   chatHistory: Message[];
   userInstruction: string;
   mergeMode: MergeMode;
+  includeUserInstructionMessage?: boolean;
 }
 
 export function useChatPromptBuilder() {
@@ -93,7 +94,7 @@ export function useChatPromptBuilder() {
         userCharacter: context.userCharacter,
         knowledgeBases: context.knowledgeBases.filter(kb => kb.globallyEnabled),
         chatHistory: context.chatHistory,
-        userInstruction: context.userInstruction,
+        userInstruction: context.includeUserInstructionMessage === false ? '' : context.userInstruction,
         mergeMode: context.mergeMode,
       });
 

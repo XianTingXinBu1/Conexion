@@ -9,6 +9,13 @@ import type { ChatCompletionRequest, ChatCompletionResponse, ChatMessage, Messag
 import { logApi, logApiError } from '@/modules/debug';
 import { parseStreamChunk, type StreamUsagePayload } from './stream';
 
+class StreamTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StreamTimeoutError';
+  }
+}
+
 /**
  * 聊天 API 服务
  */
@@ -51,6 +58,34 @@ export class ChatApi extends ApiClient {
     apiMessages.push(...chatMessages);
 
     return apiMessages;
+  }
+
+  private getStreamIdleTimeoutMs(): number {
+    return Math.min(this.timeout, 30000);
+  }
+
+  private readStreamChunk(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    timeoutMs: number,
+    onTimeout: () => void,
+  ): Promise<ReadableStreamReadResult<Uint8Array>> {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        onTimeout();
+        reject(new StreamTimeoutError('流式响应空闲超时'));
+      }, timeoutMs);
+
+      reader.read().then(
+        (result) => {
+          clearTimeout(timeoutId);
+          resolve(result);
+        },
+        (error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        },
+      );
+    });
   }
 
   /**
@@ -139,43 +174,38 @@ export class ChatApi extends ApiClient {
       cleanup();
 
       if (!response.ok) {
+        const errorText = await response.text();
+        const errorMessage = this.parseErrorMessage(errorText);
+        const error = new Error(`API 请求失败 (${response.status}): ${errorMessage || response.statusText}`);
 
-              const errorText = await response.text();
+        logApiError('流式请求失败', { status: response.status, message: errorMessage });
 
-              const errorMessage = this.parseErrorMessage(errorText);
+        throw error;
+      }
 
-              const error = new Error(`API 请求失败 (${response.status}): ${errorMessage || response.statusText}`);
-
-      
-
-              logApiError('流式请求失败', { status: response.status, message: errorMessage });
-
-      
-
-              throw error;
-
-            }
-
-      
-
-            if (!response.body) {
-
-              const error = new Error('无法读取响应流');
-
-              throw error;
-
-            }
+      if (!response.body) {
+        throw new Error('无法读取响应流');
+      }
 
       logApi('开始接收流式响应');
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
+      const streamStartedAt = Date.now();
       let buffer = '';
       let latestUsage: StreamUsagePayload | null = null;
 
       try {
         while (true) {
-          const { done, value } = await reader.read();
+          const elapsed = Date.now() - streamStartedAt;
+          if (elapsed >= this.timeout) {
+            throw new StreamTimeoutError('流式响应超时');
+          }
+
+          const idleTimeoutMs = Math.min(this.getStreamIdleTimeoutMs(), Math.max(this.timeout - elapsed, 1));
+          const { done, value } = await this.readStreamChunk(reader, idleTimeoutMs, () => {
+            controller.abort();
+          });
 
           if (done) {
             break;
@@ -188,18 +218,27 @@ export class ChatApi extends ApiClient {
           }
 
           for (const content of parsed.chunks) {
-            if (onChunk) {
-              onChunk(content);
-            }
+            onChunk?.(content);
+            yield content;
+          }
+        }
+
+        const finalText = decoder.decode();
+        if (finalText || buffer) {
+          const parsed = parseStreamChunk(buffer, finalText, { flush: true });
+          buffer = parsed.remainder;
+          if (parsed.usage) {
+            latestUsage = parsed.usage;
+          }
+
+          for (const content of parsed.chunks) {
+            onChunk?.(content);
             yield content;
           }
         }
 
         logApi('流式响应完成');
-
-        if (onComplete) {
-          onComplete({ usage: latestUsage });
-        }
+        onComplete?.({ usage: latestUsage });
       } finally {
         this.activeStreamCleanup = null;
         reader.releaseLock();
@@ -207,7 +246,9 @@ export class ChatApi extends ApiClient {
 
     } catch (error) {
       let errorMessage = '请求失败';
-      if (error instanceof Error) {
+      if (error instanceof StreamTimeoutError) {
+        errorMessage = error.message;
+      } else if (error instanceof Error) {
         errorMessage = error.name === 'AbortError' ? '请求已取消' : error.message;
       }
 

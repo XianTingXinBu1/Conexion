@@ -275,6 +275,20 @@ export function useChatApi() {
       return;
     }
 
+    let didNotifyError = false;
+    const reportError = (errorMessage: string) => {
+      if (didNotifyError) {
+        return;
+      }
+      didNotifyError = true;
+      if (!wasCancelled.value) {
+        error.value = errorMessage;
+        setRequestStatus('error');
+      }
+      logApiError('流式请求异常', { error: errorMessage });
+      onError(errorMessage);
+    };
+
     try {
       const chatApi = createChatApi(preset);
       activeChatApi = chatApi;
@@ -329,11 +343,7 @@ export function useChatApi() {
           onComplete();
         },
         onError: (errorMessage) => {
-          if (!wasCancelled.value) {
-            setRequestStatus('error');
-          }
-          logApiError('流式请求异常', { error: errorMessage });
-          onError(errorMessage);
+          reportError(errorMessage);
         },
       })) {
         // chunk 已经通过 onChunk 回调处理
@@ -345,12 +355,7 @@ export function useChatApi() {
         errorMessage = err.message;
       }
 
-      if (!wasCancelled.value) {
-        error.value = errorMessage;
-        setRequestStatus('error');
-        logApiError('请求异常', { error: errorMessage });
-        onError(errorMessage);
-      }
+      reportError(errorMessage);
     } finally {
       activeChatApi = null;
       if (requestStatus.value === 'sending' || requestStatus.value === 'streaming') {

@@ -1,13 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { URL } from 'node:url';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
+import { URL, fileURLToPath } from 'node:url';
 
 const HOST = process.env.HOST || '127.0.0.1';
 const PORT = Number(process.env.PORT || 3900);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://127.0.0.1:3100';
 const DEFAULT_UPSTREAM_BASE_URL = process.env.DEFAULT_UPSTREAM_BASE_URL || '';
 const DEFAULT_UPSTREAM_API_KEY = process.env.DEFAULT_UPSTREAM_API_KEY || '';
+const UPSTREAM_TIMEOUT_MS = Number(process.env.UPSTREAM_TIMEOUT_MS || 60000);
 
 interface ProxyRequestPayload {
   baseURL?: string;
@@ -17,6 +18,20 @@ interface ProxyRequestPayload {
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+}
+
+class HttpError extends Error {
+  constructor(public statusCode: number, message: string) {
+    super(message);
+    this.name = 'HttpError';
+  }
+}
+
+class UpstreamRequestError extends Error {
+  constructor(public statusCode: number, message: string) {
+    super(message);
+    this.name = 'UpstreamRequestError';
+  }
 }
 
 function setCorsHeaders(res: ServerResponse) {
@@ -37,7 +52,31 @@ function sendText(res: ServerResponse, statusCode: number, message: string) {
   res.end(message);
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<any> {
+function isHttpError(error: unknown): error is HttpError {
+  return error instanceof HttpError;
+}
+
+function isUpstreamRequestError(error: unknown): error is UpstreamRequestError {
+  return error instanceof UpstreamRequestError;
+}
+
+function mapUpstreamError(error: unknown, fallbackMessage: string): UpstreamRequestError {
+  if (isUpstreamRequestError(error)) {
+    return error;
+  }
+
+  if (error instanceof Error) {
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : '';
+    if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT') {
+      return new UpstreamRequestError(504, error.message || '上游请求超时');
+    }
+    return new UpstreamRequestError(502, error.message || fallbackMessage);
+  }
+
+  return new UpstreamRequestError(502, fallbackMessage);
+}
+
+async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -48,16 +87,34 @@ async function readJsonBody(req: IncomingMessage): Promise<any> {
   }
 
   const raw = Buffer.concat(chunks).toString('utf-8');
-  return JSON.parse(raw);
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new HttpError(400, 'malformed JSON');
+  }
 }
 
-function getResolvedUpstream(payload: { baseURL?: string; apiKey?: string }) {
-  const baseURL = (payload.baseURL || DEFAULT_UPSTREAM_BASE_URL).trim().replace(/\/$/, '');
-  const apiKey = (payload.apiKey || DEFAULT_UPSTREAM_API_KEY).trim();
-
-  if (!baseURL) {
-    throw new Error('缺少上游 API URL');
+function ensureObjectPayload(payload: unknown): Record<string, unknown> {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    throw new HttpError(400, '请求体必须是 JSON 对象');
   }
+
+  return payload as Record<string, unknown>;
+}
+
+function requireNonEmptyString(value: unknown, fieldName: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new HttpError(400, `缺少 ${fieldName}`);
+  }
+
+  return value.trim();
+}
+
+function getResolvedUpstream(payload: { baseURL?: unknown; apiKey?: unknown }) {
+  const baseURL = requireNonEmptyString(payload.baseURL ?? DEFAULT_UPSTREAM_BASE_URL, 'baseURL').replace(/\/$/, '');
+  const apiKeySource = payload.apiKey ?? DEFAULT_UPSTREAM_API_KEY;
+  const apiKey = typeof apiKeySource === 'string' ? apiKeySource.trim() : '';
 
   return { baseURL, apiKey };
 }
@@ -96,7 +153,7 @@ function proxyRequest(options: {
             options.streamToClient?.end();
             resolve({ status: upstreamRes.statusCode || 200, headers: upstreamRes.headers as Record<string, string | string[] | undefined> });
           });
-          upstreamRes.on('error', reject);
+          upstreamRes.on('error', (error) => reject(mapUpstreamError(error, '流式上游响应失败')));
           return;
         }
 
@@ -109,11 +166,15 @@ function proxyRequest(options: {
             headers: upstreamRes.headers as Record<string, string | string[] | undefined>,
           });
         });
-        upstreamRes.on('error', reject);
+        upstreamRes.on('error', (error) => reject(mapUpstreamError(error, '上游响应失败')));
       },
     );
 
-    upstreamReq.on('error', reject);
+    upstreamReq.setTimeout(UPSTREAM_TIMEOUT_MS, () => {
+      upstreamReq.destroy(new UpstreamRequestError(504, '上游请求超时'));
+    });
+
+    upstreamReq.on('error', (error) => reject(mapUpstreamError(error, '上游请求失败')));
 
     if (options.body) {
       upstreamReq.write(options.body);
@@ -126,7 +187,7 @@ function proxyRequest(options: {
 async function handleModels(req: IncomingMessage, res: ServerResponse) {
   const source = req.method === 'GET'
     ? Object.fromEntries(new URL(req.url || '/', `http://${req.headers.host}`).searchParams.entries())
-    : await readJsonBody(req);
+    : ensureObjectPayload(await readJsonBody(req));
 
   const { baseURL, apiKey } = getResolvedUpstream(source);
   const result = await proxyRequest({
@@ -141,7 +202,7 @@ async function handleModels(req: IncomingMessage, res: ServerResponse) {
 }
 
 async function handleConnectionTest(req: IncomingMessage, res: ServerResponse) {
-  const payload = await readJsonBody(req);
+  const payload = ensureObjectPayload(await readJsonBody(req));
   const startedAt = Date.now();
   const { baseURL, apiKey } = getResolvedUpstream(payload);
 
@@ -157,30 +218,26 @@ async function handleConnectionTest(req: IncomingMessage, res: ServerResponse) {
       latency: Date.now() - startedAt,
     });
   } catch (error) {
-    sendJson(res, 502, {
+    const upstreamError = mapUpstreamError(error, '连接测试失败');
+    sendJson(res, upstreamError.statusCode, {
       success: false,
       latency: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : '连接测试失败',
+      error: upstreamError.message,
     });
   }
 }
 
 async function handleChat(req: IncomingMessage, res: ServerResponse) {
-  const payload = (await readJsonBody(req)) as ProxyRequestPayload;
+  const payload = ensureObjectPayload(await readJsonBody(req)) as ProxyRequestPayload;
   const { baseURL, apiKey } = getResolvedUpstream(payload);
-
-  if (!payload.model) {
-    sendJson(res, 400, { error: { message: '缺少 model' } });
-    return;
-  }
+  const model = requireNonEmptyString(payload.model, 'model');
 
   if (!Array.isArray(payload.messages)) {
-    sendJson(res, 400, { error: { message: '缺少 messages' } });
-    return;
+    throw new HttpError(400, '缺少 messages');
   }
 
   const body = JSON.stringify({
-    model: payload.model,
+    model,
     messages: payload.messages,
     temperature: payload.temperature,
     max_tokens: payload.max_tokens,
@@ -197,8 +254,9 @@ async function handleChat(req: IncomingMessage, res: ServerResponse) {
         streamToClient: res,
       });
     } catch (error) {
+      const upstreamError = mapUpstreamError(error, '流式请求失败');
       if (!res.headersSent) {
-        sendJson(res, 502, { error: { message: error instanceof Error ? error.message : '流式请求失败' } });
+        sendJson(res, upstreamError.statusCode, { error: { message: upstreamError.message } });
       } else {
         res.end();
       }
@@ -218,52 +276,70 @@ async function handleChat(req: IncomingMessage, res: ServerResponse) {
     res.writeHead(result.status, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(result.body || '{}');
   } catch (error) {
-    sendJson(res, 502, { error: { message: error instanceof Error ? error.message : '聊天请求失败' } });
+    const upstreamError = mapUpstreamError(error, '聊天请求失败');
+    sendJson(res, upstreamError.statusCode, { error: { message: upstreamError.message } });
   }
 }
 
-const server = createServer(async (req, res) => {
-  try {
-    if (!req.url || !req.method) {
-      sendText(res, 400, 'Bad Request');
-      return;
+export function createAppServer() {
+  return createServer(async (req, res) => {
+    try {
+      if (!req.url || !req.method) {
+        sendText(res, 400, 'Bad Request');
+        return;
+      }
+
+      if (req.method === 'OPTIONS') {
+        setCorsHeaders(res);
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      const url = new URL(req.url, `http://${req.headers.host}`);
+
+      if (req.method === 'GET' && url.pathname === '/api/health') {
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      if ((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/models') {
+        await handleModels(req, res);
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/connection-test') {
+        await handleConnectionTest(req, res);
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/chat/completions') {
+        await handleChat(req, res);
+        return;
+      }
+
+      sendJson(res, 404, { error: { message: 'Not Found' } });
+    } catch (error) {
+      if (isHttpError(error)) {
+        sendJson(res, error.statusCode, { error: { message: error.message } });
+        return;
+      }
+
+      const upstreamError = mapUpstreamError(error, 'Internal Server Error');
+      sendJson(res, upstreamError.statusCode, { error: { message: upstreamError.message } });
     }
+  });
+}
 
-    if (req.method === 'OPTIONS') {
-      setCorsHeaders(res);
-      res.writeHead(204);
-      res.end();
-      return;
-    }
+export function startServer() {
+  const server = createAppServer();
+  server.listen(PORT, HOST, () => {
+    console.log(`[server] listening on http://${HOST}:${PORT}`);
+  });
+  return server;
+}
 
-    const url = new URL(req.url, `http://${req.headers.host}`);
-
-    if (req.method === 'GET' && url.pathname === '/api/health') {
-      sendJson(res, 200, { ok: true });
-      return;
-    }
-
-    if ((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/models') {
-      await handleModels(req, res);
-      return;
-    }
-
-    if (req.method === 'POST' && url.pathname === '/api/connection-test') {
-      await handleConnectionTest(req, res);
-      return;
-    }
-
-    if (req.method === 'POST' && url.pathname === '/api/chat/completions') {
-      await handleChat(req, res);
-      return;
-    }
-
-    sendJson(res, 404, { error: { message: 'Not Found' } });
-  } catch (error) {
-    sendJson(res, 500, { error: { message: error instanceof Error ? error.message : 'Internal Server Error' } });
-  }
-});
-
-server.listen(PORT, HOST, () => {
-  console.log(`[server] listening on http://${HOST}:${PORT}`);
-});
+const entryPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
+if (entryPath) {
+  startServer();
+}

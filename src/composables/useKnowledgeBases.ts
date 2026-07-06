@@ -3,6 +3,7 @@ import type { KnowledgeBase, KnowledgeEntry } from '../types';
 import { STORAGE_KEYS, DEFAULT_KNOWLEDGE_BASES } from '../constants';
 import { getStorage, setStorage } from '@/utils/storage';
 import { generalLogger } from '../modules/debug';
+import type { AICharacter } from '../types';
 
 /**
  * 知识库管理 Composable
@@ -110,7 +111,18 @@ export function useKnowledgeBases() {
     const initialLength = knowledgeBases.value.length;
     knowledgeBases.value = knowledgeBases.value.filter(kb => kb.id !== id);
     if (knowledgeBases.value.length < initialLength) {
+      const aiCharacters = await getStorage<AICharacter[]>(STORAGE_KEYS.AI_CHARACTERS, []);
+      const normalizedAICharacters = (Array.isArray(aiCharacters) ? aiCharacters : []).map(character =>
+        character.knowledgeBaseId === id
+          ? { ...character, knowledgeBaseId: undefined }
+          : character
+      );
+      const aiCharactersChanged = normalizedAICharacters.some((character, index) => character !== aiCharacters[index]);
+
       await saveKnowledgeBases();
+      if (aiCharactersChanged) {
+        await setStorage(STORAGE_KEYS.AI_CHARACTERS, normalizedAICharacters);
+      }
       // 如果删除的是当前选中的知识库，清空选中状态
       if (selectedKnowledgeBaseId.value === id) {
         selectedKnowledgeBaseId.value = null;

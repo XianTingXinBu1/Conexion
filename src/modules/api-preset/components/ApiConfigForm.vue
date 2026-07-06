@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Server, Shield, AlertCircle } from 'lucide-vue-next';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { Server, Shield, AlertCircle, RefreshCw } from 'lucide-vue-next';
 import { validateUrl } from '../../../utils';
 
 interface Props {
@@ -16,6 +16,38 @@ const emit = defineEmits<{
 }>();
 
 const urlError = ref('');
+const BACKEND_STATUS_REFRESH_INTERVAL = 5000;
+
+const backendStatus = ref<'checking' | 'online' | 'offline'>('checking');
+const backendMessage = ref('正在检查内建后端代理...');
+const backendLatency = ref<number | null>(null);
+let backendStatusTimer: ReturnType<typeof window.setInterval> | undefined;
+
+async function checkBackendStatus() {
+  backendStatus.value = 'checking';
+  backendMessage.value = '正在检查内建后端代理...';
+  backendLatency.value = null;
+
+  const startedAt = Date.now();
+
+  try {
+    const response = await fetch('/api/health', { cache: 'no-store' });
+    const data = await response.json().catch(() => null) as { ok?: boolean } | null;
+
+    if (!response.ok || data?.ok !== true) {
+      throw new Error(`状态码 ${response.status}`);
+    }
+
+    backendLatency.value = Date.now() - startedAt;
+    backendStatus.value = 'online';
+    backendMessage.value = '内建后端代理运行正常';
+  } catch (error) {
+    backendStatus.value = 'offline';
+    backendMessage.value = error instanceof Error
+      ? `内建后端代理不可用：${error.message}`
+      : '内建后端代理不可用';
+  }
+}
 
 function handleUrlInput(value: string) {
   emit('update:url', value);
@@ -26,6 +58,19 @@ function handleUrlInput(value: string) {
     urlError.value = '';
   }
 }
+
+onMounted(() => {
+  void checkBackendStatus();
+  backendStatusTimer = window.setInterval(() => {
+    void checkBackendStatus();
+  }, BACKEND_STATUS_REFRESH_INTERVAL);
+});
+
+onBeforeUnmount(() => {
+  if (backendStatusTimer !== undefined) {
+    window.clearInterval(backendStatusTimer);
+  }
+});
 </script>
 
 <template>
@@ -64,12 +109,21 @@ function handleUrlInput(value: string) {
   <div class="section">
     <div class="section-title">
       <Shield :size="18" />
-      <span>连接方式</span>
+      <span>后端状态</span>
     </div>
     <div class="proxy-info">
-      <div class="info-title">已启用内建后端代理</div>
+      <div class="status-header">
+        <div class="status-title">
+          <span class="status-dot" :class="backendStatus" />
+          <span>{{ backendStatus === 'online' ? '后端在线' : backendStatus === 'offline' ? '后端离线' : '检查中' }}</span>
+        </div>
+        <button class="status-refresh" type="button" @click="checkBackendStatus">
+          <RefreshCw :size="14" />
+          <span>刷新</span>
+        </button>
+      </div>
       <div class="info-text">
-        当前版本会通过项目内置后端转发请求并处理跨域，无需再手动配置外部代理服务。
+        {{ backendMessage }}<span v-if="backendLatency !== null">（{{ backendLatency }}ms）</span>
       </div>
     </div>
   </div>
@@ -104,11 +158,59 @@ function handleUrlInput(value: string) {
   border: 1px solid var(--border-color);
 }
 
-.info-title {
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.status-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-main);
-  margin-bottom: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
+.status-dot.online {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.45);
+}
+
+.status-dot.offline {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.45);
+}
+
+.status-dot.checking {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+}
+
+.status-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 3px 0;
+}
+
+.status-refresh:hover {
+  color: var(--accent-purple);
 }
 
 .info-text {

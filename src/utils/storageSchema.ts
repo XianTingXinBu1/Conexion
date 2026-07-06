@@ -19,8 +19,9 @@ import type {
 } from '@/types';
 import { APP_SETTINGS_DEFAULTS } from '@/composables/useAppSettings';
 import { getStorage, setStorage } from '@/utils/storage';
+import { clampCompressionThresholdPercent } from './conversationCompression';
 
-export const STORAGE_SCHEMA_VERSION = 2;
+export const STORAGE_SCHEMA_VERSION = 3;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -104,6 +105,12 @@ function normalizeConversation(conversation: Partial<Conversation>, index: numbe
   const now = Date.now();
   const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
   const createdAt = normalizeTimestamp(conversation.createdAt, now);
+  const rawCompression = isObject(conversation.compression) ? conversation.compression : null;
+  const sourceMessageIds = Array.isArray(rawCompression?.sourceMessageIds)
+    ? rawCompression.sourceMessageIds.filter((id): id is string => typeof id === 'string')
+    : [];
+  const summaryContent = normalizeString(rawCompression?.summaryContent);
+  const promptContent = normalizeString(rawCompression?.promptContent);
 
   return {
     id: normalizeString(conversation.id, `migrated-conv-${index + 1}`),
@@ -111,6 +118,27 @@ function normalizeConversation(conversation: Partial<Conversation>, index: numbe
     characterId: typeof conversation.characterId === 'string' ? conversation.characterId : undefined,
     characterName: typeof conversation.characterName === 'string' ? conversation.characterName : undefined,
     messages,
+    compressed: normalizeBoolean(conversation.compressed, summaryContent.length > 0),
+    compression: summaryContent
+      ? {
+          compressedAt: normalizeTimestamp(rawCompression?.compressedAt, createdAt),
+          summaryContent,
+          promptContent: promptContent || summaryContent,
+          sourceMessageCount: typeof rawCompression?.sourceMessageCount === 'number'
+            ? rawCompression.sourceMessageCount
+            : sourceMessageIds.length,
+          sourceMessageIds,
+          keepRecentCount: typeof rawCompression?.keepRecentCount === 'number'
+            ? rawCompression.keepRecentCount
+            : 6,
+          contextBeforeCompression: typeof rawCompression?.contextBeforeCompression === 'number'
+            ? rawCompression.contextBeforeCompression
+            : undefined,
+          contextAfterCompression: typeof rawCompression?.contextAfterCompression === 'number'
+            ? rawCompression.contextAfterCompression
+            : undefined,
+        }
+      : undefined,
     createdAt,
     updatedAt: normalizeTimestamp(conversation.updatedAt, createdAt),
   };
@@ -344,6 +372,23 @@ async function migrateToV2(): Promise<void> {
   if (!['none', 'adjacent', 'all'].includes(currentPromptMergeMode)) {
     await setStorage(STORAGE_KEYS.PROMPT_MERGE_MODE, APP_SETTINGS_DEFAULTS.promptMergeMode);
   }
+
+  const compressionThresholdPercent = await getStorage<number>(
+    STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT,
+    APP_SETTINGS_DEFAULTS.compressionThresholdPercent
+  );
+  await setStorage(
+    STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT,
+    clampCompressionThresholdPercent(compressionThresholdPercent)
+  );
+
+  const compressionMode = await getStorage<string>(
+    STORAGE_KEYS.COMPRESSION_MODE,
+    APP_SETTINGS_DEFAULTS.compressionMode
+  );
+  if (!['manual', 'auto'].includes(compressionMode)) {
+    await setStorage(STORAGE_KEYS.COMPRESSION_MODE, APP_SETTINGS_DEFAULTS.compressionMode);
+  }
 }
 
 export async function ensureStorageSchema(): Promise<number> {
@@ -358,6 +403,10 @@ export async function ensureStorageSchema(): Promise<number> {
   }
 
   if (currentVersion < 2) {
+    await migrateToV2();
+  }
+
+  if (currentVersion < 3) {
     await migrateToV2();
   }
 

@@ -16,7 +16,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useCharacters } from '../composables/useCharacters';
 import { useKnowledgeBases } from '../composables/useKnowledgeBases';
 import { useApiPresets } from '../modules/api-preset';
-import { useNotifications } from '../modules/notification';
+import { useNotifications, getNotificationMessage } from '../modules/notification';
 import { useConversationManager } from '../composables/useConversationManager';
 import { useAppSettings } from '../composables/useAppSettings';
 import { useTheme } from '../composables/useTheme';
@@ -29,6 +29,8 @@ import { useChatSendFlow } from '../composables/useChatSendFlow';
 import { useChatPageInit } from '../composables/useChatPageInit';
 import { useChatSessionMeta } from '../composables/useChatSessionMeta';
 import { useChatPageController } from '../composables/useChatPageController';
+import { useConversationCompression } from '../composables/useConversationCompression';
+import { isTemporaryConversationId } from '@/services/conversationRepository';
 
 import '../styles/common.css';
 import '../styles/chat.css';
@@ -54,11 +56,17 @@ const {
   showMessageIndex,
   chatHistoryLimit,
   promptMergeMode,
+  compressionThresholdPercent,
+  compressionMode,
 } = useAppSettings();
 const { theme } = useTheme();
 
 const router = useRouter();
 const persistedConversationId = computed(() => currentConversation.value?.id);
+const canUseConversationCompression = computed(() => {
+  const conversationId = currentConversation.value?.id;
+  return !!conversationId && !isTemporaryConversationId(conversationId);
+});
 
 // 加载 AI 角色数据
 const loadAICharacter = async (characterId: string): Promise<AICharacter | undefined> => {
@@ -105,8 +113,8 @@ const createNewConversation = async (firstMessage: Message): Promise<Conversatio
   return await createConv(firstMessage, currentCharacter.value);
 };
 
-const saveConversation = async () => {
-  await saveConv(messages.value);
+const saveConversation = async (nextMessages = messages.value, updates: Partial<Conversation> = {}) => {
+  await saveConv(nextMessages, updates);
 };
 
 const loadRegexRules = async () => {
@@ -122,6 +130,7 @@ const { chatTitle, chatSubtitle } = useChatSessionMeta({
 });
 
 const {
+  sendChatRequest,
   sendStreamChatRequest,
   cancelRequest,
   usage,
@@ -130,12 +139,27 @@ const {
   requestStatus,
   isRequestActive,
 } = useChatApi();
-const { showSuccess, showError } = useNotifications();
+const { showSuccess, showError, showInfo } = useNotifications();
 const { selectedUser, init: initCharacters } = useCharacters();
 const { knowledgeBases, init: initKnowledgeBases } = useKnowledgeBases();
 const { currentPreset: currentApiPreset, loadPresets: loadApiPresets } = useApiPresets();
 
-const chatViewport = useChatViewport(messages, chatHistoryLimit);
+const {
+  compression,
+  compressionSummary,
+  compressionPromptContent,
+  effectiveMessages,
+  canCompress,
+  isCompressing,
+  compressConversation,
+} = useConversationCompression({
+  messages,
+  currentConversation,
+  saveConversation,
+  sendChatRequest,
+});
+
+const chatViewport = useChatViewport(effectiveMessages, chatHistoryLimit);
 const {
   displayMessages,
   loadedCount,
@@ -155,7 +179,9 @@ const {
   chatMessageCount,
   userMessageCount,
   aiMessageCount,
-} = useChatStats(messages, currentApiPreset);
+  usagePercent,
+  isCompressionThresholdReached,
+} = useChatStats(messages, currentApiPreset, compression, compressionThresholdPercent);
 
 const {
   lastSystemPromptResult,
@@ -175,10 +201,42 @@ const {
   currentCharacter,
   selectedUser,
   knowledgeBases,
-  messages,
+  messages: effectiveMessages,
   promptMergeMode,
+  compressionSummary: compressionPromptContent,
   showPromptAssistant,
 });
+
+const handleCompressConversation = async () => {
+  if (isCompressing.value) {
+    return;
+  }
+
+  if (!canUseConversationCompression.value) {
+    showInfo('暂不支持', '请先创建已保存会话后再压缩。');
+    return;
+  }
+
+  if (!canCompress.value) {
+    showInfo('无需压缩', '当前会话可压缩的历史不足。');
+    return;
+  }
+
+  try {
+    const compressed = await compressConversation();
+    if (!compressed) {
+      showInfo('无需压缩', '当前会话可压缩的历史不足。');
+      return;
+    }
+
+    const msg = getNotificationMessage('CHAT_COMPRESSION_SUCCESS');
+    showSuccess(msg.title, msg.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '压缩失败';
+    const msg = getNotificationMessage('CHAT_COMPRESSION_FAILED', { error: errorMessage });
+    showError(msg.title, msg.message);
+  }
+};
 
 const {
   isSending,
@@ -186,16 +244,23 @@ const {
   handleCancelSend,
 } = useChatSendFlow({
   messages,
+  requestMessages: effectiveMessages,
   regexRules,
   currentCharacter,
   selectedUser,
   knowledgeBases,
   promptMergeMode,
+  compressionMode,
+  canUseConversationCompression,
+  isCompressionThresholdReached,
+  compressConversation,
+  isCompressingConversation: isCompressing,
+  compressionSummary: compressionPromptContent,
   persistedConversationId,
   resetUsage,
   loadRegexRules,
   createNewConversation,
-  saveConversation,
+  saveConversation: () => saveConversation(),
   onStreamFlush: scrollPolicy.onStreamFlush,
   onMessageSend: scrollPolicy.onMessageSend,
   sendStreamChatRequest,
@@ -225,7 +290,7 @@ const {
 
 useChatPageInit({
   props,
-  messages,
+  messages: effectiveMessages,
   currentCharacter,
   chatHistoryLimit,
   onPageLoad: scrollPolicy.onPageLoad,
@@ -238,6 +303,7 @@ useChatPageInit({
   initCharacters,
   initKnowledgeBases,
   loadMessages,
+  refreshVisibleMessages: syncVisibleMessages,
 });
 </script>
 
@@ -248,7 +314,10 @@ useChatPageInit({
         <ArrowLeft :size="22" />
       </button>
       <div class="header-content">
-        <div class="chat-title">{{ chatTitle }}</div>
+        <div class="chat-title-row">
+          <div class="chat-title">{{ chatTitle }}</div>
+          <span v-if="compressionSummary" class="compression-badge">已压缩</span>
+        </div>
         <div class="chat-subtitle">{{ chatSubtitle }}</div>
       </div>
       <ContextRing
@@ -260,20 +329,40 @@ useChatPageInit({
       />
     </header>
 
+    <div
+      v-if="canUseConversationCompression && isCompressionThresholdReached"
+      class="compression-warning"
+      :class="theme"
+    >
+      <div>
+        上下文使用率已达到 {{ usagePercent }}%（阈值 {{ compressionThresholdPercent }}%）。
+        <span v-if="compressionMode === 'auto'">下次发送前会自动压缩。</span>
+        <span v-else>建议先压缩会话以保留关键上下文。</span>
+      </div>
+      <button
+        v-if="compressionMode === 'manual'"
+        class="compression-warning-btn"
+        :disabled="isCompressing"
+        @click="handleCompressConversation"
+      >
+        立即压缩
+      </button>
+    </div>
+
     <div :ref="(el) => { chatViewport.messagesContainer.value = el as HTMLElement | undefined; }" class="chat-messages">
       <button
         v-if="hasMoreMessages"
         class="load-more-btn"
         @click="loadMoreMessages"
       >
-        加载更多历史消息 ({{ messages.length - loadedCount }} 条未加载)
+        加载更多历史消息 ({{ chatMessageCount - loadedCount }} 条未加载)
       </button>
       <MessageItem
         v-for="(message, index) in displayMessages"
         :key="message.id"
         :message="message"
         :index="index"
-        :total-messages="messages.length"
+        :total-messages="chatMessageCount"
         :display-count="displayMessages.length"
         :theme="theme"
         :enable-markdown="enableMarkdown"
@@ -299,7 +388,16 @@ useChatPageInit({
       :usage="usage"
       :response-metrics="responseMetrics"
       :theme="theme"
+      :usage-percent="usagePercent"
+      :compression-threshold-percent="compressionThresholdPercent"
+      :compression-mode="compressionMode"
+      :compression-summary="compressionSummary"
+      :is-compression-threshold-reached="isCompressionThresholdReached"
+      :is-compressing="isCompressing"
+      :show-compression-section="canUseConversationCompression"
+      :can-compress="canCompress && canUseConversationCompression"
       @close="closeTokenDetails"
+      @compress="handleCompressConversation"
     />
 
     <ChatInput
@@ -342,3 +440,64 @@ useChatPageInit({
     />
   </div>
 </template>
+
+<style scoped>
+.chat-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compression-warning-btn {
+  border: none;
+  border-radius: 10px;
+  background: rgba(157, 141, 241, 0.14);
+  color: var(--accent-purple);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.compression-warning-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.compression-warning-btn:active {
+  transform: scale(0.97);
+}
+
+.compression-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.compression-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.compression-warning.light {
+  background: rgba(245, 158, 11, 0.08);
+  color: #92400e;
+}
+
+.compression-warning.dark {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+</style>

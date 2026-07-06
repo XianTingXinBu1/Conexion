@@ -14,16 +14,24 @@ describe('useChatSendFlow', () => {
 
   it('sends current user message exactly once even without user-instruction preset item', async () => {
     const messages = ref<Message[]>([]);
+    const requestMessages = ref<Message[]>([]);
     const regexRules = ref<RegexRule[]>([]);
     const sentMessages: Message[][] = [];
 
     const deps = {
       messages,
+      requestMessages,
       regexRules,
       currentCharacter: { value: undefined as AICharacter | undefined },
       selectedUser: { value: undefined as UserCharacter | undefined },
       knowledgeBases: { value: [] },
       promptMergeMode: ref<'adjacent'>('adjacent'),
+      compressionMode: ref<'manual' | 'auto'>('manual'),
+      canUseConversationCompression: ref(false),
+      isCompressionThresholdReached: ref(false),
+      compressConversation: vi.fn(async () => true),
+      isCompressingConversation: ref(false),
+      compressionSummary: ref(''),
       persistedConversationId: { value: undefined },
       resetUsage: vi.fn(),
       loadRegexRules: vi.fn(async () => undefined),
@@ -56,8 +64,54 @@ describe('useChatSendFlow', () => {
     }));
   });
 
+  it('skips auto compression for temporary conversations even when threshold is reached', async () => {
+    const messages = ref<Message[]>([]);
+    const requestMessages = ref<Message[]>([]);
+    const regexRules = ref<RegexRule[]>([]);
+    const compressConversation = vi.fn(async () => true);
+
+    const deps = {
+      messages,
+      requestMessages,
+      regexRules,
+      currentCharacter: { value: undefined as AICharacter | undefined },
+      selectedUser: { value: undefined as UserCharacter | undefined },
+      knowledgeBases: { value: [] },
+      promptMergeMode: ref<'adjacent'>('adjacent'),
+      compressionMode: ref<'manual' | 'auto'>('auto'),
+      canUseConversationCompression: ref(false),
+      isCompressionThresholdReached: ref(true),
+      compressConversation,
+      isCompressingConversation: ref(false),
+      compressionSummary: ref(''),
+      persistedConversationId: { value: 'temp-123' },
+      resetUsage: vi.fn(),
+      loadRegexRules: vi.fn(async () => undefined),
+      createNewConversation: vi.fn(async () => undefined),
+      saveConversation: vi.fn(async () => undefined),
+      onStreamFlush: vi.fn(),
+      onMessageSend: vi.fn(async () => undefined),
+      sendStreamChatRequest: vi.fn(async (_requestMessages: Message[], onChunk, onComplete) => {
+        onChunk('reply');
+        await vi.advanceTimersByTimeAsync(60);
+        await onComplete();
+      }),
+      cancelRequest: vi.fn(),
+      buildSystemMessages: vi.fn(() => []),
+      showSuccess: vi.fn(),
+      showError: vi.fn(),
+    };
+
+    const { handleSendMessage } = useChatSendFlow(deps);
+    await handleSendMessage('hello');
+
+    expect(compressConversation).not.toHaveBeenCalled();
+    expect(deps.sendStreamChatRequest).toHaveBeenCalledTimes(1);
+  });
+
   it('does not re-apply non-idempotent assistant regex rules to old streamed content', async () => {
     const messages = ref<Message[]>([]);
+    const requestMessages = ref<Message[]>([]);
     const regexRules = ref<RegexRule[]>([
       {
         id: 'r1',
@@ -73,11 +127,18 @@ describe('useChatSendFlow', () => {
 
     const deps = {
       messages,
+      requestMessages,
       regexRules,
       currentCharacter: { value: undefined as AICharacter | undefined },
       selectedUser: { value: undefined as UserCharacter | undefined },
       knowledgeBases: { value: [] },
       promptMergeMode: ref<'adjacent'>('adjacent'),
+      compressionMode: ref<'manual' | 'auto'>('manual'),
+      canUseConversationCompression: ref(false),
+      isCompressionThresholdReached: ref(false),
+      compressConversation: vi.fn(async () => true),
+      isCompressingConversation: ref(false),
+      compressionSummary: ref(''),
       persistedConversationId: { value: undefined },
       resetUsage: vi.fn(),
       loadRegexRules: vi.fn(async () => undefined),

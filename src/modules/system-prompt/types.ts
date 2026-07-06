@@ -35,6 +35,8 @@ export interface SystemPromptConfig {
   chatHistory?: Message[];
   /** 当前用户输入的指令（可选） */
   userInstruction?: string;
+  /** 历史压缩摘要（可选） */
+  compressionSummary?: string;
   /** 合并模式（默认: adjacent） */
   mergeMode?: MergeMode;
   /** 是否在构建时过滤掉空的 prompt（默认: true） */
@@ -92,6 +94,7 @@ export interface ContentFillerContext {
   knowledgeBases?: KnowledgeBase[];
   chatHistory?: Message[];
   userInstruction?: string;
+  compressionSummary?: string;
 }
 
 /**

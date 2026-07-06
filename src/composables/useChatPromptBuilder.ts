@@ -23,6 +23,7 @@ interface BuildPromptContext {
   userInstruction: string;
   mergeMode: MergeMode;
   includeUserInstructionMessage?: boolean;
+  compressionSummary?: string;
 }
 
 export function useChatPromptBuilder() {
@@ -58,8 +59,17 @@ export function useChatPromptBuilder() {
     return promptPresets.value.find(p => p.id === selectedPromptPresetId.value) || null;
   };
 
-  const buildFallbackSystemMessages = (aiCharacter?: AICharacter): ChatMessage[] => {
-    if (!aiCharacter) return [];
+  const buildFallbackSystemMessages = (aiCharacter?: AICharacter, compressionSummary?: string): ChatMessage[] => {
+    const messages: ChatMessage[] = [];
+
+    if (compressionSummary?.trim()) {
+      messages.push({
+        role: 'system',
+        content: compressionSummary.trim(),
+      });
+    }
+
+    if (!aiCharacter) return messages;
 
     const parts: string[] = [];
     if (aiCharacter.name) {
@@ -72,14 +82,14 @@ export function useChatPromptBuilder() {
       parts.push(`你的性格：${aiCharacter.personality}`);
     }
 
-    if (parts.length === 0) return [];
+    if (parts.length === 0) return messages;
 
-    return [
-      {
-        role: 'system' as const,
-        content: parts.join('\n'),
-      },
-    ];
+    messages.push({
+      role: 'system' as const,
+      content: parts.join('\n'),
+    });
+
+    return messages;
   };
 
   const buildSystemMessages = (context: BuildPromptContext): ChatMessage[] => {
@@ -96,6 +106,7 @@ export function useChatPromptBuilder() {
         chatHistory: context.chatHistory,
         userInstruction: context.includeUserInstructionMessage === false ? '' : context.userInstruction,
         mergeMode: context.mergeMode,
+        compressionSummary: context.compressionSummary,
       });
 
       systemMessages = result.messages;
@@ -133,7 +144,7 @@ export function useChatPromptBuilder() {
     }
 
     logPrompt('未找到提示词预设，使用默认构建');
-    systemMessages = buildFallbackSystemMessages(context.aiCharacter);
+    systemMessages = buildFallbackSystemMessages(context.aiCharacter, context.compressionSummary);
     lastSystemMessages.value = systemMessages;
     lastSystemPromptResult.value = {
       estimatedTokens: systemMessages.reduce((sum, msg) => sum + msg.content.length, 0),

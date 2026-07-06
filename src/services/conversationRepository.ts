@@ -125,13 +125,14 @@ export async function deleteConversationRecord(id: string): Promise<boolean> {
 
 export async function updateConversationMessages(
   id: string,
-  messages: Message[]
+  messages: Message[],
+  updates: Partial<Conversation> = {}
 ): Promise<Conversation | undefined> {
   if (messages.length === 0) {
     return undefined;
   }
 
-  return updateConversationRecord(id, { messages });
+  return updateConversationRecord(id, { ...updates, messages });
 }
 
 export async function editConversationMessage(

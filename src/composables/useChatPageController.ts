@@ -8,12 +8,14 @@ interface UseChatPageControllerOptions {
   knowledgeBases: Ref<KnowledgeBase[]>;
   messages: Ref<Message[]>;
   promptMergeMode: Ref<MergeMode>;
+  compressionSummary: Ref<string>;
   showPromptAssistant: (context: {
     aiCharacter?: AICharacter;
     userCharacter?: UserCharacter;
     knowledgeBases: KnowledgeBase[];
     chatHistory: Message[];
     mergeMode: MergeMode;
+    compressionSummary?: string;
   }) => void;
 }
 
@@ -24,6 +26,7 @@ export function useChatPageController(options: UseChatPageControllerOptions) {
     knowledgeBases,
     messages,
     promptMergeMode,
+    compressionSummary,
     showPromptAssistant,
   } = options;
 
@@ -48,6 +51,7 @@ export function useChatPageController(options: UseChatPageControllerOptions) {
       knowledgeBases: knowledgeBases.value,
       chatHistory: messages.value.filter(message => message.type !== 'system'),
       mergeMode: promptMergeMode.value,
+      compressionSummary: compressionSummary.value,
     });
   };
 

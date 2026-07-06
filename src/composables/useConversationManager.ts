@@ -56,7 +56,7 @@ export function useConversationManager(
   /**
    * 保存会话
    */
-  const saveConversation = async (messages: Message[]) => {
+  const saveConversation = async (messages: Message[], updates: Partial<Conversation> = {}) => {
     if (!currentConversationId.value || messages.length === 0) {
       return;
     }
@@ -66,7 +66,7 @@ export function useConversationManager(
       return;
     }
 
-    const updated = await updateConversationMessages(currentConversationId.value, messages);
+    const updated = await updateConversationMessages(currentConversationId.value, messages, updates);
 
     if (updated) {
       currentConversation.value = updated;

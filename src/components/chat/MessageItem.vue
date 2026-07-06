@@ -27,6 +27,18 @@ const isStreamingMessage = computed(() => props.index === props.displayCount - 1
 const getWordCount = (text: string) => {
   return text.length;
 };
+
+const messageLabel = computed(() => {
+  if (props.message.type === 'user') {
+    return '用户';
+  }
+
+  if (props.message.type === 'system') {
+    return '系统';
+  }
+
+  return 'AI';
+});
 </script>
 
 <template>
@@ -40,7 +52,7 @@ const getWordCount = (text: string) => {
       <span v-else>{{ message.content }}</span>
     </div>
     <div class="message-meta">
-      <div class="message-label">{{ message.type === 'user' ? '用户' : 'AI' }}</div>
+      <div class="message-label">{{ messageLabel }}</div>
       <div v-if="showWordCount" class="message-word-count">{{ getWordCount(message.content) }} 字</div>
       <div v-if="showMessageIndex" class="message-index">#{{ totalMessages - displayCount + index + 1 }}</div>
       <div class="message-actions">

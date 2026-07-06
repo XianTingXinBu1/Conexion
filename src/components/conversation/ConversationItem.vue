@@ -68,7 +68,10 @@ const getConversationPreview = (conversation: Conversation) => {
       <Bot :size="20" />
     </div>
     <div class="conversation-info">
-      <div class="conversation-name">{{ conversation.title }}</div>
+      <div class="conversation-name-row">
+        <div class="conversation-name">{{ conversation.title }}</div>
+        <span v-if="conversation.compressed" class="conversation-compressed-badge">已压缩</span>
+      </div>
       <div class="conversation-preview">{{ getConversationPreview(conversation) }}</div>
       <div class="conversation-meta">
         <span class="conversation-time">{{ formatTime(conversation.updatedAt) }}</span>
@@ -125,6 +128,13 @@ const getConversationPreview = (conversation: Conversation) => {
   gap: 4px;
 }
 
+.conversation-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .conversation-name {
   font-size: 15px;
   font-weight: 600;
@@ -132,6 +142,16 @@ const getConversationPreview = (conversation: Conversation) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.conversation-compressed-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
 }
 
 .conversation-preview {

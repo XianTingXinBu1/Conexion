@@ -19,6 +19,8 @@ export const STORAGE_KEYS = {
   MERGE_PROMPT_PRESETS: 'conexion_merge_prompt_presets', // 是否合并提示词预设到系统提示词
   PROMPT_MERGE_MODE: 'conexion_prompt_merge_mode', // 提示词合并模式: 'none' | 'adjacent' | 'all'
   DEBUG_MODE: 'conexion_debug_mode', // 调试模式开关
+  COMPRESSION_THRESHOLD_PERCENT: 'conexion_compression_threshold_percent', // 会话压缩阈值百分比
+  COMPRESSION_MODE: 'conexion_compression_mode', // 会话压缩模式: 'manual' | 'auto'
   STORAGE_SCHEMA_VERSION: 'conexion_storage_schema_version', // 存储 schema 版本
 
   // IndexedDB: 大数据
@@ -47,6 +49,8 @@ export const DEFAULTS = {
   PROMPT_MERGE_MODE: 'adjacent' as const, // 默认合并相邻同类型消息
   MAX_CONTEXT_LIMIT: 128, // 最大上下文消息数
   DEBUG_MODE: false, // 默认关闭调试模式
+  COMPRESSION_THRESHOLD_PERCENT: 75,
+  COMPRESSION_MODE: 'manual' as const,
 };
 
 /**

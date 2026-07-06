@@ -8,6 +8,7 @@ import { ref } from 'vue';
 import { useLocalStorage } from './useLocalStorage';
 import { STORAGE_KEYS, DEFAULTS } from '@/constants';
 import type { MergeMode } from '@/modules/system-prompt';
+import type { ConversationCompressionMode } from '@/types';
 import { setStorage } from '@/utils/storage';
 
 /**
@@ -23,6 +24,10 @@ export interface AppSettings {
 
   // 提示词设置
   promptMergeMode: MergeMode;
+
+  // 会话压缩设置
+  compressionThresholdPercent: number;
+  compressionMode: ConversationCompressionMode;
 }
 
 export const APP_SETTINGS_DEFAULTS: AppSettings & {
@@ -35,6 +40,8 @@ export const APP_SETTINGS_DEFAULTS: AppSettings & {
   showMessageIndex: DEFAULTS.SHOW_MESSAGE_INDEX,
   chatHistoryLimit: DEFAULTS.CHAT_HISTORY_LIMIT,
   promptMergeMode: DEFAULTS.PROMPT_MERGE_MODE,
+  compressionThresholdPercent: DEFAULTS.COMPRESSION_THRESHOLD_PERCENT,
+  compressionMode: DEFAULTS.COMPRESSION_MODE,
   mergePromptPresets: DEFAULTS.MERGE_PROMPT_PRESETS,
   debugMode: DEFAULTS.DEBUG_MODE,
 } as const;
@@ -47,6 +54,8 @@ export function getAppSettingsSnapshot(): AppSettings {
     showMessageIndex: APP_SETTINGS_DEFAULTS.showMessageIndex,
     chatHistoryLimit: APP_SETTINGS_DEFAULTS.chatHistoryLimit,
     promptMergeMode: APP_SETTINGS_DEFAULTS.promptMergeMode,
+    compressionThresholdPercent: APP_SETTINGS_DEFAULTS.compressionThresholdPercent,
+    compressionMode: APP_SETTINGS_DEFAULTS.compressionMode,
   };
 }
 
@@ -60,6 +69,8 @@ export async function writeAppSettingsDefaults(
   await write(STORAGE_KEYS.CHAT_HISTORY_LIMIT, APP_SETTINGS_DEFAULTS.chatHistoryLimit);
   await write(STORAGE_KEYS.MERGE_PROMPT_PRESETS, APP_SETTINGS_DEFAULTS.mergePromptPresets);
   await write(STORAGE_KEYS.PROMPT_MERGE_MODE, APP_SETTINGS_DEFAULTS.promptMergeMode);
+  await write(STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT, APP_SETTINGS_DEFAULTS.compressionThresholdPercent);
+  await write(STORAGE_KEYS.COMPRESSION_MODE, APP_SETTINGS_DEFAULTS.compressionMode);
   await write(STORAGE_KEYS.DEBUG_MODE, APP_SETTINGS_DEFAULTS.debugMode);
 }
 
@@ -78,6 +89,16 @@ export function useAppSettings() {
   const { value: promptMergeMode } = useLocalStorage<MergeMode>(
     STORAGE_KEYS.PROMPT_MERGE_MODE,
     APP_SETTINGS_DEFAULTS.promptMergeMode
+  );
+
+  // 会话压缩设置
+  const { value: compressionThresholdPercent } = useLocalStorage(
+    STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT,
+    APP_SETTINGS_DEFAULTS.compressionThresholdPercent
+  );
+  const { value: compressionMode } = useLocalStorage<ConversationCompressionMode>(
+    STORAGE_KEYS.COMPRESSION_MODE,
+    APP_SETTINGS_DEFAULTS.compressionMode
   );
 
   // 设置更新方法
@@ -105,6 +126,14 @@ export function useAppSettings() {
     promptMergeMode.value = value;
   };
 
+  const updateCompressionThresholdPercent = (value: number) => {
+    compressionThresholdPercent.value = value;
+  };
+
+  const updateCompressionMode = (value: ConversationCompressionMode) => {
+    compressionMode.value = value;
+  };
+
   const applyDefaultRefs = () => {
     enterToSend.value = APP_SETTINGS_DEFAULTS.enterToSend;
     showWordCount.value = APP_SETTINGS_DEFAULTS.showWordCount;
@@ -112,6 +141,8 @@ export function useAppSettings() {
     showMessageIndex.value = APP_SETTINGS_DEFAULTS.showMessageIndex;
     chatHistoryLimit.value = APP_SETTINGS_DEFAULTS.chatHistoryLimit;
     promptMergeMode.value = APP_SETTINGS_DEFAULTS.promptMergeMode;
+    compressionThresholdPercent.value = APP_SETTINGS_DEFAULTS.compressionThresholdPercent;
+    compressionMode.value = APP_SETTINGS_DEFAULTS.compressionMode;
   };
 
   const applyDefaults = async () => {
@@ -138,6 +169,8 @@ export function useAppSettings() {
     showMessageIndex: showMessageIndex.value,
     chatHistoryLimit: chatHistoryLimit.value,
     promptMergeMode: promptMergeMode.value,
+    compressionThresholdPercent: compressionThresholdPercent.value,
+    compressionMode: compressionMode.value,
   };
 
   return {
@@ -151,6 +184,10 @@ export function useAppSettings() {
     // 提示词设置
     promptMergeMode,
 
+    // 会话压缩设置
+    compressionThresholdPercent,
+    compressionMode,
+
     // 更新方法
     updateEnterToSend,
     updateShowWordCount,
@@ -158,6 +195,8 @@ export function useAppSettings() {
     updateShowMessageIndex,
     updateChatHistoryLimit,
     updatePromptMergeMode,
+    updateCompressionThresholdPercent,
+    updateCompressionMode,
 
     // 其他方法
     applyDefaults,

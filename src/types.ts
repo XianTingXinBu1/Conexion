@@ -2,6 +2,8 @@ export type Theme = 'light' | 'dark';
 
 export type MessageType = 'user' | 'assistant' | 'system';
 
+export type ConversationCompressionMode = 'manual' | 'auto';
+
 /**
  * 文本动画类型
  */
@@ -113,12 +115,25 @@ export interface AICharacter {
 /**
  * 会话接口
  */
+export interface ConversationCompression {
+  compressedAt: number;
+  summaryContent: string;
+  promptContent: string;
+  sourceMessageCount: number;
+  sourceMessageIds: string[];
+  keepRecentCount: number;
+  contextBeforeCompression?: number;
+  contextAfterCompression?: number;
+}
+
 export interface Conversation {
   id: string;
   title: string;
   characterId?: string;
   characterName?: string;
   messages: Message[];
+  compressed?: boolean;
+  compression?: ConversationCompression;
   createdAt: number;
   updatedAt: number;
 }

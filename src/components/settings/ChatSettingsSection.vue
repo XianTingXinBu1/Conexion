@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { MergeMode } from '../../modules/system-prompt';
+import type { ConversationCompressionMode } from '../../types';
 
 interface Props {
   enterToSend: boolean;
@@ -9,6 +10,8 @@ interface Props {
   debugMode: boolean;
   chatHistoryLimit: number;
   promptMergeMode: MergeMode;
+  compressionThresholdPercent: number;
+  compressionMode: ConversationCompressionMode;
 }
 
 const props = defineProps<Props>();
@@ -20,6 +23,8 @@ const emit = defineEmits<{
   updateShowMessageIndex: [value: boolean];
   updateChatHistoryLimit: [value: number];
   updatePromptMergeMode: [value: MergeMode];
+  updateCompressionThresholdPercent: [value: number];
+  updateCompressionMode: [value: ConversationCompressionMode];
   toggleDebugMode: [];
 }>();
 
@@ -48,8 +53,17 @@ const handleDebugModeToggle = () => {
   emit('toggleDebugMode');
 };
 
+const handleCompressionThresholdChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit('updateCompressionThresholdPercent', parseInt(target.value));
+};
+
 const handlePromptMergeModeChange = (mode: MergeMode) => {
   emit('updatePromptMergeMode', mode);
+};
+
+const handleCompressionModeChange = (mode: ConversationCompressionMode) => {
+  emit('updateCompressionMode', mode);
 };
 
 // 合并模式选项
@@ -68,6 +82,19 @@ const mergeModeOptions: { value: MergeMode; label: string; desc: string }[] = [
     value: 'all',
     label: '全部合并',
     desc: '合并所有到一个消息',
+  },
+];
+
+const compressionModeOptions: { value: ConversationCompressionMode; label: string; desc: string }[] = [
+  {
+    value: 'manual',
+    label: '手动压缩',
+    desc: '达到阈值时提示压缩，由你手动触发',
+  },
+  {
+    value: 'auto',
+    label: '自动压缩',
+    desc: '达到阈值时发送前自动生成摘要并继续对话',
   },
 ];
 </script>
@@ -127,6 +154,39 @@ const mergeModeOptions: { value: MergeMode; label: string; desc: string }[] = [
           <div class="option-desc">{{ option.desc }}</div>
         </button>
       </div>
+    </div>
+
+    <div class="selector-item">
+      <div class="selector-label">会话压缩模式</div>
+      <div class="selector-options">
+        <button
+          v-for="option in compressionModeOptions"
+          :key="option.value"
+          class="selector-option"
+          :class="{ 'active': compressionMode === option.value }"
+          @click="handleCompressionModeChange(option.value)"
+        >
+          <div class="option-label">{{ option.label }}</div>
+          <div class="option-desc">{{ option.desc }}</div>
+        </button>
+      </div>
+    </div>
+
+    <div class="slider-item">
+      <div class="slider-header">
+        <div class="slider-label">压缩阈值</div>
+        <div class="slider-value">{{ compressionThresholdPercent }}%</div>
+      </div>
+      <input
+        type="range"
+        class="slider-input"
+        :min="50"
+        :max="95"
+        :step="5"
+        :value="compressionThresholdPercent"
+        @input="handleCompressionThresholdChange"
+      />
+      <div class="slider-desc">当上下文使用率达到该阈值时显示压缩提示；自动模式会在发送前自动压缩。</div>
     </div>
 
     <div class="slider-item">

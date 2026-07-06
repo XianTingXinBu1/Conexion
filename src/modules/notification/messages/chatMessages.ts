@@ -6,6 +6,8 @@ import { type NotificationMessage } from './types';
 export type ChatMessageKey =
   | 'CHAT_SEND_SUCCESS'
   | 'CHAT_SEND_FAILED'
+  | 'CHAT_COMPRESSION_SUCCESS'
+  | 'CHAT_COMPRESSION_FAILED'
   | 'CODE_COPY_SUCCESS'
   | 'CODE_COPY_FAILED';
 
@@ -29,6 +31,18 @@ export const CHAT_MESSAGES: Record<ChatMessageKey, (params?: Record<string, stri
     type: 'error',
     title: '发送失败',
     message: String(params?.error || '发送失败'),
+  }),
+
+  CHAT_COMPRESSION_SUCCESS: () => ({
+    type: 'success',
+    title: '已压缩',
+    message: '会话摘要已生成，并会参与后续对话',
+  }),
+
+  CHAT_COMPRESSION_FAILED: (params) => ({
+    type: 'error',
+    title: '压缩失败',
+    message: String(params?.error || '无法生成会话摘要'),
   }),
 
   /**

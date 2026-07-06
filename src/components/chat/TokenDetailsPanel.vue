@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import type { Theme, Preset } from '../../types';
+import { computed, ref, watch } from 'vue';
+import type { Theme, Preset, ConversationCompressionMode } from '../../types';
 
 interface BuildMetadata {
   filledPlaceholders?: Record<string, { contentLength: number }>;
@@ -40,6 +40,14 @@ interface Props {
   usage: UsageStats | null;
   responseMetrics: ResponseMetrics | null;
   theme: Theme;
+  usagePercent: number;
+  compressionThresholdPercent: number;
+  compressionMode: ConversationCompressionMode;
+  compressionSummary: string;
+  isCompressionThresholdReached: boolean;
+  isCompressing: boolean;
+  showCompressionSection: boolean;
+  canCompress: boolean;
 }
 
 const props = defineProps<Props>();
@@ -71,16 +79,18 @@ const formatTimestamp = (timestamp: number | null): string => {
 
 const emit = defineEmits<{
   close: [];
+  compress: [];
 }>();
 
 // 展开/折叠状态
 const expandedSections = ref({
   chatHistory: false,
   promptDetails: false,
+  compression: true,
 });
 
 // 切换展开状态
-const toggleSection = (section: 'chatHistory' | 'promptDetails') => {
+const toggleSection = (section: 'chatHistory' | 'promptDetails' | 'compression') => {
   expandedSections.value[section] = !expandedSections.value[section];
 };
 
@@ -88,6 +98,9 @@ const toggleSection = (section: 'chatHistory' | 'promptDetails') => {
 const remainingTokens = ref(
   Math.max(0, props.maxContextLength - props.currentContextCount)
 );
+
+const compressionModeLabel = computed(() => props.compressionMode === 'auto' ? '自动压缩' : '手动压缩');
+const hasCompressionSummary = computed(() => props.compressionSummary.trim().length > 0);
 
 // 监听 props 变化，更新剩余 Token
 watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]) => {
@@ -108,10 +121,10 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
             <div class="summary-main-left">
               <div class="summary-label">使用率</div>
               <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: `${Math.round((currentContextCount / maxContextLength) * 100)}%` }"></div>
+                <div class="progress-fill" :style="{ width: `${usagePercent}%` }"></div>
               </div>
             </div>
-            <div class="summary-value token-details-percent">{{ Math.round((currentContextCount / maxContextLength) * 100) }}%</div>
+            <div class="summary-value token-details-percent">{{ usagePercent }}%</div>
           </div>
           <div class="summary-item">
             <div class="summary-label">总使用</div>
@@ -125,6 +138,44 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
             <div class="summary-label">上限</div>
             <div class="summary-value">{{ maxContextLength.toLocaleString() }}</div>
           </div>
+        </div>
+
+        <div v-if="showCompressionSection" class="token-card" @click="toggleSection('compression')">
+          <div class="card-header expandable">
+            <span class="card-title">会话压缩</span>
+            <div class="card-right">
+              <span class="card-badge">{{ compressionModeLabel }}</span>
+              <svg :class="['expand-icon', { expanded: expandedSections.compression }]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </div>
+          </div>
+          <Transition name="expand">
+            <div v-if="expandedSections.compression" class="card-content">
+              <div class="stat-row">
+                <span class="stat-label">阈值</span>
+                <span class="stat-value">{{ compressionThresholdPercent }}%</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">状态</span>
+                <span class="stat-value">
+                  {{ hasCompressionSummary ? '已压缩' : (isCompressionThresholdReached ? '建议压缩' : '正常') }}
+                </span>
+              </div>
+              <button
+                v-if="showCompressionSection"
+                class="compress-action"
+                :disabled="isCompressing || !canCompress"
+                @click.stop="emit('compress')"
+              >
+                {{ isCompressing ? '压缩中...' : '手动压缩' }}
+              </button>
+              <div v-if="hasCompressionSummary" class="compression-summary">
+                <div class="compression-summary-title">压缩后的内容</div>
+                <pre class="compression-summary-content">{{ compressionSummary }}</pre>
+              </div>
+            </div>
+          </Transition>
         </div>
 
         <!-- 聊天历史 -->
@@ -485,6 +536,47 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
   color: #e5e7eb;
 }
 
+.compress-action {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background: rgba(157, 141, 241, 0.14);
+  color: var(--accent-purple);
+  padding: 8px 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.compress-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.compression-summary {
+  margin-top: 10px;
+}
+
+.compression-summary-title {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.compression-summary-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(157, 141, 241, 0.08);
+  color: inherit;
+  font-family: inherit;
+}
+
 .expand-icon {
   transition: transform 0.25s ease;
   flex-shrink: 0;
@@ -569,7 +661,7 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
 .expand-enter-active,
 .expand-leave-active {
   transition: all 0.25s ease;
-  max-height: 200px;
+  max-height: 280px;
   overflow: hidden;
 }
 

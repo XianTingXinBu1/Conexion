@@ -11,6 +11,8 @@ describe('useAppSettings helpers', () => {
       showMessageIndex: false,
       chatHistoryLimit: 20,
       promptMergeMode: 'adjacent',
+      compressionThresholdPercent: 75,
+      compressionMode: 'manual',
       mergePromptPresets: true,
       debugMode: false,
     });
@@ -29,6 +31,8 @@ describe('useAppSettings helpers', () => {
       [STORAGE_KEYS.CHAT_HISTORY_LIMIT, 20],
       [STORAGE_KEYS.MERGE_PROMPT_PRESETS, true],
       [STORAGE_KEYS.PROMPT_MERGE_MODE, 'adjacent'],
+      [STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT, 75],
+      [STORAGE_KEYS.COMPRESSION_MODE, 'manual'],
       [STORAGE_KEYS.DEBUG_MODE, false],
     ]);
   });

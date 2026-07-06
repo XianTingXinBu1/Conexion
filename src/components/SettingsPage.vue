@@ -22,12 +22,16 @@ const {
   showMessageIndex,
   chatHistoryLimit,
   promptMergeMode,
+  compressionThresholdPercent,
+  compressionMode,
   updateEnterToSend,
   updateShowWordCount,
   updateEnableMarkdown,
   updateShowMessageIndex,
   updateChatHistoryLimit,
   updatePromptMergeMode,
+  updateCompressionThresholdPercent,
+  updateCompressionMode,
 } = appSettings;
 
 const debugMode = appDebug?.debugMode ?? ref(false);
@@ -68,6 +72,8 @@ const handleRestoreDefaults = async () => {
   updateShowMessageIndex(APP_SETTINGS_DEFAULTS.showMessageIndex);
   updateChatHistoryLimit(APP_SETTINGS_DEFAULTS.chatHistoryLimit);
   updatePromptMergeMode(APP_SETTINGS_DEFAULTS.promptMergeMode);
+  updateCompressionThresholdPercent(APP_SETTINGS_DEFAULTS.compressionThresholdPercent);
+  updateCompressionMode(APP_SETTINGS_DEFAULTS.compressionMode);
   debugMode.value = false;
   const msg = getNotificationMessage('SETTINGS_RESTORE_SUCCESS');
   showSuccess(msg.title, msg.message);
@@ -104,12 +110,16 @@ onMounted(async () => {
         :debug-mode="debugMode"
         :chat-history-limit="chatHistoryLimit"
         :prompt-merge-mode="promptMergeMode"
+        :compression-threshold-percent="compressionThresholdPercent"
+        :compression-mode="compressionMode"
         @update-enter-to-send="updateEnterToSend"
         @update-show-word-count="updateShowWordCount"
         @update-enable-markdown="updateEnableMarkdown"
         @update-show-message-index="updateShowMessageIndex"
         @update-chat-history-limit="updateChatHistoryLimit"
         @update-prompt-merge-mode="updatePromptMergeMode"
+        @update-compression-threshold-percent="updateCompressionThresholdPercent"
+        @update-compression-mode="updateCompressionMode"
         @toggle-debug-mode="toggleDebugMode"
       />
 

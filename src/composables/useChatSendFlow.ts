@@ -7,18 +7,25 @@ import type {
   RegexRule,
   UserCharacter,
 } from '../types';
+import { getNotificationMessage } from '../modules/notification';
 import type { MergeMode } from '../modules/system-prompt';
 import type { Ref } from 'vue';
 import { applyRules } from '../utils/regexEngine';
-import { getNotificationMessage } from '../modules/notification';
 
 interface SendFlowDeps {
   messages: { value: Message[] };
+  requestMessages: Ref<Message[]>;
   regexRules: Ref<RegexRule[]>;
   currentCharacter: { value: AICharacter | undefined };
   selectedUser: { value: UserCharacter | undefined };
   knowledgeBases: { value: KnowledgeBase[] };
   promptMergeMode: Ref<MergeMode>;
+  compressionMode: Ref<'manual' | 'auto'>;
+  canUseConversationCompression: Ref<boolean>;
+  isCompressionThresholdReached: Ref<boolean>;
+  compressConversation: () => Promise<boolean>;
+  isCompressingConversation: Ref<boolean>;
+  compressionSummary: Ref<string>;
   persistedConversationId: { value: string | undefined };
   resetUsage: () => void;
   loadRegexRules: () => Promise<void>;
@@ -43,6 +50,7 @@ interface SendFlowDeps {
     userInstruction: string;
     mergeMode: MergeMode;
     includeUserInstructionMessage?: boolean;
+    compressionSummary?: string;
   }) => ChatMessage[];
   showSuccess: (title: string, message?: string) => void;
   showError: (title: string, message?: string) => void;
@@ -61,7 +69,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
   };
 
   const handleSendMessage = async (content: string) => {
-    if (isSending.value) {
+    if (isSending.value || deps.isCompressingConversation.value) {
       return;
     }
 
@@ -77,7 +85,22 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       timestamp: Date.now(),
     };
 
-    const chatHistoryBeforeSend = [...deps.messages.value];
+    if (
+      deps.canUseConversationCompression.value
+      && deps.compressionMode.value === 'auto'
+      && deps.isCompressionThresholdReached.value
+    ) {
+      try {
+        await deps.compressConversation();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '压缩失败';
+        const notificationMsg = getNotificationMessage('CHAT_COMPRESSION_FAILED', { error: errorMessage });
+        deps.showError(notificationMsg.title, notificationMsg.message);
+        return;
+      }
+    }
+
+    const chatHistoryBeforeSend = [...deps.requestMessages.value];
     const messagesForRequest = [...chatHistoryBeforeSend, userMessage];
     deps.messages.value.push(userMessage);
 
@@ -107,6 +130,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       userInstruction: processedContent,
       mergeMode: deps.promptMergeMode.value,
       includeUserInstructionMessage: false,
+      compressionSummary: deps.compressionSummary.value,
     });
 
     let streamBuffer = '';

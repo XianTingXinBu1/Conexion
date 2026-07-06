@@ -31,6 +31,11 @@ function processUserInstructionItem(userInstruction: string): ChatMessage | null
   return { role: 'user', content: userInstruction.trim() };
 }
 
+function processCompressionSummaryItem(compressionSummary: string): ChatMessage | null {
+  if (!compressionSummary?.trim()) return null;
+  return { role: 'system', content: compressionSummary.trim() };
+}
+
 /**
  * 构建系统提示词
  */
@@ -42,6 +47,7 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
     knowledgeBases,
     chatHistory = [],
     userInstruction = '',
+    compressionSummary = '',
     mergeMode = DEFAULT_MERGE_MODE,
     filterEmptyPrompts = true,
   } = config;
@@ -52,9 +58,14 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
     knowledgeBases,
     chatHistory,
     userInstruction,
+    compressionSummary,
   };
 
   const messages: ChatMessage[] = [];
+  const compressionMessage = processCompressionSummaryItem(compressionSummary);
+  if (compressionMessage) {
+    messages.push(compressionMessage);
+  }
   const usedItemIds: string[] = [];
   const skippedItemIds: string[] = [];
   const filledPlaceholders: BuildMetadata['filledPlaceholders'] = {};

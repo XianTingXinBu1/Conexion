@@ -20,6 +20,7 @@ interface UseChatPageInitOptions {
   initCharacters: () => void;
   initKnowledgeBases: () => void;
   loadMessages: () => void;
+  refreshVisibleMessages?: () => void;
 }
 
 export function useChatPageInit(options: UseChatPageInitOptions) {
@@ -38,6 +39,7 @@ export function useChatPageInit(options: UseChatPageInitOptions) {
     initCharacters,
     initKnowledgeBases,
     loadMessages,
+    refreshVisibleMessages,
   } = options;
 
   onMounted(async () => {
@@ -62,6 +64,7 @@ export function useChatPageInit(options: UseChatPageInitOptions) {
     [() => messages.value.length, chatHistoryLimit],
     () => {
       loadMessages();
+      refreshVisibleMessages?.();
     },
     { immediate: true }
   );

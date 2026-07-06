@@ -1,6 +1,12 @@
 import { computed, ref, watch, type Ref } from 'vue';
-import type { Message, Preset } from '../types';
+import type { ConversationCompression, Message, Preset } from '../types';
 import { countMessageTokens, countMessagesTokens } from '../utils/tokenCounter';
+import {
+  getCompressionSummaryTokenCount,
+  getContextUsagePercent,
+  getEffectiveChatHistory,
+  isCompressionThresholdReached,
+} from '@/utils/conversationCompression';
 
 interface CachedMessageTokenEntry {
   signature: string;
@@ -19,22 +25,28 @@ const countByType = (messages: Message[], type: Message['type']) => {
   return count;
 };
 
-export function useChatStats(messages: Ref<Message[]>, currentApiPreset: Ref<Preset | undefined>) {
+export function useChatStats(
+  messages: Ref<Message[]>,
+  currentApiPreset: Ref<Preset | undefined>,
+  compression: Ref<ConversationCompression | undefined>,
+  compressionThresholdPercent: Ref<number>,
+) {
   const tokenCache = new Map<string, CachedMessageTokenEntry>();
   const currentContextCountValue = ref(0);
   const userTokensValue = ref(0);
   const aiTokensValue = ref(0);
 
   watch(
-    messages,
-    (nextMessages) => {
+    [messages, compression],
+    ([nextMessages, nextCompression]) => {
       try {
+        const visibleMessages = getEffectiveChatHistory(nextMessages, nextCompression);
         const activeIds = new Set<string>();
         let totalTokens = 0;
         let userTokens = 0;
         let aiTokens = 0;
 
-        for (const message of nextMessages) {
+        for (const message of visibleMessages) {
           activeIds.add(message.id);
 
           const signature = `${message.type}:${message.content}`;
@@ -74,14 +86,15 @@ export function useChatStats(messages: Ref<Message[]>, currentApiPreset: Ref<Pre
         userTokensValue.value = userTokens;
         aiTokensValue.value = aiTokens;
       } catch {
-        const chatMessages = nextMessages.map(msg => ({
+        const visibleMessages = getEffectiveChatHistory(nextMessages, nextCompression);
+        const chatMessages = visibleMessages.map(msg => ({
           role: msg.type === 'user' ? 'user' : 'assistant',
           content: msg.content,
         }));
-        const userMessages = nextMessages
+        const userMessages = visibleMessages
           .filter(msg => msg.type === 'user')
           .map(msg => ({ role: 'user', content: msg.content }));
-        const assistantMessages = nextMessages
+        const assistantMessages = visibleMessages
           .filter(msg => msg.type === 'assistant')
           .map(msg => ({ role: 'assistant', content: msg.content }));
 
@@ -96,18 +109,27 @@ export function useChatStats(messages: Ref<Message[]>, currentApiPreset: Ref<Pre
     }
   );
 
-  const currentContextCount = computed(() => currentContextCountValue.value);
+  const currentContextCount = computed(() => {
+    return currentContextCountValue.value + getCompressionSummaryTokenCount(compression.value?.summaryContent ?? '');
+  });
 
   const maxContextLength = computed(() => {
-    return currentApiPreset.value?.maxTokens || 4096;
+    return currentApiPreset.value?.contextLength || currentApiPreset.value?.maxTokens || 4096;
   });
 
   const userTokens = computed(() => userTokensValue.value);
   const aiTokens = computed(() => aiTokensValue.value);
+  const visibleMessages = computed(() => getEffectiveChatHistory(messages.value, compression.value));
+  const usagePercent = computed(() => getContextUsagePercent(currentContextCount.value, maxContextLength.value));
+  const isCompressionThresholdReachedValue = computed(() => isCompressionThresholdReached(
+    currentContextCount.value,
+    maxContextLength.value,
+    compressionThresholdPercent.value,
+  ));
 
-  const chatMessageCount = computed(() => messages.value.length);
-  const userMessageCount = computed(() => countByType(messages.value, 'user'));
-  const aiMessageCount = computed(() => countByType(messages.value, 'assistant'));
+  const chatMessageCount = computed(() => visibleMessages.value.length);
+  const userMessageCount = computed(() => countByType(visibleMessages.value, 'user'));
+  const aiMessageCount = computed(() => countByType(visibleMessages.value, 'assistant'));
 
   return {
     currentContextCount,
@@ -117,5 +139,7 @@ export function useChatStats(messages: Ref<Message[]>, currentApiPreset: Ref<Pre
     chatMessageCount,
     userMessageCount,
     aiMessageCount,
+    usagePercent,
+    isCompressionThresholdReached: isCompressionThresholdReachedValue,
   };
 }

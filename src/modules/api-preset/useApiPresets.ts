@@ -70,8 +70,6 @@ export function useApiPresets() {
   // 保存预设
   async function savePresets() {
     await setStorage(STORAGE_KEYS.API_PRESETS, presets.value);
-    console.log('[useApiPresets] 已保存预设列表，数量:', presets.value.length);
-    console.log('[useApiPresets] 预设IDs:', presets.value.map(p => p.id));
   }
 
   // 加载选中的预设
@@ -81,7 +79,6 @@ export function useApiPresets() {
       const exists = presets.value.find(p => p.id === saved);
       if (exists) {
         selectedPreset.value = saved;
-        console.log('[useApiPresets] 加载选中的预设:', saved);
         return;
       }
     }
@@ -90,7 +87,6 @@ export function useApiPresets() {
     if (presets.value.length > 0) {
       selectedPreset.value = presets.value[0]!.id;
       await saveSelectedPreset(selectedPreset.value);
-      console.log('[useApiPresets] 未找到选中的预设，默认选择:', selectedPreset.value);
     }
   }
 
@@ -107,19 +103,6 @@ export function useApiPresets() {
 
   // 保存当前预设
   async function saveCurrentPreset(formData: PresetFormData) {
-    console.log('[useApiPresets] ===== 开始保存预设 =====');
-    console.log('[useApiPresets] 选中的预设ID:', selectedPreset.value);
-    console.log('[useApiPresets] 表单数据:', {
-      url: formData.url,
-      hasApiKey: !!formData.apiKey,
-      model: formData.model,
-      hasModel: !!formData.model,
-      streamEnabled: formData.streamEnabled,
-      temperature: formData.temperature,
-      maxTokens: formData.maxTokens,
-      maxOutputTokens: formData.maxOutputTokens,
-    });
-
     const presetIndex = presets.value.findIndex(p => p.id === selectedPreset.value);
     if (presetIndex !== -1) {
       const existing = presets.value[presetIndex]!;
@@ -139,12 +122,9 @@ export function useApiPresets() {
       await savePresets();
       // 确保选中的预设 ID 也被保存
       await saveSelectedPreset(selectedPreset.value);
-      console.log('[useApiPresets] ✓ 预设已保存到 localStorage');
-      console.log('[useApiPresets] 保存后的预设数据:', presets.value[presetIndex]);
     } else {
-      console.error('[useApiPresets] 错误：未找到要更新的预设，预设ID:', selectedPreset.value);
+      showError('保存失败', '未找到要更新的预设');
     }
-    console.log('[useApiPresets] ===== 预设保存完成 =====');
   }
 
   // 创建新预设
@@ -167,18 +147,12 @@ export function useApiPresets() {
       updatedAt: Date.now(),
     };
 
-    console.log('[useApiPresets] ===== 创建新预设 =====');
-    console.log('[useApiPresets] 新预设数据:', newPreset);
-
     presets.value.push(newPreset);
     await savePresets();
     selectedPreset.value = newPreset.id;
     await saveSelectedPreset(newPreset.id);
     newPresetName.value = '';
     showNewPresetDialog.value = false;
-
-    console.log('[useApiPresets] 新预设已创建，ID:', newPreset.id);
-    console.log('[useApiPresets] 当前选中的预设ID:', selectedPreset.value);
 
     showSuccess('创建成功', '预设已创建');
   }

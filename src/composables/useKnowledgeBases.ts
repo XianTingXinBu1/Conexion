@@ -164,8 +164,8 @@ export function useKnowledgeBases() {
       };
       kb.entries.unshift(newEntry);
       kb.updatedAt = Date.now();
-      await saveKnowledgeBases();
-      return newEntry;
+      const saved = await saveKnowledgeBases();
+      return saved ? newEntry : null;
     }
     return null;
   };

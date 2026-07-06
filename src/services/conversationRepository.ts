@@ -10,6 +10,18 @@ const createConversationTitle = (content: string): string => {
   return content.slice(0, 30) + (content.length > 30 ? '...' : '');
 };
 
+const clearCompressionIfSourceChanged = (
+  conversation: Conversation,
+  changedMessageIds: string[]
+): Partial<Conversation> => {
+  const sourceMessageIds = conversation.compression?.sourceMessageIds ?? [];
+  const changedCompressedSource = changedMessageIds.some(id => sourceMessageIds.includes(id));
+
+  return changedCompressedSource
+    ? { compressed: false, compression: undefined }
+    : {};
+};
+
 const cloneConversation = (conversation: Conversation): Conversation => ({
   ...conversation,
   messages: [...conversation.messages],
@@ -165,7 +177,10 @@ export async function editConversationMessage(
     timestamp: originalMessage.timestamp,
   };
 
-  return updateConversationRecord(conversationId, { messages: nextMessages });
+  return updateConversationRecord(conversationId, {
+    ...clearCompressionIfSourceChanged(conversation, [messageId]),
+    messages: nextMessages,
+  });
 }
 
 export async function deleteConversationMessage(
@@ -188,5 +203,8 @@ export async function deleteConversationMessage(
     return undefined;
   }
 
-  return updateConversationRecord(conversationId, { messages: nextMessages });
+  return updateConversationRecord(conversationId, {
+    ...clearCompressionIfSourceChanged(conversation, [messageId]),
+    messages: nextMessages,
+  });
 }

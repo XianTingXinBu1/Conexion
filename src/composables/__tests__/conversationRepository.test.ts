@@ -125,6 +125,40 @@ describe('conversationRepository', () => {
     expect(setStorageMock.mock.calls[0]?.[1][0].messages[0].content).toBe('New');
   });
 
+  it('clears compression metadata when editing or deleting compressed source messages', async () => {
+    const conversation = {
+      id: 'conv-1',
+      title: 'Test',
+      messages: [
+        { id: 'msg-1', type: 'user', content: 'Old', timestamp: 1 },
+        { id: 'msg-2', type: 'assistant', content: 'Reply', timestamp: 2 },
+      ],
+      compressed: true,
+      compression: {
+        compressedAt: 3,
+        summaryContent: 'summary',
+        promptContent: 'prompt summary',
+        sourceMessageCount: 1,
+        sourceMessageIds: ['msg-1'],
+        keepRecentCount: 1,
+      },
+      createdAt: 1,
+      updatedAt: 2,
+    };
+
+    const { editConversationMessage, deleteConversationMessage } = await import('@/services/conversationRepository');
+
+    getStorageMock.mockResolvedValue([conversation]);
+    const edited = await editConversationMessage('conv-1', 'msg-1', 'New');
+    expect(edited?.compressed).toBe(false);
+    expect(edited?.compression).toBeUndefined();
+
+    getStorageMock.mockResolvedValue([conversation]);
+    const deleted = await deleteConversationMessage('conv-1', 'msg-1');
+    expect(deleted?.compressed).toBe(false);
+    expect(deleted?.compression).toBeUndefined();
+  });
+
   it('tracks the persisted conversation id after first creation so later sends update instead of creating again', async () => {
     getStorageMock.mockResolvedValue([]);
 

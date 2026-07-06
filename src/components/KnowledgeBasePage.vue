@@ -8,7 +8,6 @@ import { useNotifications, getNotificationMessage } from '../modules/notificatio
 import KnowledgeBaseListView from './knowledge/KnowledgeBaseListView.vue';
 import KnowledgeBaseDetailView from './knowledge/KnowledgeBaseDetailView.vue';
 import KnowledgeBaseFormModal from './knowledge/KnowledgeBaseFormModal.vue';
-import KnowledgeEntryFormModal from './knowledge/KnowledgeEntryFormModal.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 
 const router = useRouter();
@@ -39,11 +38,6 @@ const isViewingList = ref(true);
 const showKbFormModal = ref(false);
 const kbFormMode = ref<'create' | 'edit'>('create');
 const editingKbData = ref<Partial<KnowledgeBase>>({});
-
-// 条目管理相关
-const showEntryFormModal = ref(false);
-const entryFormMode = ref<'create' | 'edit'>('create');
-const editingEntryData = ref<Partial<KnowledgeEntry>>({});
 
 // 切换到知识库列表视图
 const goToListView = () => {
@@ -141,9 +135,13 @@ const handleReorderEntries = (entries: KnowledgeEntry[]) => {
 };
 
 // 详情视图：添加条目（来自表单模态框）
-const handleSaveEntry = (data: { name: string; content: string; priority: number }) => {
-  if (selectedKnowledgeBaseId.value) {
-    addKnowledgeEntry(selectedKnowledgeBaseId.value, data.name, data.content, data.priority);
+const handleSaveEntry = async (data: { name: string; content: string; priority: number }) => {
+  if (!selectedKnowledgeBaseId.value) {
+    return;
+  }
+
+  const entry = await addKnowledgeEntry(selectedKnowledgeBaseId.value, data.name, data.content, data.priority);
+  if (entry) {
     const msg = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_ADD_SUCCESS', { name: data.name });
     showSuccess(msg.title, msg.message);
   }
@@ -199,6 +197,7 @@ onMounted(() => {
       @update-base="handleUpdateBase"
       @delete-base="handleDeleteBase"
       @toggle-entry="handleToggleEntry"
+      @add-entry="handleSaveEntry"
       @update-entry="handleUpdateEntry"
       @delete-entry="handleDeleteEntry"
       @reorder-entries="handleReorderEntries"
@@ -211,15 +210,6 @@ onMounted(() => {
       :knowledge-base="editingKbData"
       @update:show="showKbFormModal = $event"
       @save="handleSaveKb"
-    />
-
-    <!-- 条目表单模态框 -->
-    <KnowledgeEntryFormModal
-      :show="showEntryFormModal"
-      :mode="entryFormMode"
-      :entry="editingEntryData"
-      @update:show="showEntryFormModal = $event"
-      @save="handleSaveEntry"
     />
 
     <!-- 删除确认对话框 -->

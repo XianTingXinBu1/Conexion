@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
+import { isIP } from 'node:net';
 import { URL, fileURLToPath } from 'node:url';
 
 const HOST = process.env.HOST || '127.0.0.1';
@@ -9,6 +10,7 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://127.0.0.1:3100';
 const DEFAULT_UPSTREAM_BASE_URL = process.env.DEFAULT_UPSTREAM_BASE_URL || '';
 const DEFAULT_UPSTREAM_API_KEY = process.env.DEFAULT_UPSTREAM_API_KEY || '';
 const UPSTREAM_TIMEOUT_MS = Number(process.env.UPSTREAM_TIMEOUT_MS || 60000);
+const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 1024 * 1024);
 
 interface ProxyRequestPayload {
   baseURL?: string;
@@ -76,10 +78,97 @@ function mapUpstreamError(error: unknown, fallbackMessage: string): UpstreamRequ
   return new UpstreamRequestError(502, fallbackMessage);
 }
 
+function allowsPrivateUpstreams(): boolean {
+  if (process.env.ALLOW_PRIVATE_UPSTREAMS !== undefined) {
+    return process.env.ALLOW_PRIVATE_UPSTREAMS === 'true';
+  }
+
+  return HOST === '127.0.0.1' || HOST === 'localhost' || HOST === '::1';
+}
+
+function normalizeHostnameForPrivateCheck(hostname: string): string {
+  const normalized = hostname.toLowerCase();
+  return normalized.startsWith('[') && normalized.endsWith(']')
+    ? normalized.slice(1, -1)
+    : normalized;
+}
+
+function isPrivateHostname(hostname: string): boolean {
+  const normalized = normalizeHostnameForPrivateCheck(hostname);
+  if (normalized === 'localhost' || normalized.endsWith('.localhost')) {
+    return true;
+  }
+
+  const ipVersion = isIP(normalized);
+  if (ipVersion === 4) {
+    const [a = 0, b = 0] = normalized.split('.').map(Number);
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      a === 0
+    );
+  }
+
+  if (ipVersion === 6) {
+    const ipv4MappedMatch = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (ipv4MappedMatch?.[1]) {
+      return isPrivateHostname(ipv4MappedMatch[1]);
+    }
+
+    if (normalized.startsWith('::ffff:')) {
+      return true;
+    }
+
+    return normalized === '::1' || normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80:');
+  }
+
+  return false;
+}
+
+function validateUpstreamBaseUrl(rawBaseURL: string): string {
+  let url: URL;
+  try {
+    url = new URL(rawBaseURL);
+  } catch {
+    throw new HttpError(400, 'baseURL 无效');
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new HttpError(400, 'baseURL 仅支持 http/https');
+  }
+
+  if (url.username || url.password) {
+    throw new HttpError(400, 'baseURL 不允许包含认证信息');
+  }
+
+  if (!allowsPrivateUpstreams() && isPrivateHostname(url.hostname)) {
+    throw new HttpError(400, 'baseURL 不允许指向本机或内网地址');
+  }
+
+  url.hash = '';
+  url.search = '';
+  return url.toString().replace(/\/$/, '');
+}
+
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  const contentLength = Number(req.headers['content-length'] || 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    throw new HttpError(413, '请求体过大');
+  }
+
   const chunks: Buffer[] = [];
+  let receivedBytes = 0;
+
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    receivedBytes += buffer.length;
+    if (receivedBytes > MAX_BODY_BYTES) {
+      throw new HttpError(413, '请求体过大');
+    }
+    chunks.push(buffer);
   }
 
   if (chunks.length === 0) {
@@ -112,7 +201,8 @@ function requireNonEmptyString(value: unknown, fieldName: string): string {
 }
 
 function getResolvedUpstream(payload: { baseURL?: unknown; apiKey?: unknown }) {
-  const baseURL = requireNonEmptyString(payload.baseURL ?? DEFAULT_UPSTREAM_BASE_URL, 'baseURL').replace(/\/$/, '');
+  const rawBaseURL = requireNonEmptyString(payload.baseURL ?? DEFAULT_UPSTREAM_BASE_URL, 'baseURL');
+  const baseURL = validateUpstreamBaseUrl(rawBaseURL);
   const apiKeySource = payload.apiKey ?? DEFAULT_UPSTREAM_API_KEY;
   const apiKey = typeof apiKeySource === 'string' ? apiKeySource.trim() : '';
 

@@ -68,4 +68,52 @@ describe('server api validation', () => {
       error: { message: '缺少 baseURL' },
     });
   });
+
+  it('rejects private upstream baseURL values when private upstreams are disabled', async () => {
+    const previous = process.env.ALLOW_PRIVATE_UPSTREAMS;
+    process.env.ALLOW_PRIVATE_UPSTREAMS = 'false';
+    const started = await startTestServer();
+    servers.push(started.server);
+
+    try {
+      for (const baseURL of ['http://127.0.0.1:11434/v1', 'http://[::1]:11434/v1', 'http://[::ffff:127.0.0.1]:11434/v1']) {
+        const response = await fetch(`${started.baseUrl}/api/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            baseURL,
+            model: 'gpt-test',
+            messages: [],
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({
+          error: { message: 'baseURL 不允许指向本机或内网地址' },
+        });
+      }
+    } finally {
+      if (previous === undefined) {
+        delete process.env.ALLOW_PRIVATE_UPSTREAMS;
+      } else {
+        process.env.ALLOW_PRIVATE_UPSTREAMS = previous;
+      }
+    }
+  });
+
+  it('returns 413 for oversized JSON bodies', async () => {
+    const started = await startTestServer();
+    servers.push(started.server);
+
+    const response = await fetch(`${started.baseUrl}/api/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ padding: 'x'.repeat(1024 * 1024 + 1) }),
+    });
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      error: { message: '请求体过大' },
+    });
+  });
 });

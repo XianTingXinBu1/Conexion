@@ -22,6 +22,7 @@ const emit = defineEmits<{
   updateBase: [data: { name: string; description: string }];
   deleteBase: [];
   toggleEntry: [entryId: string];
+  addEntry: [data: { name: string; content: string; priority: number }];
   updateEntry: [entryId: string, data: { name: string; content: string; priority: number }];
   deleteEntry: [entryId: string];
   reorderEntries: [entries: KnowledgeEntry[]];
@@ -148,8 +149,7 @@ const handleSaveKb = (data: { name: string; description: string }) => {
 // 保存条目
 const handleSaveEntry = (data: { name: string; content: string; priority: number }) => {
   if (entryFormMode.value === 'create') {
-    const msg = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_ADD_SUCCESS', { name: data.name });
-    showSuccess(msg.title, msg.message);
+    emit('addEntry', data);
   } else {
     if (editingId.value) {
       handleUpdateEntry(editingId.value, data);
@@ -158,6 +158,8 @@ const handleSaveEntry = (data: { name: string; content: string; priority: number
     }
   }
   showEntryFormModal.value = false;
+  entryFormMode.value = 'create';
+  editingEntryData.value = {};
 };
 
 // 确认删除
@@ -187,7 +189,7 @@ const handleConfirmDelete = () => {
         </div>
       </div>
       <div class="header-actions">
-        <button class="nav-btn" @click="showEntryFormModal ? (showEntryFormModal = false) : showEntryFormModal = true">
+        <button class="nav-btn" @click="showEntryFormModal ? (showEntryFormModal = false) : (entryFormMode = 'create', editingEntryData = {}, showEntryFormModal = true)">
           <X v-if="showEntryFormModal" :size="22" />
           <Plus v-else :size="22" />
         </button>

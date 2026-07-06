@@ -2,8 +2,13 @@
 import { computed, ref, watch } from 'vue';
 import type { Theme, Preset, ConversationCompressionMode } from '../../types';
 
+type PlaceholderType = 'character' | 'user' | 'knowledge' | 'chat-history' | 'user-instruction';
+
 interface BuildMetadata {
-  filledPlaceholders?: Record<string, { contentLength: number }>;
+  filledPlaceholders?: Record<string, {
+    placeholder?: PlaceholderType;
+    contentLength: number;
+  }>;
   totalItems: number;
   enabledItems: number;
 }
@@ -101,6 +106,21 @@ const remainingTokens = ref(
 
 const compressionModeLabel = computed(() => props.compressionMode === 'auto' ? '自动压缩' : '手动压缩');
 const hasCompressionSummary = computed(() => props.compressionSummary.trim().length > 0);
+const placeholderStats = computed(() => {
+  const stats: Partial<Record<PlaceholderType, number>> = {};
+  const filled = props.lastSystemPromptResult?.metadata?.filledPlaceholders;
+
+  if (!filled) {
+    return stats;
+  }
+
+  Object.entries(filled).forEach(([key, value]) => {
+    const placeholder = value.placeholder ?? (key as PlaceholderType);
+    stats[placeholder] = (stats[placeholder] ?? 0) + value.contentLength;
+  });
+
+  return stats;
+});
 
 // 监听 props 变化，更新剩余 Token
 watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]) => {
@@ -207,7 +227,6 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
         <div class="token-card" v-if="usage || responseMetrics">
           <div class="card-header">
             <span class="card-title">本次请求</span>
-            <span class="card-badge">MVP</span>
           </div>
           <div class="card-content">
             <div class="stat-row" v-if="usage">
@@ -250,17 +269,17 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
           </div>
           <Transition name="expand">
             <div v-if="expandedSections.promptDetails && lastSystemPromptResult.metadata" class="card-content">
-              <div class="stat-row" v-if="lastSystemPromptResult.metadata.filledPlaceholders?.character">
+              <div class="stat-row" v-if="placeholderStats.character">
                 <span class="stat-label">角色</span>
-                <span class="stat-value">{{ lastSystemPromptResult.metadata.filledPlaceholders.character.contentLength.toLocaleString() }}</span>
+                <span class="stat-value">{{ placeholderStats.character.toLocaleString() }}</span>
               </div>
-              <div class="stat-row" v-if="lastSystemPromptResult.metadata.filledPlaceholders?.user">
+              <div class="stat-row" v-if="placeholderStats.user">
                 <span class="stat-label">用户</span>
-                <span class="stat-value">{{ lastSystemPromptResult.metadata.filledPlaceholders.user.contentLength.toLocaleString() }}</span>
+                <span class="stat-value">{{ placeholderStats.user.toLocaleString() }}</span>
               </div>
-              <div class="stat-row" v-if="lastSystemPromptResult.metadata.filledPlaceholders?.knowledge">
+              <div class="stat-row" v-if="placeholderStats.knowledge">
                 <span class="stat-label">知识库</span>
-                <span class="stat-value">{{ lastSystemPromptResult.metadata.filledPlaceholders.knowledge.contentLength.toLocaleString() }}</span>
+                <span class="stat-value">{{ placeholderStats.knowledge.toLocaleString() }}</span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">启用</span>

@@ -9,7 +9,10 @@ import { logPrompt, logSystemPrompt } from '../modules/debug';
 interface LastSystemPromptResult {
   estimatedTokens: number;
   metadata?: {
-    filledPlaceholders?: Record<string, { contentLength: number }>;
+    filledPlaceholders?: Record<string, {
+      placeholder?: 'character' | 'user' | 'knowledge' | 'chat-history' | 'user-instruction';
+      contentLength: number;
+    }>;
     totalItems: number;
     enabledItems: number;
   };

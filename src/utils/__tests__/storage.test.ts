@@ -2,6 +2,50 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const testLocalStorage = {} as Storage;
+const storageData: Record<string, string> = {};
+
+Object.defineProperties(testLocalStorage, {
+  length: {
+    get: () => Object.keys(storageData).length,
+  },
+  clear: {
+    value: () => {
+      Object.keys(storageData).forEach(key => {
+        delete storageData[key];
+        delete (testLocalStorage as unknown as Record<string, string>)[key];
+      });
+    },
+  },
+  getItem: {
+    value: (key: string) => storageData[key] ?? null,
+  },
+  key: {
+    value: (index: number) => Object.keys(storageData)[index] ?? null,
+  },
+  removeItem: {
+    value: (key: string) => {
+      delete storageData[key];
+      delete (testLocalStorage as unknown as Record<string, string>)[key];
+    },
+  },
+  setItem: {
+    value: (key: string, value: string) => {
+      storageData[key] = String(value);
+      Object.defineProperty(testLocalStorage, key, {
+        value: String(value),
+        enumerable: true,
+        configurable: true,
+      });
+    },
+  },
+});
+
+Object.defineProperty(globalThis, 'localStorage', {
+  value: testLocalStorage,
+  configurable: true,
+});
+
 const clearMock = vi.fn(async () => undefined);
 const idbKeysMock = vi.fn(async () => ['conexion_models', 'conexion_conversations']);
 

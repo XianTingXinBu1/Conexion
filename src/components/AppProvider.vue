@@ -5,7 +5,12 @@ import { useCharacters } from '@/composables/useCharacters';
 import { useDebugLogger } from '@/composables/useDebugLogger';
 import { useAppSettings } from '@/composables/useAppSettings';
 import { clearStorage } from '@/utils/storage';
-import { ensureStorageSchema } from '@/utils/storageSchema';
+import {
+  APP_DATA_KEY,
+  APP_DEBUG_KEY,
+  APP_SETTINGS_KEY,
+  APP_THEME_KEY,
+} from '@/app/providers/appInjectionKeys';
 
 // 主题管理
 const { theme, toggleTheme } = useTheme();
@@ -41,20 +46,23 @@ const deleteAllData = async () => {
  * 初始化应用
  */
 const initializeApp = async () => {
-  await ensureStorageSchema();
-  await initCharacters();
+  try {
+    await initCharacters();
+  } catch (error) {
+    console.error('[AppProvider] 初始化应用状态失败:', error);
+  }
 };
 
 // 生命周期
 onMounted(() => {
-  initializeApp();
+  void initializeApp();
 });
 
 // 提供全局状态给子组件
-provide('app-theme', { theme, toggleTheme });
-provide('app-debug', { debugMode, toggleDebugMode });
-provide('app-settings', appSettings);
-provide('app-data', {
+provide(APP_THEME_KEY, { theme, toggleTheme });
+provide(APP_DEBUG_KEY, { debugMode, toggleDebugMode });
+provide(APP_SETTINGS_KEY, appSettings);
+provide(APP_DATA_KEY, {
   selectedUser,
   deleteAllData,
 });

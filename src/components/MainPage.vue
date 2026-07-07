@@ -3,13 +3,13 @@ import { Sun, Moon, MessageSquare, Zap, Settings, FileText, User, BookOpen, Hash
 import { useRouter } from 'vue-router';
 import { inject } from 'vue';
 import { prefetchRouteComponent } from '@/router';
-import type { Theme } from '../types';
+import { APP_THEME_KEY } from '@/app/providers/appInjectionKeys';
 
 // 获取路由实例
 const router = useRouter();
 
 // 从 AppProvider 注入的主题切换函数
-const appTheme = inject('app-theme') as { theme: Theme; toggleTheme: () => void } | undefined;
+const appTheme = inject(APP_THEME_KEY);
 
 // 获取主题
 const theme = appTheme?.theme || 'light';

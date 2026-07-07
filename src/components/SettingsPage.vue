@@ -1,19 +1,20 @@
 <script setup lang="ts">
-import { ref, onMounted, inject, type Ref } from 'vue';
+import { ref, onMounted, inject } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
 import { STORAGE_KEYS } from '../constants';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import { clearStorage, getStorage } from '@/utils/storage';
 import { useAppSettings, APP_SETTINGS_DEFAULTS, writeAppSettingsDefaults } from '../composables/useAppSettings';
+import { APP_DEBUG_KEY, APP_SETTINGS_KEY } from '@/app/providers/appInjectionKeys';
 import ChatSettingsSection from './settings/ChatSettingsSection.vue';
 import DataManagementSection from './settings/DataManagementSection.vue';
 
 const router = useRouter();
 
-const injectedAppSettings = inject<ReturnType<typeof useAppSettings> | undefined>('app-settings');
+const injectedAppSettings = inject(APP_SETTINGS_KEY);
 const appSettings = injectedAppSettings ?? useAppSettings();
-const appDebug = inject<{ debugMode: Ref<boolean>; toggleDebugMode: () => void } | undefined>('app-debug');
+const appDebug = inject(APP_DEBUG_KEY);
 
 const {
   enterToSend,

@@ -1,3 +1,4 @@
+import { requestJson } from '@/api/http';
 import type { PromptPreset } from '@/types';
 import { DEFAULT_PROMPT_PRESETS, STORAGE_KEYS } from '@/constants';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
@@ -11,41 +12,17 @@ export function cloneDefaultPromptPresets(): PromptPreset[] {
   }));
 }
 
-async function readApiJson<T>(response: Response): Promise<T> {
-  if (response.ok) {
-    return await response.json() as T;
-  }
-
-  let message = `请求失败 (${response.status})`;
-  try {
-    const data = await response.json() as { error?: { message?: string }; message?: string };
-    message = data.error?.message || data.message || message;
-  } catch {
-    // 保留默认错误信息
-  }
-
-  throw new Error(message);
-}
-
-async function requestJson<T>(options: RequestInit = {}): Promise<T> {
-  const response = await fetch(PROMPT_PRESETS_ENDPOINT, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-  return readApiJson<T>(response);
+function requestPromptPresets<T>(options: RequestInit = {}): Promise<T> {
+  return requestJson<T>(PROMPT_PRESETS_ENDPOINT, options);
 }
 
 export async function loadPromptPresets(): Promise<PromptPreset[]> {
-  const stored = await requestJson<PromptPreset[]>();
+  const stored = await requestPromptPresets<PromptPreset[]>();
   return Array.isArray(stored) && stored.length > 0 ? stored : cloneDefaultPromptPresets();
 }
 
 export async function savePromptPresets(presets: PromptPreset[]): Promise<void> {
-  await requestJson<PromptPreset[]>({
+  await requestPromptPresets<PromptPreset[]>({
     method: 'PUT',
     body: JSON.stringify({ presets }),
   });

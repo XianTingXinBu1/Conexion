@@ -1,39 +1,16 @@
+import { requestJson } from '@/api/http';
 import type { Preset } from '@/types';
 import { DEFAULT_API_PRESETS, STORAGE_KEYS } from '@/constants';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
 
 const API_PRESETS_ENDPOINT = '/api/api-presets';
 
-async function readApiJson<T>(response: Response): Promise<T> {
-  if (response.ok) {
-    return await response.json() as T;
-  }
-
-  let message = `请求失败 (${response.status})`;
-  try {
-    const data = await response.json() as { error?: { message?: string }; message?: string };
-    message = data.error?.message || data.message || message;
-  } catch {
-    // 保留默认错误信息
-  }
-
-  throw new Error(message);
-}
-
-async function requestJson<T>(options: RequestInit = {}): Promise<T> {
-  const response = await fetch(API_PRESETS_ENDPOINT, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-  return readApiJson<T>(response);
+function requestApiPresets<T>(options: RequestInit = {}): Promise<T> {
+  return requestJson<T>(API_PRESETS_ENDPOINT, options);
 }
 
 export async function loadApiPresets(): Promise<Preset[]> {
-  const presets = await requestJson<Preset[]>();
+  const presets = await requestApiPresets<Preset[]>();
   return Array.isArray(presets) ? presets : [];
 }
 
@@ -43,7 +20,7 @@ export async function loadApiPresetsWithDefaults(): Promise<Preset[]> {
 }
 
 export async function saveApiPresets(presets: Preset[]): Promise<void> {
-  await requestJson<Preset[]>({
+  await requestApiPresets<Preset[]>({
     method: 'PUT',
     body: JSON.stringify({ presets }),
   });

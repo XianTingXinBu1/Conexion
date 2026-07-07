@@ -1,3 +1,4 @@
+import { requestJson } from '@/api/http';
 import type { AICharacter, Conversation, Message } from '@/types';
 
 const TEMP_CONVERSATION_PREFIX = 'temp-';
@@ -15,32 +16,8 @@ const cloneConversation = (conversation: Conversation): Conversation => ({
   compression: conversation.compression ? { ...conversation.compression } : undefined,
 });
 
-async function readApiJson<T>(response: Response): Promise<T> {
-  if (response.ok) {
-    return await response.json() as T;
-  }
-
-  let message = `请求失败 (${response.status})`;
-  try {
-    const data = await response.json() as { error?: { message?: string }; message?: string };
-    message = data.error?.message || data.message || message;
-  } catch {
-    // 保留默认错误信息
-  }
-
-  throw new Error(message);
-}
-
-async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${CONVERSATIONS_API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-  return readApiJson<T>(response);
+function requestConversations<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return requestJson<T>(`${CONVERSATIONS_API_BASE}${path}`, options);
 }
 
 export const isTemporaryConversationId = (id?: string): boolean => {
@@ -70,12 +47,12 @@ export const createStoredConversation = (
 });
 
 export async function loadStoredConversations(): Promise<Conversation[]> {
-  const conversations = await requestJson<Conversation[]>('');
+  const conversations = await requestConversations<Conversation[]>('');
   return Array.isArray(conversations) ? conversations.map(cloneConversation) : [];
 }
 
 export async function saveStoredConversations(conversations: Conversation[]): Promise<void> {
-  await requestJson<Conversation[]>('', {
+  await requestConversations<Conversation[]>('', {
     method: 'PUT',
     body: JSON.stringify({ conversations }),
   });
@@ -87,7 +64,7 @@ export async function getStoredConversation(id: string): Promise<Conversation | 
   }
 
   try {
-    return cloneConversation(await requestJson<Conversation>(`/${encodeURIComponent(id)}`));
+    return cloneConversation(await requestConversations<Conversation>(`/${encodeURIComponent(id)}`));
   } catch (error) {
     if (error instanceof Error && error.message === '会话不存在') {
       return undefined;
@@ -105,7 +82,7 @@ export async function createConversationRecord(
     return createTemporaryConversation(firstMessage);
   }
 
-  return cloneConversation(await requestJson<Conversation>('', {
+  return cloneConversation(await requestConversations<Conversation>('', {
     method: 'POST',
     body: JSON.stringify({ firstMessage, character }),
   }));
@@ -120,7 +97,7 @@ export async function updateConversationRecord(
   }
 
   try {
-    return cloneConversation(await requestJson<Conversation>(`/${encodeURIComponent(id)}`, {
+    return cloneConversation(await requestConversations<Conversation>(`/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify({ updates }),
     }));
@@ -138,7 +115,7 @@ export async function deleteConversationRecord(id: string): Promise<boolean> {
     return false;
   }
 
-  const result = await requestJson<{ deleted: boolean }>(`/${encodeURIComponent(id)}`, {
+  const result = await requestConversations<{ deleted: boolean }>(`/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
   return result.deleted;
@@ -154,7 +131,7 @@ export async function updateConversationMessages(
   }
 
   try {
-    return cloneConversation(await requestJson<Conversation>(`/${encodeURIComponent(id)}/messages`, {
+    return cloneConversation(await requestConversations<Conversation>(`/${encodeURIComponent(id)}/messages`, {
       method: 'PUT',
       body: JSON.stringify({ messages, updates }),
     }));
@@ -177,7 +154,7 @@ export async function editConversationMessage(
   }
 
   try {
-    return cloneConversation(await requestJson<Conversation>(
+    return cloneConversation(await requestConversations<Conversation>(
       `/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
       {
         method: 'PATCH',
@@ -202,7 +179,7 @@ export async function deleteConversationMessage(
   }
 
   try {
-    return cloneConversation(await requestJson<Conversation>(
+    return cloneConversation(await requestConversations<Conversation>(
       `/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
       { method: 'DELETE' },
     ));

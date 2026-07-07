@@ -13,8 +13,8 @@ export interface SendMessageUseCaseDeps {
   getPromptMergeMode: () => MergeMode;
   getCompressionMode: () => 'manual' | 'auto';
   canUseConversationCompression: () => boolean;
-  isCompressionThresholdReached: () => boolean;
-  compressConversation: () => Promise<boolean>;
+  isCompressionThresholdReached: (messages?: Message[]) => boolean;
+  compressConversation: (options?: { keepRecentCount?: number }) => Promise<boolean>;
   getCompressionSummary: () => string;
   getPersistedConversationId: () => string | undefined;
   resetUsage: () => void;
@@ -26,8 +26,8 @@ export interface SendMessageUseCaseDeps {
   sendStreamChatRequest: (
     messages: Message[],
     onChunk: (chunk: string) => void,
-    onComplete: () => void,
-    onError: (error: string) => void,
+    onComplete: () => void | Promise<void>,
+    onError: (error: string) => void | Promise<void>,
     systemPrompt?: string,
     systemMessages?: ChatMessage[]
   ) => Promise<void>;
@@ -74,16 +74,9 @@ export class SendMessageUseCase {
       timestamp: Date.now(),
     };
 
-    if (
-      this.deps.canUseConversationCompression()
-      && this.deps.getCompressionMode() === 'auto'
-      && this.deps.isCompressionThresholdReached()
-    ) {
-      try {
-        await this.deps.compressConversation();
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '压缩失败';
-        this.deps.onError('compression', errorMessage);
+    if (this.shouldAutoCompress([...this.deps.getMessages(), userMessage])) {
+      const compressed = await this.runAutoCompression();
+      if (!compressed) {
         return;
       }
     }
@@ -149,6 +142,9 @@ export class SendMessageUseCase {
         async () => {
           hasCompleted = true;
           await finalizeSend();
+          if (this.shouldAutoCompress(this.deps.getMessages())) {
+            await this.runAutoCompression({ blockOnFailure: false });
+          }
           this.deps.onSuccess('send');
         },
         async (error: string) => {
@@ -192,6 +188,28 @@ export class SendMessageUseCase {
       msg.content = `错误: ${errorMessage}`;
       await this.deps.saveConversation();
       this.deps.onError('send', errorMessage);
+    }
+  }
+
+  private shouldAutoCompress(messages?: Message[]): boolean {
+    return this.deps.canUseConversationCompression()
+      && this.deps.getCompressionMode() === 'auto'
+      && this.deps.isCompressionThresholdReached(messages);
+  }
+
+  private async runAutoCompression(options: { blockOnFailure?: boolean } = {}): Promise<boolean> {
+    const { blockOnFailure = true } = options;
+
+    try {
+      const compressed = await this.deps.compressConversation();
+      if (compressed) {
+        this.deps.onSuccess('compression');
+      }
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '压缩失败';
+      this.deps.onError('compression', errorMessage);
+      return !blockOnFailure;
     }
   }
 

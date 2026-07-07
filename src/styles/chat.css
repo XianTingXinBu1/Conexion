@@ -332,7 +332,8 @@
   font-weight: 700;
 }
 
-.compression-warning {
+.compression-warning,
+.manual-compression-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -351,4 +352,14 @@
 .compression-warning.dark {
   background: rgba(245, 158, 11, 0.12);
   color: #fbbf24;
+}
+
+.manual-compression-bar.light {
+  background: rgba(157, 141, 241, 0.08);
+  color: var(--text-muted);
+}
+
+.manual-compression-bar.dark {
+  background: rgba(157, 141, 241, 0.12);
+  color: var(--text-muted);
 }

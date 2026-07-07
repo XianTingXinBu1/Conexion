@@ -1,7 +1,7 @@
 import type { Ref } from 'vue';
 import type { Conversation, Message } from '@/types';
-import { getNotificationMessage } from '@/modules/notification';
-import { useConversationCompression } from '@/composables/useConversationCompression';
+import { getNotificationMessage } from '@/modules/notification/messages';
+import { useConversationCompression } from './useConversationCompression';
 
 interface UseChatCompressionControllerOptions {
   messages: Ref<Message[]>;
@@ -42,7 +42,7 @@ export function useChatCompressionController(options: UseChatCompressionControll
     }
 
     try {
-      const compressed = await compressionState.compressConversation();
+      const compressed = await compressionState.compressConversation({ keepRecentCount: 0 });
       if (!compressed) {
         options.showInfo('无需压缩', '当前会话可压缩的历史不足。');
         return;

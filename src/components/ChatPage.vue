@@ -3,6 +3,7 @@ import { defineAsyncComponent } from 'vue';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { ChatPageProps } from '@/features/chat/presentation/chatPageTypes';
 import { ChatInput, MessageItem, ContextRing } from './chat';
+import { CompressionSummaryCard } from '@/modules/conversation-compression/components';
 import { useChatPageViewModel } from '@/features/chat/presentation/useChatPageViewModel';
 
 import '../styles/common.css';
@@ -102,20 +103,32 @@ const {
     >
       <div>
         上下文使用率已达到 {{ usagePercent }}%（阈值 {{ compressionThresholdPercent }}%）。
-        <span v-if="compressionMode === 'auto'">下次发送前会自动压缩。</span>
-        <span v-else>建议先压缩会话以保留关键上下文。</span>
+        <span v-if="compressionMode === 'auto'">正在自动压缩历史上下文。</span>
+        <span v-else>可手动压缩会话以保留关键上下文。</span>
       </div>
+    </div>
+
+    <div
+      v-if="compressionMode === 'manual' && canUseConversationCompression && canCompress"
+      class="manual-compression-bar"
+      :class="theme"
+    >
+      <span>可压缩历史上下文，压缩后会隐藏已摘要的旧消息。</span>
       <button
-        v-if="compressionMode === 'manual'"
         class="compression-warning-btn"
         :disabled="isCompressing"
         @click="handleCompressConversation"
       >
-        立即压缩
+        {{ isCompressing ? '压缩中...' : '手动压缩' }}
       </button>
     </div>
 
     <div :ref="(el) => { chatViewport.messagesContainer.value = el as HTMLElement | undefined; }" class="chat-messages">
+      <CompressionSummaryCard
+        v-if="compressionSummary"
+        :summary="compressionSummary"
+        :theme="theme"
+      />
       <button
         v-if="hasMoreMessages"
         class="load-more-btn"

@@ -41,6 +41,41 @@ describe('useChatApi', () => {
     vi.useRealTimers();
   });
 
+  it('sends non-stream requests through backend proxy with upstream credentials', async () => {
+    const requestBodies: unknown[] = [];
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/api-presets') {
+        return createApiPresetResponse();
+      }
+      if (String(input) === '/api/settings/conexion_selected_preset') {
+        return new Response(JSON.stringify({ value: 'preset-1' }), { status: 200 });
+      }
+
+      requestBodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: 'summary' } }],
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      });
+    }) as typeof fetch;
+
+    const api = useChatApi();
+    const result = await api.sendChatRequest([
+      { id: '1', type: 'user', content: 'hi', timestamp: Date.now() },
+    ]);
+
+    expect(result).toBe('summary');
+    expect(requestBodies).toHaveLength(1);
+    expect(requestBodies[0]).toMatchObject({
+      baseURL: 'https://api.example.com',
+      apiKey: 'key',
+      model: 'gpt-test',
+      stream: false,
+    });
+  });
+
   it('cancels active stream request and updates state', async () => {
     let readDeferred: { reject: (reason?: unknown) => void } | null = null;
 
@@ -158,6 +193,62 @@ describe('useChatApi', () => {
       totalTokens: 3,
     });
     expect(api.requestStatus.value).toBe('completed');
+  });
+
+  it('awaits async stream completion handlers before resolving', async () => {
+    const encoder = new TextEncoder();
+    let readCount = 0;
+    let releaseCompletion!: () => void;
+    const completionGate = new Promise<void>(resolve => {
+      releaseCompletion = resolve;
+    });
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/api-presets') {
+        return createApiPresetResponse();
+      }
+      if (String(input) === '/api/settings/conexion_selected_preset') {
+        return new Response(JSON.stringify({ value: 'preset-1' }), { status: 200 });
+      }
+
+      return createStreamingResponse(async () => {
+        readCount += 1;
+        if (readCount === 1) {
+          return {
+            done: false,
+            value: encoder.encode('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n'),
+          };
+        }
+
+        return { done: true, value: undefined };
+      });
+    }) as typeof fetch;
+
+    const api = useChatApi();
+    let completed = false;
+    let settled = false;
+
+    const pending = api.sendStreamChatRequest(
+      [{ id: '1', type: 'user', content: 'hi', timestamp: Date.now() }],
+      vi.fn(),
+      async () => {
+        await completionGate;
+        completed = true;
+      },
+      vi.fn(),
+    ).then(() => {
+      settled = true;
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(settled).toBe(false);
+    expect(completed).toBe(false);
+
+    releaseCompletion();
+    await pending;
+
+    expect(completed).toBe(true);
+    expect(settled).toBe(true);
   });
 
   it('distinguishes idle timeout from user cancellation', async () => {

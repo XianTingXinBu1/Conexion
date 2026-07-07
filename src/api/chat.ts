@@ -114,7 +114,11 @@ export class ChatApi extends ApiClient {
 
     logApiRequest(requestBody);
 
-    return this.post<ChatCompletionResponse>('/chat/completions', requestBody);
+    return this.post<ChatCompletionResponse>('/chat/completions', {
+      ...requestBody,
+      baseURL: this.baseURL,
+      apiKey: this.apiKey,
+    });
   }
 
   /**
@@ -128,8 +132,8 @@ export class ChatApi extends ApiClient {
       temperature?: number;
       maxTokens?: number;
       onChunk?: (chunk: string) => void;
-      onComplete?: (meta?: { usage?: StreamUsagePayload | null }) => void;
-      onError?: (error: string) => void;
+      onComplete?: (meta?: { usage?: StreamUsagePayload | null }) => void | Promise<void>;
+      onError?: (error: string) => void | Promise<void>;
     } = {}
   ): AsyncGenerator<string> {
     const { systemPrompt, systemMessages, temperature, maxTokens, onChunk, onComplete, onError } = options;
@@ -238,7 +242,7 @@ export class ChatApi extends ApiClient {
         }
 
         logApi('流式响应完成');
-        onComplete?.({ usage: latestUsage });
+        await onComplete?.({ usage: latestUsage });
       } finally {
         this.activeStreamCleanup = null;
         reader.releaseLock();
@@ -253,7 +257,7 @@ export class ChatApi extends ApiClient {
       }
 
       logApiError('流式请求异常', { error: errorMessage });
-      onError?.(errorMessage);
+      await onError?.(errorMessage);
       this.activeStreamCleanup = null;
 
       throw new Error(errorMessage);

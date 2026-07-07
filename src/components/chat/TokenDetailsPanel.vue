@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { Theme, Preset, ConversationCompressionMode } from '../../types';
+import type { Theme, Preset, ConversationCompressionMode } from '@/types';
 
 type PlaceholderType = 'character' | 'user' | 'knowledge' | 'chat-history' | 'user-instruction';
 
@@ -182,7 +182,7 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
                 </span>
               </div>
               <button
-                v-if="showCompressionSection"
+                v-if="showCompressionSection && compressionMode === 'manual'"
                 class="compress-action"
                 :disabled="isCompressing || !canCompress"
                 @click.stop="emit('compress')"

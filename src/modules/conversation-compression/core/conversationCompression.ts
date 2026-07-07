@@ -1,7 +1,7 @@
 import type { ChatMessage, ConversationCompression, Message } from '@/types';
-import { countMessageTokens } from './tokenCounter';
+import { countMessageTokens } from '@/utils/tokenCounter';
 
-export const DEFAULT_COMPRESSION_KEEP_RECENT_MESSAGES = 6;
+export const DEFAULT_COMPRESSION_KEEP_RECENT_MESSAGES = 2;
 export const MIN_COMPRESSION_THRESHOLD_PERCENT = 50;
 export const MAX_COMPRESSION_THRESHOLD_PERCENT = 95;
 
@@ -44,7 +44,15 @@ export function splitMessagesForCompression(
   messages: Message[],
   keepRecentCount = DEFAULT_COMPRESSION_KEEP_RECENT_MESSAGES,
 ) {
-  const safeKeepRecentCount = Math.max(2, keepRecentCount);
+  const safeKeepRecentCount = Math.max(0, keepRecentCount);
+
+  if (safeKeepRecentCount === 0) {
+    return {
+      compressibleMessages: [...messages],
+      retainedMessages: [] as Message[],
+      keepRecentCount: safeKeepRecentCount,
+    };
+  }
 
   if (messages.length <= safeKeepRecentCount) {
     return {

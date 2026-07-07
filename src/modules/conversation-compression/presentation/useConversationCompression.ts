@@ -8,7 +8,7 @@ import {
   getEffectiveChatHistory,
   getEffectiveConversationTokenCount,
   splitMessagesForCompression,
-} from '@/utils/conversationCompression';
+} from '../core/conversationCompression';
 
 interface UseConversationCompressionOptions {
   messages: Ref<Message[]>;
@@ -46,17 +46,20 @@ export function useConversationCompression(options: UseConversationCompressionOp
   );
 
   const effectiveMessages = computed(() => getEffectiveChatHistory(messages.value, compression.value));
-  const canCompress = computed(() => canCompressMessages(effectiveMessages.value));
+  const canCompress = computed(() => canCompressMessages(effectiveMessages.value, 0));
   const compressionSummary = computed(() => compression.value?.summaryContent?.trim() || '');
   const compressionPromptContent = computed(() => compression.value?.promptContent?.trim() || '');
 
-  const compressConversation = async (): Promise<boolean> => {
+  const compressConversation = async (options: { keepRecentCount?: number } = {}): Promise<boolean> => {
     if (isCompressing.value) {
       return false;
     }
 
     const activeMessages = effectiveMessages.value;
-    const { compressibleMessages, retainedMessages, keepRecentCount } = splitMessagesForCompression(activeMessages);
+    const { compressibleMessages, retainedMessages, keepRecentCount } = splitMessagesForCompression(
+      activeMessages,
+      options.keepRecentCount ?? DEFAULT_COMPRESSION_KEEP_RECENT_MESSAGES,
+    );
 
     if (compressibleMessages.length === 0) {
       return false;
@@ -86,7 +89,7 @@ export function useConversationCompression(options: UseConversationCompressionOp
         promptContent: formatCompressionSummaryForPrompt(summaryContent),
         sourceMessageCount: sourceMessageIds.length,
         sourceMessageIds,
-        keepRecentCount: Math.max(keepRecentCount, DEFAULT_COMPRESSION_KEEP_RECENT_MESSAGES),
+        keepRecentCount,
         contextBeforeCompression,
       };
       nextCompression.contextAfterCompression = getEffectiveConversationTokenCount(

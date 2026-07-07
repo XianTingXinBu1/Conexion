@@ -1,0 +1,15 @@
+export {
+  DEFAULT_COMPRESSION_KEEP_RECENT_MESSAGES,
+  MAX_COMPRESSION_THRESHOLD_PERCENT,
+  MIN_COMPRESSION_THRESHOLD_PERCENT,
+  buildCompressionSystemMessages,
+  canCompressMessages,
+  clampCompressionThresholdPercent,
+  formatCompressionSummaryForPrompt,
+  getCompressionSummaryTokenCount,
+  getContextUsagePercent,
+  getEffectiveChatHistory,
+  getEffectiveConversationTokenCount,
+  isCompressionThresholdReached,
+  splitMessagesForCompression,
+} from './core/conversationCompression';

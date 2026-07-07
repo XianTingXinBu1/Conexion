@@ -9,12 +9,12 @@ import type {
   ChatMessage,
   Message,
   Preset,
-} from '../types';
+} from '@/types';
 import {
   logApi,
   logApiError,
   logApiWarn,
-} from '../modules/debug';
+} from '@/modules/debug';
 import { ChatApi, type ApiClientConfig } from '@/api';
 import {
   loadApiPresets,
@@ -222,8 +222,8 @@ export function useChatApi() {
   async function sendStreamChatRequest(
     messages: Message[],
     onChunk: (chunk: string) => void,
-    onComplete: () => void,
-    onError: (error: string) => void,
+    onComplete: () => void | Promise<void>,
+    onError: (error: string) => void | Promise<void>,
     systemPrompt?: string,
     systemMessages?: ChatMessage[]
   ): Promise<void> {
@@ -267,7 +267,7 @@ export function useChatApi() {
     }
 
     let didNotifyError = false;
-    const reportError = (errorMessage: string) => {
+    const reportError = async (errorMessage: string) => {
       if (didNotifyError) {
         return;
       }
@@ -277,7 +277,7 @@ export function useChatApi() {
         setRequestStatus('error');
       }
       logApiError('流式请求异常', { error: errorMessage });
-      onError(errorMessage);
+      await onError(errorMessage);
     };
 
     try {
@@ -310,7 +310,7 @@ export function useChatApi() {
             logApi('接收进度', { chunks: chunkCount, length: totalLength });
           }
         },
-        onComplete: (meta) => {
+        onComplete: async (meta) => {
           if (meta?.usage) {
             usage.value = {
               promptTokens: meta.usage.prompt_tokens,
@@ -331,10 +331,10 @@ export function useChatApi() {
           };
           setRequestStatus('completed');
           logApi('流式响应完成', { totalChunks: chunkCount, totalLength });
-          onComplete();
+          await onComplete();
         },
-        onError: (errorMessage) => {
-          reportError(errorMessage);
+        onError: async (errorMessage) => {
+          await reportError(errorMessage);
         },
       })) {
         // chunk 已经通过 onChunk 回调处理
@@ -346,7 +346,7 @@ export function useChatApi() {
         errorMessage = err.message;
       }
 
-      reportError(errorMessage);
+      await reportError(errorMessage);
     } finally {
       activeChatApi = null;
       if (requestStatus.value === 'sending' || requestStatus.value === 'streaming') {

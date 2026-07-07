@@ -1,12 +1,12 @@
 import { computed, ref, watch, type Ref } from 'vue';
-import type { ConversationCompression, Message, Preset } from '../types';
+import type { ConversationCompression, Message, Preset } from '@/types';
 import { countMessageTokens, countMessagesTokens } from '../utils/tokenCounter';
 import {
   getCompressionSummaryTokenCount,
   getContextUsagePercent,
   getEffectiveChatHistory,
   isCompressionThresholdReached,
-} from '@/utils/conversationCompression';
+} from '@/modules/conversation-compression';
 
 interface CachedMessageTokenEntry {
   signature: string;

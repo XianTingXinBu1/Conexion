@@ -6,11 +6,15 @@ import type {
   Message,
   RegexRule,
   UserCharacter,
-} from '../types';
+} from '@/types';
 import { getNotificationMessage } from '../modules/notification';
-import type { MergeMode } from '../modules/system-prompt';
+import type { MergeMode } from '@/modules/system-prompt';
 import type { Ref } from 'vue';
 import { SendMessageUseCase } from '@/features/chat/application/sendMessage.usecase';
+import {
+  getEffectiveConversationTokenCount,
+  isCompressionThresholdReached,
+} from '@/modules/conversation-compression';
 
 interface SendFlowStateDeps {
   messages: { value: Message[] };
@@ -26,7 +30,10 @@ interface SendFlowCompressionDeps {
   mode: Ref<'manual' | 'auto'>;
   canUse: Ref<boolean>;
   thresholdReached: Ref<boolean>;
-  compress: () => Promise<boolean>;
+  thresholdPercent: Ref<number>;
+  maxContextLength: Ref<number>;
+  currentCompression: Ref<import('@/types').ConversationCompression | undefined>;
+  compress: (options?: { keepRecentCount?: number }) => Promise<boolean>;
   isCompressing: Ref<boolean>;
   summary: Ref<string>;
 }
@@ -43,8 +50,8 @@ interface SendFlowTransportDeps {
   sendStreamChatRequest: (
     messages: Message[],
     onChunk: (chunk: string) => void,
-    onComplete: () => void,
-    onError: (error: string) => void,
+    onComplete: () => void | Promise<void>,
+    onError: (error: string) => void | Promise<void>,
     systemPrompt?: string,
     systemMessages?: ChatMessage[]
   ) => Promise<void>;
@@ -104,7 +111,17 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       getPromptMergeMode: () => deps.state.promptMergeMode.value,
       getCompressionMode: () => deps.compression.mode.value,
       canUseConversationCompression: () => deps.compression.canUse.value,
-      isCompressionThresholdReached: () => deps.compression.thresholdReached.value,
+      isCompressionThresholdReached: (messages) => {
+        if (!messages) {
+          return deps.compression.thresholdReached.value;
+        }
+
+        return isCompressionThresholdReached(
+          getEffectiveConversationTokenCount(messages, deps.compression.currentCompression.value),
+          deps.compression.maxContextLength.value,
+          deps.compression.thresholdPercent.value,
+        );
+      },
       compressConversation: deps.compression.compress,
       getCompressionSummary: () => deps.compression.summary.value,
       getPersistedConversationId: () => deps.session.persistedConversationId.value,
@@ -116,8 +133,10 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       onMessageSend: deps.uiEffects.onMessageSend,
       sendStreamChatRequest: deps.transport.sendStreamChatRequest,
       buildSystemMessages: deps.transport.buildSystemMessages,
-      onSuccess: () => {
-        const notificationMsg = getNotificationMessage('CHAT_SEND_SUCCESS');
+      onSuccess: (kind) => {
+        const notificationMsg = getNotificationMessage(
+          kind === 'compression' ? 'CHAT_COMPRESSION_SUCCESS' : 'CHAT_SEND_SUCCESS'
+        );
         deps.uiEffects.showSuccess(notificationMsg.title, notificationMsg.message);
       },
       onError: (kind, error) => {

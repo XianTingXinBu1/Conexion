@@ -14,7 +14,7 @@ import { useChatMessageActions } from '@/composables/useChatMessageActions';
 import { useChatSendFlow } from '@/composables/useChatSendFlow';
 import { useChatSessionMeta } from '@/composables/useChatSessionMeta';
 import { useChatSessionFacade } from './useChatSessionFacade';
-import { useChatCompressionController } from './useChatCompressionController';
+import { useChatCompressionController } from '@/modules/conversation-compression/presentation';
 import { useChatPromptController } from './useChatPromptController';
 import { useChatLifecycleController } from './useChatLifecycleController';
 import type { ChatPageProps } from './chatPageTypes';
@@ -173,6 +173,9 @@ export function useChatPageViewModel(props: ChatPageProps) {
       mode: compressionMode,
       canUse: canUseConversationCompression,
       thresholdReached: isCompressionThresholdReached,
+      thresholdPercent: compressionThresholdPercent,
+      maxContextLength,
+      currentCompression: compression,
       compress: compressConversation,
       isCompressing,
       summary: compressionPromptContent,

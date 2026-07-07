@@ -74,6 +74,72 @@ describe('SendMessageUseCase', () => {
     expect(deps.onError).toHaveBeenCalledWith('compression', 'boom');
   });
 
+  it('predicts the outgoing user message when deciding pre-send auto compression', async () => {
+    const compressConversation = vi.fn(async () => true);
+    const { deps } = createDeps({
+      getCompressionMode: () => 'auto',
+      canUseConversationCompression: () => true,
+      isCompressionThresholdReached: vi.fn((messages?: Message[]) => Boolean(
+        messages?.some(message => message.content === 'hello')
+        && !messages?.some(message => message.type === 'assistant')
+      )),
+      compressConversation,
+    });
+    const useCase = new SendMessageUseCase(deps);
+
+    await useCase.execute('hello');
+
+    expect(compressConversation).toHaveBeenCalledTimes(1);
+    expect(deps.sendStreamChatRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs auto compression after final assistant reply is saved', async () => {
+    const events: string[] = [];
+    const compressedSnapshots: Message[][] = [];
+    let thresholdReached = false;
+    const compressConversation = vi.fn(async () => {
+      events.push('compress');
+      compressedSnapshots.push(messages.map(message => ({ ...message })));
+      return true;
+    });
+    const { deps, messages } = createDeps({
+      getCompressionMode: () => 'auto',
+      canUseConversationCompression: () => true,
+      isCompressionThresholdReached: () => thresholdReached,
+      compressConversation,
+      createNewConversation: vi.fn(async (firstMessage) => {
+        events.push(`create:${firstMessage.type}:${firstMessage.content}`);
+      }),
+      saveConversation: vi.fn(async () => {
+        const lastMessage = messages[messages.length - 1];
+        events.push(`save:${lastMessage?.type}:${lastMessage?.content || '<empty>'}`);
+      }),
+      sendStreamChatRequest: vi.fn(async (_messages, onChunk, onComplete) => {
+        onChunk('完整');
+        onChunk('回复');
+        thresholdReached = true;
+        await vi.advanceTimersByTimeAsync(60);
+        await onComplete();
+      }),
+    });
+    const useCase = new SendMessageUseCase(deps);
+
+    await useCase.execute('hello');
+
+    expect(compressConversation).toHaveBeenCalledTimes(1);
+    const compressedSnapshot = compressedSnapshots[0] ?? [];
+    expect(compressedSnapshot[compressedSnapshot.length - 1]).toMatchObject({
+      type: 'assistant',
+      content: '完整回复',
+    });
+    expect(events).toEqual([
+      'create:user:hello',
+      'save:assistant:完整回复',
+      'compress',
+    ]);
+    expect(deps.onSuccess).toHaveBeenCalledWith('send');
+  });
+
   it('marks empty cancelled response as stopped', async () => {
     const { deps, messages } = createDeps({
       sendStreamChatRequest: vi.fn(async (_messages, _onChunk, _onComplete, onError) => {

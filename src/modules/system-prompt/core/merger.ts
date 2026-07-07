@@ -5,8 +5,8 @@
  */
 
 import { MESSAGE_SEPARATOR } from '../utils/constants';
-import type { MergeResult, MergeMode } from '../types';
 import type { ChatMessage } from '@/types';
+import type { MergeResult, MergeMode } from '../types';
 
 /**
  * 合并相邻同类型的消息

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { ChevronDown, Database } from 'lucide-vue-next';
-import type { Model } from '../../../types';
+import type { Model } from '@/types';
 import { filterModels } from '../../../data/modelData';
 
 interface Props {

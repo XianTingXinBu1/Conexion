@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue';
-import type { UserCharacter, AICharacter, CharacterType } from '../types';
+import type { UserCharacter, AICharacter, CharacterType } from '@/types';
 import { DEFAULT_USER_CHARACTER, DEFAULT_AI_CHARACTERS } from '../constants';
-import { generalLogger } from '../modules/debug';
+import { generalLogger } from '@/modules/debug';
 import {
   loadAICharacters as loadAICharactersFromRepository,
   loadSelectedUserCharacterId,

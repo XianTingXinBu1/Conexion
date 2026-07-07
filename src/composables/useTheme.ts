@@ -1,5 +1,5 @@
 import { ref, watch, onMounted } from 'vue';
-import type { Theme } from '../types';
+import type { Theme } from '@/types';
 import { STORAGE_KEYS } from '../constants';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
 import { User, Bot, Check, Edit2, Trash2, X } from 'lucide-vue-next';
-import type { UserCharacter, AICharacter, CharacterType, KnowledgeBase } from '../../types';
+import type { UserCharacter, AICharacter, CharacterType, KnowledgeBase } from '@/types';
 import { loadKnowledgeBases as loadKnowledgeBasesFromRepository } from '@/repositories/knowledgeBaseRepository';
 import FormInput from '../form/FormInput.vue';
 import FormTextarea from '../form/FormTextarea.vue';

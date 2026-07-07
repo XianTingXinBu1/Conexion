@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ToggleLeft, ToggleRight, Edit2, Trash2, User, Bot, Hash } from 'lucide-vue-next';
-import type { RegexRule, RegexScope, RegexApplyTo } from '../../types';
+import type { RegexRule, RegexScope, RegexApplyTo } from '@/types';
 
 interface Props {
   rule: RegexRule;

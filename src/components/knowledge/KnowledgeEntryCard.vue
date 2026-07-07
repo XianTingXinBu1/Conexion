@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { GripVertical, Pencil, Trash2, Check, X } from 'lucide-vue-next';
-import type { KnowledgeEntry } from '../../types';
+import type { KnowledgeEntry } from '@/types';
 import FormInput from '../form/FormInput.vue';
 import FormTextarea from '../form/FormTextarea.vue';
 import FormActions from '../form/FormActions.vue';

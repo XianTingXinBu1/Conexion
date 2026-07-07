@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import type { KnowledgeBase } from '../../types';
+import type { KnowledgeBase } from '@/types';
 import Modal from '../common/Modal.vue';
 import FormInput from '../form/FormInput.vue';
 import FormTextarea from '../form/FormTextarea.vue';

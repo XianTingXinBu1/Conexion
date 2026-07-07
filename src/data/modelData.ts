@@ -1,4 +1,4 @@
-import type { Model } from '../types';
+import type { Model } from '@/types';
 
 /**
  * 默认模型列表

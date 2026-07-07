@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { ChevronLeft, Plus, X, Database, Trash2, MoreVertical, Edit2 } from 'lucide-vue-next';
-import type { KnowledgeBase, KnowledgeEntry } from '../../types';
+import type { KnowledgeBase, KnowledgeEntry } from '@/types';
 import { useConfirmDialog } from '../../composables/useConfirmDialog';
 import { useDraggable } from '../../composables/useDraggable';
 import { useNotifications, getNotificationMessage } from '../../modules/notification';

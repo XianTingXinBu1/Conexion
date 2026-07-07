@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { Message, Conversation, AICharacter } from '../types';
+import type { Message, Conversation, AICharacter } from '@/types';
 import {
   createConversationRecord,
   deleteConversationMessage,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { AICharacter } from '../../types';
+import type { AICharacter } from '@/types';
 import CharacterCard from './CharacterCard.vue';
 import EmptyState from '../common/EmptyState.vue';
 

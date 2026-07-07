@@ -1,5 +1,5 @@
 import { onMounted, ref } from 'vue';
-import type { RegexRule } from '../types';
+import type { RegexRule } from '@/types';
 import { DEFAULT_REGEX_SCRIPTS } from '../constants';
 import {
   loadRegexRules as loadRegexRulesFromRepository,

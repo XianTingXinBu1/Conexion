@@ -1,5 +1,5 @@
 import { onMounted, watch, type Ref } from 'vue';
-import type { AICharacter, Message } from '../types';
+import type { AICharacter, Message } from '@/types';
 
 interface UseChatPageInitOptions {
   props: {

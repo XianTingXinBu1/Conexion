@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Bot, Edit2, Trash2 } from 'lucide-vue-next';
-import type { Conversation } from '../../types';
+import type { Conversation } from '@/types';
 
 interface Props {
   conversation: Conversation;

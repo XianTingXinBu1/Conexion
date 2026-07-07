@@ -1,5 +1,5 @@
 import { computed, type Ref } from 'vue';
-import type { AICharacter, Conversation } from '../types';
+import type { AICharacter, Conversation } from '@/types';
 
 interface UseChatSessionMetaOptions {
   currentCharacter: Ref<AICharacter | undefined>;

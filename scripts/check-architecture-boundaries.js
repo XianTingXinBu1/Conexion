@@ -33,13 +33,33 @@ const rules = [
     ],
   },
   {
-    name: 'ChatPage must only depend on chat presentation entry, chat UI and shared styles',
+    name: 'Compression domain must not live in legacy util/composable/chat component paths',
+    file: /src\/(utils\/conversationCompression\.ts|composables\/useConversationCompression\.ts|features\/chat\/presentation\/useChatCompressionController\.ts|components\/chat\/CompressionSummaryCard\.vue)$/,
+    forbidden: [/.*/],
+  },
+  {
+    name: 'Chat prompt adapter must not live in legacy feature/composable paths',
+    file: /src\/(features\/chat\/application\/buildSystemMessages\.usecase\.ts|composables\/useChatPromptBuilder\.ts|composables\/useChatPageController\.ts)$/,
+    forbidden: [/.*/],
+  },
+  {
+    name: 'System prompt engine must stay adapter/repository/UI free',
+    file: /src\/modules\/system-prompt\/.*\.ts$/,
+    forbidden: [
+      /@\/features|\.\.\/.*features/,
+      /@\/composables|\.\.\/.*composables/,
+      /@\/repositories|\.\.\/.*repositories/,
+      /@\/components|\.\.\/.*components/,
+    ],
+  },
+  {
+    name: 'ChatPage must only depend on chat presentation entry, chat UI, compression module and shared styles',
     file: /src\/components\/ChatPage\.vue$/,
     forbidden: [
       /@\/composables|\.\.\/composables/,
       /@\/repositories|\.\.\/repositories/,
       /@\/services|\.\.\/services/,
-      /@\/modules|\.\.\/modules/,
+      /@\/modules\/(?!conversation-compression)|\.\.\/modules\/(?!conversation-compression)/,
       /@\/api|\.\.\/api/,
     ],
   },

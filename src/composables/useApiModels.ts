@@ -5,7 +5,7 @@
  */
 
 import { ref } from 'vue';
-import type { Model } from '../types';
+import type { Model } from '@/types';
 import { DEFAULT_MODELS, getModelById } from '../data/modelData';
 import { STORAGE_KEYS, DEFAULTS } from '../constants';
 import { ModelsApi, type ApiClientConfig } from '@/api';

@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { Message } from '../types';
+import type { Message } from '@/types';
 
 interface UseChatMessageActionsOptions {
   messages: { value: Message[] };

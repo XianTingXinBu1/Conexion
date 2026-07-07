@@ -1,4 +1,4 @@
-import type { RegexRule } from '../types';
+import type { RegexRule } from '@/types';
 
 /**
  * 正则规则缓存

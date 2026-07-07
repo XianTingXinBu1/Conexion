@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronLeft, Plus, Database } from 'lucide-vue-next';
-import type { KnowledgeBase } from '../../types';
+import type { KnowledgeBase } from '@/types';
 import KnowledgeBaseCard from './KnowledgeBaseCard.vue';
 import EmptyState from '../common/EmptyState.vue';
 

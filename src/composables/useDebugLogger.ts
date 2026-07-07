@@ -11,7 +11,7 @@ import {
   showDebugHelp as coreShowDebugHelp,
   setDebugMode,
   type DebugLogItem,
-} from '../modules/debug';
+} from '@/modules/debug';
 
 /**
  * 调试日志级别

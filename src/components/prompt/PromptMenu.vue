@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { X, Plus, Pencil, Trash2, Check } from 'lucide-vue-next';
-import type { PromptPreset } from '../../types';
+import type { PromptPreset } from '@/types';
 import Modal from '../common/Modal.vue';
 import FormInput from '../form/FormInput.vue';
 

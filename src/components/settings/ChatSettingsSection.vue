@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { MergeMode } from '../../modules/system-prompt';
-import type { ConversationCompressionMode } from '../../types';
+import type { MergeMode } from '@/modules/system-prompt';
+import type { ConversationCompressionMode } from '@/types';
 
 interface Props {
   enterToSend: boolean;

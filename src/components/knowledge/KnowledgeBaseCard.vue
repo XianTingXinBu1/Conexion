@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { KnowledgeBase } from '../../types';
+import type { KnowledgeBase } from '@/types';
 
 interface Props {
   knowledgeBase: KnowledgeBase;

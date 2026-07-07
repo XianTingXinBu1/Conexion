@@ -8,8 +8,8 @@ import { DEFAULT_MERGE_MODE } from '../utils/constants';
 import { estimateMessagesTokens, isContentEmpty } from '../utils';
 import { fillItemContent, isChatHistoryItem, isUserInstructionItem } from './content-filler';
 import { mergeMessages } from './merger';
-import type { SystemPromptConfig, SystemPromptResult, BuildMetadata } from '../types';
 import type { ChatMessage } from '@/types';
+import type { SystemPromptConfig, SystemPromptResult, BuildMetadata } from '../types';
 
 /**
  * 处理聊天历史条目

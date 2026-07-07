@@ -1,5 +1,5 @@
 import { computed, nextTick, ref, type Ref } from 'vue';
-import type { Message } from '../types';
+import type { Message } from '@/types';
 
 export function useChatViewport(messages: Ref<Message[]>, chatHistoryLimit: Ref<number>) {
   const messagesContainer = ref<HTMLElement>();

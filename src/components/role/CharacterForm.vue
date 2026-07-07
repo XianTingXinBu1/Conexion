@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import type { UserCharacter, AICharacter, CharacterType, KnowledgeBase } from '../../types';
+import type { UserCharacter, AICharacter, CharacterType, KnowledgeBase } from '@/types';
 import { loadKnowledgeBases as loadKnowledgeBasesFromRepository } from '@/repositories/knowledgeBaseRepository';
 import FormInput from '../form/FormInput.vue';
 import FormTextarea from '../form/FormTextarea.vue';

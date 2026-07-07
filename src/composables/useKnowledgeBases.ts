@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue';
-import type { KnowledgeBase, KnowledgeEntry } from '../types';
+import type { KnowledgeBase, KnowledgeEntry } from '@/types';
 import { DEFAULT_KNOWLEDGE_BASES } from '../constants';
-import { generalLogger } from '../modules/debug';
+import { generalLogger } from '@/modules/debug';
 import {
   loadKnowledgeBases as loadKnowledgeBasesFromRepository,
   saveKnowledgeBases as saveKnowledgeBasesToRepository,

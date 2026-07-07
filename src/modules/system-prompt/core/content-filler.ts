@@ -6,8 +6,8 @@
 
 import { SPECIAL_ITEM_NAMES, DEFAULT_PROMPT_TEMPLATES, KNOWLEDGE_ENTRY_TEMPLATE } from '../utils/constants';
 import { normalizeContent } from '../utils';
-import type { ContentPlaceholder, ContentFillerContext } from '../types';
 import type { PromptItem } from '@/types';
+import type { ContentPlaceholder, ContentFillerContext } from '../types';
 
 /**
  * 内容填充器策略接口

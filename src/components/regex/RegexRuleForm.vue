@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { User, Bot } from 'lucide-vue-next';
-import type { RegexRule, RegexScope, RegexApplyTo } from '../../types';
+import type { RegexRule, RegexScope, RegexApplyTo } from '@/types';
 
 interface Props {
   modelValue: Partial<RegexRule>;

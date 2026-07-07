@@ -7,7 +7,8 @@
  */
 import { computed, ref, watch, nextTick } from 'vue';
 import { useMarkdown } from '../useMarkdown';
-import { useNotifications, getNotificationMessage } from '../../notification';
+import { useNotifications } from '../../notification/useNotifications';
+import { getNotificationMessage } from '../../notification/messages';
 import type { MarkdownRendererProps } from '../types';
 
 const STREAM_RENDER_DEBOUNCE_MS = 80;

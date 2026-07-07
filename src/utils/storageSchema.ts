@@ -373,6 +373,15 @@ async function migrateToV2(): Promise<void> {
     await setStorage(STORAGE_KEYS.PROMPT_MERGE_MODE, APP_SETTINGS_DEFAULTS.promptMergeMode);
   }
 
+}
+
+async function migrateToV3(): Promise<void> {
+  const conversations = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
+  const normalizedConversations = (Array.isArray(conversations) ? conversations : [])
+    .filter(isObject)
+    .map((conversation, index) => normalizeConversation(conversation, index));
+  await setStorage(STORAGE_KEYS.CONVERSATIONS, normalizedConversations);
+
   const compressionThresholdPercent = await getStorage<number>(
     STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT,
     APP_SETTINGS_DEFAULTS.compressionThresholdPercent
@@ -407,7 +416,7 @@ export async function ensureStorageSchema(): Promise<number> {
   }
 
   if (currentVersion < 3) {
-    await migrateToV2();
+    await migrateToV3();
   }
 
   await setStorage(STORAGE_KEYS.STORAGE_SCHEMA_VERSION, STORAGE_SCHEMA_VERSION);

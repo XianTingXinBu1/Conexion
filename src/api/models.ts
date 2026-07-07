@@ -75,14 +75,7 @@ export class ModelsApi extends ApiClient {
     try {
       logApi('测试连接');
 
-      // 使用 HEAD 请求测试连接（如果服务器支持）
-      // 否则使用 GET /models 请求
-      try {
-        await this.head();
-      } catch {
-        // 如果 HEAD 不支持，使用 GET /models
-        await this.get('/models');
-      }
+      await this.testBackendConnection();
 
       const latency = Math.round(performance.now() - startTime);
 
@@ -104,29 +97,32 @@ export class ModelsApi extends ApiClient {
   }
 
   /**
-   * HEAD 请求（用于测试连接）
+   * 通过内建后端执行连接测试
    */
-  private async head(): Promise<void> {
+  private async testBackendConnection(): Promise<void> {
     this.validateUrl(this.baseURL);
 
     const { controller, cleanup } = this.createAbortController();
     const headers = this.buildHeaders();
     const url = this.buildBackendUrl('/connection-test');
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        baseURL: this.baseURL,
-        apiKey: this.apiKey,
-      }),
-      signal: controller.signal,
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          baseURL: this.baseURL,
+          apiKey: this.apiKey,
+        }),
+        signal: controller.signal,
+      });
 
-    cleanup();
-
-    if (!response.ok) {
-      throw new Error(`连接测试失败 (${response.status}): ${response.statusText}`);
+      if (!response.ok) {
+        const errorMessage = this.parseErrorMessage(await response.text());
+        throw new Error(`连接测试失败 (${response.status}): ${errorMessage || response.statusText}`);
+      }
+    } finally {
+      cleanup();
     }
   }
 }

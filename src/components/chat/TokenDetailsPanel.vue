@@ -133,7 +133,6 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
 <template>
   <Transition name="slide-in">
     <div class="token-details-panel" :class="theme">
-      <div class="token-details-overlay" @click="emit('close')"></div>
       <div class="token-details-content">
         <!-- 顶部关键指标 -->
         <div class="token-summary">
@@ -160,7 +159,7 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
           </div>
         </div>
 
-        <div v-if="showCompressionSection" class="token-card" @click="toggleSection('compression')">
+        <div v-if="showCompressionSection" class="token-card expandable" @click="toggleSection('compression')">
           <div class="card-header expandable">
             <span class="card-title">会话压缩</span>
             <div class="card-right">
@@ -199,7 +198,7 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
         </div>
 
         <!-- 聊天历史 -->
-        <div class="token-card" @click="toggleSection('chatHistory')">
+        <div class="token-card expandable" @click="toggleSection('chatHistory')">
           <div class="card-header expandable">
             <span class="card-title">聊天历史</span>
             <div class="card-right">
@@ -257,7 +256,7 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
         </div>
 
         <!-- 系统提示词 -->
-        <div class="token-card" v-if="lastSystemPromptResult" @click="toggleSection('promptDetails')">
+        <div class="token-card expandable" v-if="lastSystemPromptResult" @click="toggleSection('promptDetails')">
           <div class="card-header expandable">
             <span class="card-title">系统提示词</span>
             <div class="card-right">
@@ -318,10 +317,6 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
   right: 12px;
   z-index: 1000;
   pointer-events: none;
-}
-
-.token-details-overlay {
-  display: none;
 }
 
 .token-details-content {

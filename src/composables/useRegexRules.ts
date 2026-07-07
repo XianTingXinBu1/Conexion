@@ -1,97 +1,90 @@
+import { onMounted, ref } from 'vue';
 import type { RegexRule } from '../types';
 import { DEFAULT_REGEX_SCRIPTS } from '../constants';
-import { useLocalStorage } from './useLocalStorage';
+import {
+  loadRegexRules as loadRegexRulesFromRepository,
+  saveRegexRules as saveRegexRulesToRepository,
+} from '@/repositories/regexRuleRepository';
 
-const STORAGE_KEY = 'conexion_regex_scripts';
-
-/**
- * 正则规则管理 Composable
- * 提供正则规则的加载、保存、添加、编辑、删除、启用/禁用等功能
- */
 export function useRegexRules() {
-  const { value: rules } = useLocalStorage<RegexRule[]>(
-    STORAGE_KEY,
-    [...DEFAULT_REGEX_SCRIPTS]
-  );
+  const rules = ref<RegexRule[]>([...DEFAULT_REGEX_SCRIPTS].map(rule => ({ ...rule })));
 
-  /**
-   * 添加新规则
-   */
+  const loadRules = async () => {
+    rules.value = await loadRegexRulesFromRepository();
+  };
+
+  const saveRules = async () => {
+    await saveRegexRulesToRepository(rules.value);
+  };
+
+  const persistRules = () => {
+    void saveRules();
+  };
+
   const addRule = (rule: Omit<RegexRule, 'id'>): RegexRule => {
     const newRule: RegexRule = {
       id: Date.now().toString(),
       ...rule,
     };
     rules.value.push(newRule);
+    persistRules();
     return newRule;
   };
 
-  /**
-   * 更新规则
-   */
   const updateRule = (id: string, updates: Partial<RegexRule>): boolean => {
     const index = rules.value.findIndex(r => r.id === id);
     if (index !== -1) {
       rules.value[index] = { ...rules.value[index], ...updates } as RegexRule;
+      persistRules();
       return true;
     }
     return false;
   };
 
-  /**
-   * 删除规则
-   */
   const deleteRule = (id: string): boolean => {
     const initialLength = rules.value.length;
     rules.value = rules.value.filter(r => r.id !== id);
     if (rules.value.length < initialLength) {
+      persistRules();
       return true;
     }
     return false;
   };
 
-  /**
-   * 切换启用状态
-   */
   const toggleEnabled = (id: string): boolean => {
     const rule = rules.value.find(r => r.id === id);
     if (rule) {
       rule.enabled = !rule.enabled;
+      persistRules();
       return true;
     }
     return false;
   };
 
-  /**
-   * 获取规则
-   */
   const getRule = (id: string): RegexRule | undefined => {
     return rules.value.find(r => r.id === id);
   };
 
-  /**
-   * 获取已启用的规则
-   */
   const getEnabledRules = (): RegexRule[] => {
     return rules.value.filter(r => r.enabled);
   };
 
-  /**
-   * 根据作用域过滤规则
-   */
   const getRulesByScope = (scope: 'user' | 'assistant' | 'all'): RegexRule[] => {
     return rules.value.filter(r => r.enabled && (r.scope === scope || r.scope === 'all'));
   };
 
-  /**
-   * 根据应用时机过滤规则
-   */
   const getRulesByApplyTo = (applyTo: 'before-macro' | 'after-macro'): RegexRule[] => {
     return rules.value.filter(r => r.enabled && r.applyTo === applyTo);
   };
 
+  onMounted(() => {
+    void loadRules();
+  });
+
   return {
     rules,
+    loadRules,
+    saveRules,
     addRule,
     updateRule,
     deleteRule,

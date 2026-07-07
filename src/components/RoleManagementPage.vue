@@ -3,10 +3,16 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Plus, X, User, Bot } from 'lucide-vue-next';
 import type { UserCharacter, AICharacter, CharacterType } from '../types';
-import { DEFAULT_USER_CHARACTER, DEFAULT_AI_CHARACTERS, STORAGE_KEYS } from '../constants';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { getStorage, setStorage } from '@/utils/storage';
+import {
+  loadAICharacters as loadAICharactersFromRepository,
+  loadSelectedUserCharacterId,
+  loadUserCharacters as loadUserCharactersFromRepository,
+  saveAICharacters as saveAICharactersToRepository,
+  saveSelectedUserCharacterId,
+  saveUserCharacters as saveUserCharactersToRepository,
+} from '@/repositories/characterRepository';
 import PageHeader from './common/PageHeader.vue';
 import CharacterForm from './role/CharacterForm.vue';
 import UserCharacterList from './role/UserCharacterList.vue';
@@ -43,19 +49,17 @@ const deleteTargetType = ref<CharacterType | null>(null);
 
 // 加载用户角色
 const loadUserCharacters = async () => {
-  const stored = await getStorage<UserCharacter[]>(STORAGE_KEYS.USER_CHARACTERS, [DEFAULT_USER_CHARACTER]);
-  userCharacters.value = stored;
+  userCharacters.value = await loadUserCharactersFromRepository();
 };
 
 // 加载AI角色
 const loadAICharacters = async () => {
-  const stored = await getStorage<AICharacter[]>(STORAGE_KEYS.AI_CHARACTERS, [...DEFAULT_AI_CHARACTERS]);
-  aiCharacters.value = stored;
+  aiCharacters.value = await loadAICharactersFromRepository();
 };
 
 // 加载选中的用户角色
 const loadSelectedUser = async () => {
-  const stored = await getStorage<string>(STORAGE_KEYS.SELECTED_USER_CHARACTER, '');
+  const stored = await loadSelectedUserCharacterId();
   if (stored) {
     selectedUserId.value = stored;
   } else if (userCharacters.value.length > 0) {
@@ -65,18 +69,18 @@ const loadSelectedUser = async () => {
 
 // 保存用户角色
 const saveUserCharacters = async () => {
-  await setStorage(STORAGE_KEYS.USER_CHARACTERS, userCharacters.value);
+  await saveUserCharactersToRepository(userCharacters.value);
 };
 
 // 保存AI角色
 const saveAICharacters = async () => {
-  await setStorage(STORAGE_KEYS.AI_CHARACTERS, aiCharacters.value);
+  await saveAICharactersToRepository(aiCharacters.value);
 };
 
 // 保存选中的用户角色
 const saveSelectedUser = async () => {
   if (selectedUserId.value) {
-    await setStorage(STORAGE_KEYS.SELECTED_USER_CHARACTER, selectedUserId.value);
+    await saveSelectedUserCharacterId(selectedUserId.value);
   }
 };
 

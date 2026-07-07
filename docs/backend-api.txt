@@ -1,0 +1,524 @@
+Conexion 后端 API 文档
+=====================
+
+版本状态
+--------
+当前后端使用 Hono + @hono/node-server。
+运行时业务数据以后端 JSON 文件为权威来源，前端不再依赖浏览器 localStorage / IndexedDB 做业务持久化。
+
+默认数据目录
+------------
+.runtime/data/
+
+可通过环境变量覆盖：
+
+CONEXION_DATA_DIR=/path/to/data npm run dev:server
+
+后端数据文件
+------------
+.runtime/data/conversations.json
+.runtime/data/user-characters.json
+.runtime/data/ai-characters.json
+.runtime/data/knowledge-bases.json
+.runtime/data/api-presets.json
+.runtime/data/prompt-presets.json
+.runtime/data/regex-rules.json
+.runtime/data/settings.json
+
+通用约定
+--------
+- 所有接口前缀均为 /api。
+- 请求体使用 JSON。
+- 响应默认为 JSON。
+- 错误响应格式：
+
+{
+  "error": {
+    "message": "错误信息"
+  }
+}
+
+- CORS 由 CLIENT_ORIGIN 控制，默认 http://127.0.0.1:3100。
+- 请求体大小由 MAX_BODY_BYTES 控制，默认 1 MiB。
+- 上游模型请求超时由 UPSTREAM_TIMEOUT_MS 控制，默认 60000 ms。
+
+环境变量
+--------
+HOST
+  后端监听地址，默认 127.0.0.1。
+
+PORT
+  后端监听端口，默认 3900。
+
+CLIENT_ORIGIN
+  允许的前端来源，默认 http://127.0.0.1:3100。
+
+CONEXION_DATA_DIR
+  后端 JSON 数据目录，默认 .runtime/data。
+
+DEFAULT_UPSTREAM_BASE_URL
+  默认上游 OpenAI-compatible API baseURL。
+
+DEFAULT_UPSTREAM_API_KEY
+  默认上游 API key。
+
+UPSTREAM_TIMEOUT_MS
+  上游请求超时时间。
+
+MAX_BODY_BYTES
+  请求体最大大小。
+
+ALLOW_PRIVATE_UPSTREAMS
+  是否允许上游 baseURL 指向本机/内网。
+  未显式设置时，仅本地监听 HOST 允许私有上游。
+
+基础接口
+--------
+GET /api/health
+
+说明：健康检查。
+
+响应示例：
+
+{
+  "ok": true
+}
+
+会话接口
+--------
+GET /api/conversations
+
+说明：获取所有历史会话。
+
+响应：Conversation[]
+
+PUT /api/conversations
+
+说明：替换所有历史会话。
+
+请求体：
+
+{
+  "conversations": [Conversation]
+}
+
+响应：Conversation[]
+
+POST /api/conversations
+
+说明：创建会话。
+有 character 时创建持久会话；无 character 时返回临时会话，不落盘。
+
+请求体：
+
+{
+  "firstMessage": Message,
+  "character": AICharacter | undefined
+}
+
+响应：Conversation
+
+GET /api/conversations/:id
+
+说明：获取单个会话。
+
+响应：Conversation
+
+PATCH /api/conversations/:id
+
+说明：更新会话字段。
+
+请求体：
+
+{
+  "updates": Partial<Conversation>
+}
+
+响应：Conversation
+
+DELETE /api/conversations/:id
+
+说明：删除会话。
+
+响应：
+
+{
+  "deleted": true | false
+}
+
+PUT /api/conversations/:id/messages
+
+说明：替换会话消息列表，并可附带更新会话字段。
+
+请求体：
+
+{
+  "messages": [Message],
+  "updates": Partial<Conversation>
+}
+
+响应：Conversation
+
+PATCH /api/conversations/:id/messages/:messageId
+
+说明：编辑单条消息内容。
+
+请求体：
+
+{
+  "content": "新的消息内容"
+}
+
+响应：Conversation
+
+DELETE /api/conversations/:id/messages/:messageId
+
+说明：删除单条消息。
+
+响应：Conversation
+
+角色接口
+--------
+GET /api/characters/users
+
+说明：获取用户角色列表。
+无后端数据时返回默认用户角色。
+
+响应：UserCharacter[]
+
+PUT /api/characters/users
+
+说明：替换用户角色列表。
+空数组会回退为默认用户角色。
+
+请求体：
+
+{
+  "characters": [UserCharacter]
+}
+
+响应：UserCharacter[]
+
+GET /api/characters/ai
+
+说明：获取 AI 角色列表。
+无后端数据时返回默认 AI 角色。
+
+响应：AICharacter[]
+
+PUT /api/characters/ai
+
+说明：替换 AI 角色列表。
+空数组会回退为默认 AI 角色。
+
+请求体：
+
+{
+  "characters": [AICharacter]
+}
+
+响应：AICharacter[]
+
+GET /api/characters/ai/:id
+
+说明：获取单个 AI 角色。
+
+响应：AICharacter
+
+POST /api/characters/ai/clear-knowledge-base-reference
+
+说明：清除 AI 角色中对指定知识库的绑定。
+删除知识库后用于避免悬空引用。
+
+请求体：
+
+{
+  "knowledgeBaseId": "kb-id"
+}
+
+响应：
+
+{
+  "changed": true | false
+}
+
+知识库接口
+----------
+GET /api/knowledge-bases
+
+说明：获取知识库列表。
+
+响应：KnowledgeBase[]
+
+PUT /api/knowledge-bases
+
+说明：替换知识库列表。
+
+请求体：
+
+{
+  "knowledgeBases": [KnowledgeBase]
+}
+
+响应：KnowledgeBase[]
+
+API 预设接口
+------------
+GET /api/api-presets
+
+说明：获取 API 预设列表。
+无后端数据时返回默认 API 预设。
+
+响应：Preset[]
+
+PUT /api/api-presets
+
+说明：替换 API 预设列表。
+空数组会回退为默认 API 预设。
+
+请求体：
+
+{
+  "presets": [Preset]
+}
+
+响应：Preset[]
+
+提示词预设接口
+--------------
+GET /api/prompt-presets
+
+说明：获取提示词预设列表。
+无后端数据时返回默认提示词预设。
+
+响应：PromptPreset[]
+
+PUT /api/prompt-presets
+
+说明：替换提示词预设列表。
+空数组会回退为默认提示词预设。
+
+请求体：
+
+{
+  "presets": [PromptPreset]
+}
+
+响应：PromptPreset[]
+
+正则规则接口
+------------
+GET /api/regex-rules
+
+说明：获取正则规则列表。
+无后端数据时返回默认正则规则。
+
+响应：RegexRule[]
+
+PUT /api/regex-rules
+
+说明：替换正则规则列表。
+空数组会回退为默认正则规则。
+
+请求体：
+
+{
+  "rules": [RegexRule]
+}
+
+响应：RegexRule[]
+
+设置接口
+--------
+GET /api/settings
+
+说明：获取所有 settings.json 字段。
+
+响应：Record<string, unknown>
+
+GET /api/settings/:key
+
+说明：获取单个设置值。
+
+响应：
+
+{
+  "value": unknown
+}
+
+PUT /api/settings/:key
+
+说明：写入单个设置值。
+
+请求体：
+
+{
+  "value": unknown
+}
+
+响应：
+
+{
+  "value": unknown
+}
+
+PUT /api/settings
+
+说明：替换所有设置。
+
+请求体：
+
+{
+  "settings": Record<string, unknown>
+}
+
+响应：Record<string, unknown>
+
+数据清理接口
+------------
+DELETE /api/data
+
+说明：清空后端所有 JSON 数据。
+会清空：
+- conversations
+- user characters
+- ai characters
+- knowledge bases
+- api presets
+- prompt presets
+- regex rules
+- settings
+
+响应：
+
+{
+  "ok": true
+}
+
+上游模型代理接口
+----------------
+GET /api/models
+POST /api/models
+
+说明：代理请求上游 /models。
+GET 使用 query 参数；POST 使用 JSON body。
+
+输入字段：
+
+baseURL?: string
+apiKey?: string
+
+响应：透传上游 JSON。
+
+POST /api/connection-test
+
+说明：测试上游 /models 连接。
+
+请求体：
+
+{
+  "baseURL": "https://example.com/v1",
+  "apiKey": "optional"
+}
+
+响应：
+
+{
+  "success": true | false,
+  "latency": 123,
+  "error": "失败时存在"
+}
+
+POST /api/chat/completions
+
+说明：代理 OpenAI-compatible /chat/completions。
+支持 stream: true。
+
+请求体：
+
+{
+  "baseURL": "https://example.com/v1",
+  "apiKey": "optional",
+  "model": "model-name",
+  "messages": [],
+  "temperature": 0.7,
+  "max_tokens": 4096,
+  "stream": true | false
+}
+
+响应：
+- stream 为 false 时透传上游 JSON。
+- stream 为 true 时透传上游响应流。
+
+类型摘要
+--------
+Message:
+  id: string
+  type: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp: number
+
+Conversation:
+  id: string
+  title: string
+  characterId?: string
+  characterName?: string
+  messages: Message[]
+  compressed?: boolean
+  compression?: ConversationCompression
+  createdAt: number
+  updatedAt: number
+
+UserCharacter:
+  id: string
+  name: string
+  description: string
+  createdAt: number
+
+AICharacter:
+  id: string
+  name: string
+  description: string
+  personality: string
+  knowledgeBaseId?: string
+  createdAt: number
+
+KnowledgeBase:
+  id: string
+  name: string
+  description: string
+  entries: KnowledgeEntry[]
+  globallyEnabled: boolean
+  createdAt: number
+  updatedAt: number
+
+Preset:
+  id: string
+  name: string
+  url: string
+  apiKey: string
+  model: string
+  streamEnabled: boolean
+  temperature: number
+  maxTokens: number
+  maxOutputTokens: number
+  contextLength?: number
+  createdAt: number
+  updatedAt: number
+
+PromptPreset:
+  id: string
+  name: string
+  items: PromptItem[]
+  createdAt: number
+  updatedAt: number
+
+RegexRule:
+  id: string
+  name: string
+  enabled: boolean
+  pattern: string
+  flags: string
+  replacement: string
+  scope: 'user' | 'assistant' | 'all'
+  applyTo: 'before-macro' | 'after-macro'

@@ -1,14 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useChatApi } from '../useChatApi';
-import { getStorage, setStorage } from '@/utils/storage';
-
-vi.mock('@/utils/storage', () => ({
-  getStorage: vi.fn(),
-  setStorage: vi.fn(),
-}));
-
-const mockGetStorage = vi.mocked(getStorage);
-const mockSetStorage = vi.mocked(setStorage);
 
 function createPreset() {
   return {
@@ -21,6 +12,13 @@ function createPreset() {
     maxOutputTokens: 256,
     streamEnabled: true,
   };
+}
+
+function createApiPresetResponse(): Response {
+  return new Response(JSON.stringify([createPreset()]), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
 }
 
 function createStreamingResponse(read: () => Promise<ReadableStreamReadResult<Uint8Array>>): Response {
@@ -41,23 +39,19 @@ describe('useChatApi', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
-    mockGetStorage.mockReset();
-    mockSetStorage.mockReset();
-    mockGetStorage.mockImplementation(async (key: string, defaultValue?: unknown) => {
-      if (key === 'conexion_api_presets') {
-        return [createPreset()];
-      }
-      if (key === 'conexion_selected_preset') {
-        return 'preset-1';
-      }
-      return defaultValue;
-    });
   });
 
   it('cancels active stream request and updates state', async () => {
     let readDeferred: { reject: (reason?: unknown) => void } | null = null;
 
-    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/api-presets') {
+        return createApiPresetResponse();
+      }
+      if (String(input) === '/api/settings/conexion_selected_preset') {
+        return new Response(JSON.stringify({ value: 'preset-1' }), { status: 200 });
+      }
+
       const signal = init?.signal as AbortSignal | undefined;
       signal?.addEventListener('abort', () => {
         readDeferred?.reject(new DOMException('Aborted', 'AbortError'));
@@ -92,9 +86,18 @@ describe('useChatApi', () => {
   });
 
   it('reports stream errors only once', async () => {
-    globalThis.fetch = vi.fn(async () => createStreamingResponse(async () => {
-      throw new Error('boom');
-    })) as typeof fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/api-presets') {
+        return createApiPresetResponse();
+      }
+      if (String(input) === '/api/settings/conexion_selected_preset') {
+        return new Response(JSON.stringify({ value: 'preset-1' }), { status: 200 });
+      }
+
+      return createStreamingResponse(async () => {
+        throw new Error('boom');
+      });
+    }) as typeof fetch;
 
     const api = useChatApi();
     const onError = vi.fn();
@@ -118,7 +121,14 @@ describe('useChatApi', () => {
       encoder.encode('data: {"choices":[{"delta":{"content":"好"}}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}'),
     ];
 
-    globalThis.fetch = vi.fn(async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/api-presets') {
+        return createApiPresetResponse();
+      }
+      if (String(input) === '/api/settings/conexion_selected_preset') {
+        return new Response(JSON.stringify({ value: 'preset-1' }), { status: 200 });
+      }
+
       let index = 0;
       return createStreamingResponse(async () => {
         if (index < chunks.length) {
@@ -153,7 +163,14 @@ describe('useChatApi', () => {
   it('distinguishes idle timeout from user cancellation', async () => {
     vi.useFakeTimers();
 
-    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/api-presets') {
+        return createApiPresetResponse();
+      }
+      if (String(input) === '/api/settings/conexion_selected_preset') {
+        return new Response(JSON.stringify({ value: 'preset-1' }), { status: 200 });
+      }
+
       const signal = init?.signal as AbortSignal | undefined;
       return createStreamingResponse(() => new Promise((_resolve, reject) => {
         signal?.addEventListener('abort', () => {

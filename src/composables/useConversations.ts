@@ -2,8 +2,10 @@ import { ref } from 'vue';
 import type { Conversation, Message, AICharacter } from '../types';
 import {
   createConversationRecord,
+  deleteConversationRecord,
   loadStoredConversations,
   saveStoredConversations,
+  updateConversationRecord,
 } from '@/services/conversationRepository';
 
 /**
@@ -69,8 +71,8 @@ export function useConversations() {
       updatedAt: Date.now(),
     };
 
-    conversations.value[index] = nextConversation;
-    await saveStoredConversations(conversations.value);
+    const updated = await updateConversationRecord(id, updates);
+    conversations.value[index] = updated ?? nextConversation;
   };
 
   /**
@@ -83,8 +85,8 @@ export function useConversations() {
       return;
     }
 
+    await deleteConversationRecord(id);
     conversations.value = nextConversations;
-    await saveStoredConversations(nextConversations);
   };
 
   /**
@@ -96,12 +98,13 @@ export function useConversations() {
       return;
     }
 
-    conversations.value[index] = {
+    const fallbackConversation = {
       ...conversations.value[index]!,
       title: newName,
       updatedAt: Date.now(),
     };
-    await saveStoredConversations(conversations.value);
+    const updated = await updateConversationRecord(id, { title: newName });
+    conversations.value[index] = updated ?? fallbackConversation;
   };
 
   /**

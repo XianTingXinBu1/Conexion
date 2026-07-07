@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft, Plus, Clock, MessageSquare, Search, XCircle, SearchX } from 'lucide-vue-next';
 import type { AICharacter, Conversation } from '../types';
-import { STORAGE_KEYS, DEFAULT_AI_CHARACTERS } from '../constants';
 import { CharacterSelector, ConversationItem } from './conversation';
 import ConfirmDialog from './ConfirmDialog.vue';
 import Modal from './common/Modal.vue';
@@ -11,7 +10,7 @@ import EmptyState from './common/EmptyState.vue';
 import PageHeader from './common/PageHeader.vue';
 import { prefetchRouteComponent } from '@/router';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { getStorage } from '@/utils/storage';
+import { loadAICharacters as loadAICharactersFromRepository } from '@/repositories/characterRepository';
 import { useConversations } from '../composables/useConversations';
 import '../styles/conversation-list.css';
 
@@ -96,8 +95,7 @@ const clearSearch = () => {
 
 // 加载AI角色列表
 const loadAICharacters = async () => {
-  const stored = await getStorage<AICharacter[]>(STORAGE_KEYS.AI_CHARACTERS, DEFAULT_AI_CHARACTERS);
-  aiCharacters.value = stored.length > 0 ? stored : DEFAULT_AI_CHARACTERS;
+  aiCharacters.value = await loadAICharactersFromRepository();
 };
 
 // 加载历史会话

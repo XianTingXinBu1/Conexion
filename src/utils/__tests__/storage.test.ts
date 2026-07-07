@@ -46,51 +46,27 @@ Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
 });
 
-const clearMock = vi.fn(async () => undefined);
-const idbKeysMock = vi.fn(async () => ['conexion_models', 'conexion_conversations']);
+const delMock = vi.fn(async () => undefined);
 
 vi.mock('idb-keyval', () => ({
   createStore: vi.fn(() => ({ name: 'mock-store' })),
-  get: vi.fn(),
-  set: vi.fn(),
-  del: vi.fn(),
-  keys: idbKeysMock,
-  clear: clearMock,
+  del: delMock,
 }));
 
-describe('storage helpers', () => {
+describe('legacy storage cleanup helpers', () => {
   beforeEach(() => {
     localStorage.clear();
-    clearMock.mockClear();
-    idbKeysMock.mockClear();
+    delMock.mockClear();
   });
 
-  it('clearStorage removes only conexion local keys and clears indexeddb store', async () => {
+  it('removeStorage drops the key from localStorage and legacy IndexedDB', async () => {
     localStorage.setItem('conexion_theme', '"dark"');
-    localStorage.setItem('conexion_prompt_merge_mode', '"adjacent"');
-    localStorage.setItem('unrelated_key', 'keep-me');
 
-    const { clearStorage } = await import('../storage');
+    const { removeStorage, dbStore } = await import('../storage');
 
-    await clearStorage();
+    await removeStorage('conexion_theme');
 
     expect(localStorage.getItem('conexion_theme')).toBeNull();
-    expect(localStorage.getItem('conexion_prompt_merge_mode')).toBeNull();
-    expect(localStorage.getItem('unrelated_key')).toBe('keep-me');
-    expect(clearMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('getAllStorageKeys merges local and indexeddb keys', async () => {
-    localStorage.setItem('conexion_theme', '"light"');
-    localStorage.setItem('not_conexion', 'ignore');
-
-    const { getAllStorageKeys } = await import('../storage');
-
-    await expect(getAllStorageKeys()).resolves.toEqual([
-      'conexion_theme',
-      'conexion_models',
-      'conexion_conversations',
-    ]);
-    expect(idbKeysMock).toHaveBeenCalledTimes(1);
+    expect(delMock).toHaveBeenCalledWith('conexion_theme', dbStore);
   });
 });

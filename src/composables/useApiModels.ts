@@ -9,7 +9,7 @@ import type { Model } from '../types';
 import { DEFAULT_MODELS, getModelById } from '../data/modelData';
 import { STORAGE_KEYS, DEFAULTS } from '../constants';
 import { ModelsApi, type ApiClientConfig } from '@/api';
-import { getStorage, setStorage } from '@/utils/storage';
+import { getSetting, setSetting } from '@/repositories/settingsRepository';
 
 export function useApiModels() {
   // 模型相关状态
@@ -26,7 +26,7 @@ export function useApiModels() {
    * 加载模型列表
    */
   async function loadModels() {
-    const saved = await getStorage<{ models: Model[]; presetId: string; url: string }>(
+    const saved = await getSetting<{ models: Model[]; presetId: string; url: string }>(
       STORAGE_KEYS.MODELS,
       { models: [], presetId: '', url: '' }
     );
@@ -41,7 +41,7 @@ export function useApiModels() {
    * 保存模型列表
    */
   async function saveModels(presetId: string, url: string) {
-    await setStorage(STORAGE_KEYS.MODELS, {
+    await setSetting(STORAGE_KEYS.MODELS, {
       models: models.value,
       presetId,
       url,

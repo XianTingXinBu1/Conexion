@@ -132,9 +132,9 @@ src/repositories/apiPresetRepository.ts
 
 职责：
 
-- 作为新存储适配层。
-- 集中接触 `STORAGE_KEYS`、默认值、`getStorage`、`setStorage`。
-- 为 composables / controllers / usecases 提供语义化读写方法。
+- 作为后端 API 数据适配层。
+- 集中接触 `/api/*`、`STORAGE_KEYS`、默认值与错误处理。
+- 为 composables / controllers / usecases 提供语义化读写方法，避免业务代码直接依赖浏览器持久化。
 
 ## 发送消息调用链
 

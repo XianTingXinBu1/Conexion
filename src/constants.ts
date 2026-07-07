@@ -1,12 +1,11 @@
 /**
- * 存储键常量
- * 
- * 存储策略：
- * - localStorage: 配置类数据（主题、设置等，数据小、频繁读取）
- * - IndexedDB: 大数据（聊天记录、角色卡、知识库等）
+ * 后端设置/数据键常量。
+ *
+ * 这些 key 用作后端 settings.json 字段名，或用于清理旧浏览器本地数据。
+ * 运行时业务数据的权威来源是后端 `.runtime/data/*.json`，不是 localStorage / IndexedDB。
  */
 export const STORAGE_KEYS = {
-  // localStorage: 配置类数据
+  // settings.json: UI/选择项/偏好
   ENTER_TO_SEND: 'conexion_enter_to_send',
   THEME: 'conexion_theme',
   SHOW_WORD_COUNT: 'conexion_show_word_count',
@@ -23,7 +22,7 @@ export const STORAGE_KEYS = {
   COMPRESSION_MODE: 'conexion_compression_mode', // 会话压缩模式: 'manual' | 'auto'
   STORAGE_SCHEMA_VERSION: 'conexion_storage_schema_version', // 存储 schema 版本
 
-  // IndexedDB: 大数据
+  // 后端集合数据文件 / 旧浏览器本地数据清理键
   REGEX_SCRIPTS: 'conexion_regex_scripts',
   USER_CHARACTERS: 'conexion_user_characters',
   AI_CHARACTERS: 'conexion_ai_characters',

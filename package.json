@@ -19,9 +19,11 @@
     "health-check:verbose": "node scripts/health-check/health-check.js --verbose"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.8",
     "@types/dompurify": "^3.0.5",
     "dompurify": "^3.3.1",
     "gpt-tokenizer": "^3.4.0",
+    "hono": "^4.12.28",
     "idb-keyval": "^6.2.2",
     "lucide-vue-next": "^0.563.0",
     "marked": "^17.0.2",

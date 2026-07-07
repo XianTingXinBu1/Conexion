@@ -54,73 +54,37 @@ describe('ensureStorageSchema', () => {
     vi.resetModules();
   });
 
-  it('normalizes stored entities, clears dangling knowledge base references, and is idempotent', async () => {
-    localStorage.setItem(STORAGE_KEYS.STORAGE_SCHEMA_VERSION, JSON.stringify(0));
-    localStorage.setItem(STORAGE_KEYS.PROMPT_MERGE_MODE, JSON.stringify('invalid'));
-    indexedData.set(STORAGE_KEYS.API_PRESETS, [{ id: 'preset-1', name: 'Test', url: 'https://api.example.com', model: 'gpt' }]);
-    indexedData.set(STORAGE_KEYS.PROMPT_PRESETS, [{ id: 'prompt-1', name: 'Prompt', items: [{ id: 'x', name: '角色设定', enabled: true, prompt: '' }] }]);
-    indexedData.set(STORAGE_KEYS.USER_CHARACTERS, [{ id: 'user-1', name: 'Alice' }]);
-    indexedData.set(STORAGE_KEYS.AI_CHARACTERS, [{ id: 'ai-1', name: 'Bot', description: 1, personality: null, knowledgeBaseId: 'missing-kb' }]);
-    indexedData.set(STORAGE_KEYS.KNOWLEDGE_BASES, [{ id: 'kb-1', name: 'KB', entries: [{ id: 'entry-1', name: 'Fact', content: 'x' }] }]);
-    indexedData.set(STORAGE_KEYS.REGEX_SCRIPTS, [{ id: 'r1', name: 'rule', pattern: 'a', replacement: 'b', scope: 'invalid' }]);
-    indexedData.set(STORAGE_KEYS.CONVERSATIONS, [{ id: 'conv-1', messages: [] }]);
+  it('drops legacy frontend-owned data and keeps only the schema marker', async () => {
+    for (const key of Object.values(STORAGE_KEYS)) {
+      localStorage.setItem(key, JSON.stringify('legacy'));
+    }
+
+    for (const key of [
+      STORAGE_KEYS.REGEX_SCRIPTS,
+      STORAGE_KEYS.USER_CHARACTERS,
+      STORAGE_KEYS.AI_CHARACTERS,
+      STORAGE_KEYS.API_PRESETS,
+      STORAGE_KEYS.MODELS,
+      STORAGE_KEYS.CONVERSATIONS,
+      STORAGE_KEYS.PROMPT_PRESETS,
+      STORAGE_KEYS.KNOWLEDGE_BASES,
+    ]) {
+      indexedData.set(key, 'legacy');
+    }
 
     const { ensureStorageSchema, STORAGE_SCHEMA_VERSION } = await import('../storageSchema');
 
     await expect(ensureStorageSchema()).resolves.toBe(STORAGE_SCHEMA_VERSION);
 
-    const apiPresets = indexedData.get(STORAGE_KEYS.API_PRESETS) as Array<Record<string, unknown>>;
-    expect(apiPresets[0]?.streamEnabled).toBe(true);
-    expect(apiPresets[0]?.maxOutputTokens).toBe(4096);
+    for (const key of Object.values(STORAGE_KEYS)) {
+      if (key === STORAGE_KEYS.STORAGE_SCHEMA_VERSION) {
+        continue;
+      }
 
-    const aiCharacters = indexedData.get(STORAGE_KEYS.AI_CHARACTERS) as Array<Record<string, unknown>>;
-    expect(aiCharacters[0]?.knowledgeBaseId).toBeUndefined();
-    expect(aiCharacters[0]?.description).toBe('');
-    expect(aiCharacters[0]?.personality).toBe('');
+      expect(localStorage.getItem(key)).toBeNull();
+      expect(indexedData.has(key)).toBe(false);
+    }
 
-    const regexRules = indexedData.get(STORAGE_KEYS.REGEX_SCRIPTS) as Array<Record<string, unknown>>;
-    expect(regexRules[0]?.scope).toBe('all');
-    expect(regexRules[0]?.applyTo).toBe('after-macro');
-
-    const promptPresets = indexedData.get(STORAGE_KEYS.PROMPT_PRESETS) as Array<Record<string, unknown>>;
-    expect(promptPresets[0]?.items).toEqual([
-      expect.objectContaining({
-        id: 'x',
-        roleType: 'system',
-        insertPosition: 1,
-      }),
-    ]);
-
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.PROMPT_MERGE_MODE) ?? 'null')).toBe('adjacent');
     expect(JSON.parse(localStorage.getItem(STORAGE_KEYS.STORAGE_SCHEMA_VERSION) ?? 'null')).toBe(STORAGE_SCHEMA_VERSION);
-
-    const snapshot = JSON.stringify({
-      indexed: Object.fromEntries(indexedData.entries()),
-      local: Object.fromEntries(localData.entries()),
-    });
-    await ensureStorageSchema();
-    expect(JSON.stringify({
-      indexed: Object.fromEntries(indexedData.entries()),
-      local: Object.fromEntries(localData.entries()),
-    })).toBe(snapshot);
-  });
-
-  it('migrates legacy localStorage data only when indexeddb target is empty', async () => {
-    localStorage.setItem(STORAGE_KEYS.STORAGE_SCHEMA_VERSION, JSON.stringify(1));
-    localStorage.setItem(STORAGE_KEYS.API_PRESETS, JSON.stringify([{ id: 'legacy', name: 'Legacy', url: 'https://legacy.example.com', model: 'legacy' }]));
-    indexedData.set(STORAGE_KEYS.API_PRESETS, []);
-
-    const { ensureStorageSchema } = await import('../storageSchema');
-    await ensureStorageSchema();
-
-    const migrated = indexedData.get(STORAGE_KEYS.API_PRESETS) as Array<Record<string, unknown>>;
-    expect(migrated[0]?.id).toBe('legacy');
-
-    localStorage.setItem(STORAGE_KEYS.STORAGE_SCHEMA_VERSION, JSON.stringify(1));
-    indexedData.set(STORAGE_KEYS.API_PRESETS, [{ id: 'existing', name: 'Existing', url: 'https://existing.example.com', model: 'existing' }]);
-    await ensureStorageSchema();
-
-    const preserved = indexedData.get(STORAGE_KEYS.API_PRESETS) as Array<Record<string, unknown>>;
-    expect(preserved[0]?.id).toBe('existing');
   });
 });

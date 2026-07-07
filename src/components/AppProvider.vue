@@ -4,7 +4,7 @@ import { useTheme } from '@/composables/useTheme';
 import { useCharacters } from '@/composables/useCharacters';
 import { useDebugLogger } from '@/composables/useDebugLogger';
 import { useAppSettings } from '@/composables/useAppSettings';
-import { clearStorage } from '@/utils/storage';
+import { clearBackendData } from '@/repositories/settingsRepository';
 import {
   APP_DATA_KEY,
   APP_DEBUG_KEY,
@@ -38,7 +38,7 @@ const toggleDebugMode = () => {
  * 删除所有数据
  */
 const deleteAllData = async () => {
-  await clearStorage();
+  await clearBackendData();
   location.reload();
 };
 

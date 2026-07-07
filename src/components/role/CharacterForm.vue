@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import type { UserCharacter, AICharacter, CharacterType, KnowledgeBase } from '../../types';
-import { STORAGE_KEYS } from '../../constants';
-import { getStorage } from '@/utils/storage';
+import { loadKnowledgeBases as loadKnowledgeBasesFromRepository } from '@/repositories/knowledgeBaseRepository';
 import FormInput from '../form/FormInput.vue';
 import FormTextarea from '../form/FormTextarea.vue';
 import FormActions from '../form/FormActions.vue';
@@ -44,8 +43,7 @@ const knowledgeBaseId = computed({
 
 // 加载知识库列表
 const loadKnowledgeBases = async () => {
-  const stored = await getStorage<KnowledgeBase[]>(STORAGE_KEYS.KNOWLEDGE_BASES, []);
-  knowledgeBases.value = stored;
+  knowledgeBases.value = await loadKnowledgeBasesFromRepository();
 };
 
 const title = computed(() => {

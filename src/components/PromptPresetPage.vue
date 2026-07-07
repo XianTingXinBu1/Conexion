@@ -2,10 +2,15 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import type { PromptPreset, PromptItem } from '../types';
-import { STORAGE_KEYS, DEFAULT_PROMPT_PRESETS, DEFAULT_PROMPT_ITEMS } from '../constants';
+import { DEFAULT_PROMPT_ITEMS } from '../constants';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { getStorage, setStorage } from '@/utils/storage';
+import {
+  loadPromptPresets as loadPromptPresetsFromRepository,
+  loadSelectedPromptPresetId,
+  savePromptPresets as savePromptPresetsToRepository,
+  saveSelectedPromptPresetId,
+} from '@/repositories/promptPresetRepository';
 import PresetHeader from './prompt/PresetHeader.vue';
 import PromptMenu from './prompt/PromptMenu.vue';
 import PromptItemList from './prompt/PromptItemList.vue';
@@ -71,23 +76,19 @@ const saveCurrentPresetItems = async () => {
 
 // 保存预设列表
 const savePresets = async () => {
-  await setStorage(STORAGE_KEYS.PROMPT_PRESETS, presets.value);
+  await savePromptPresetsToRepository(presets.value);
 };
 
 // 保存当前选中的预设ID
 const saveSelectedPreset = async () => {
-  await setStorage(STORAGE_KEYS.SELECTED_PROMPT_PRESET, selectedPresetId.value);
+  await saveSelectedPromptPresetId(selectedPresetId.value);
 };
 
 // 加载预设列表
 const loadPresets = async () => {
-  const stored = await getStorage<PromptPreset[]>(
-    STORAGE_KEYS.PROMPT_PRESETS,
-    [...DEFAULT_PROMPT_PRESETS].map(p => ({ ...p, items: [...p.items] }))
-  );
-  presets.value = stored;
+  presets.value = await loadPromptPresetsFromRepository();
 
-  const selectedId = await getStorage<string>(STORAGE_KEYS.SELECTED_PROMPT_PRESET, '');
+  const selectedId = await loadSelectedPromptPresetId();
   if (selectedId) {
     const exists = presets.value.some(p => p.id === selectedId);
     if (exists) {

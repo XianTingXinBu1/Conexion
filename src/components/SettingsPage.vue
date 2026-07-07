@@ -2,9 +2,8 @@
 import { ref, onMounted, inject } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
-import { STORAGE_KEYS } from '../constants';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
-import { clearStorage, getStorage } from '@/utils/storage';
+import { clearBackendData, getAllSettings } from '@/repositories/settingsRepository';
 import { useAppSettings, APP_SETTINGS_DEFAULTS, writeAppSettingsDefaults } from '../composables/useAppSettings';
 import { APP_DEBUG_KEY, APP_SETTINGS_KEY } from '@/app/providers/appInjectionKeys';
 import ChatSettingsSection from './settings/ChatSettingsSection.vue';
@@ -48,20 +47,12 @@ const { showSuccess } = useNotifications();
 const dataSize = ref(0);
 
 const calculateDataSize = async () => {
-  let totalSize = 0;
-  for (const key of Object.values(STORAGE_KEYS)) {
-    const value = await getStorage<string>(key, '');
-    if (value) {
-      const encoder = new TextEncoder();
-      const encoded = encoder.encode(value);
-      totalSize += encoded.length;
-    }
-  }
-  dataSize.value = totalSize;
+  const settings = await getAllSettings();
+  dataSize.value = new TextEncoder().encode(JSON.stringify(settings)).length;
 };
 
 const handleDeleteAllData = async () => {
-  await clearStorage();
+  await clearBackendData();
   location.reload();
 };
 

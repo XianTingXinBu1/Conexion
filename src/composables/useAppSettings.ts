@@ -5,11 +5,11 @@
  */
 
 import { ref } from 'vue';
-import { useLocalStorage } from './useLocalStorage';
+import { useBackendSetting } from './useBackendSetting';
 import { STORAGE_KEYS, DEFAULTS } from '@/constants';
 import type { MergeMode } from '@/modules/system-prompt';
 import type { ConversationCompressionMode } from '@/types';
-import { setStorage } from '@/utils/storage';
+import { setSetting } from '@/repositories/settingsRepository';
 
 /**
  * 应用设置接口
@@ -59,8 +59,10 @@ export function getAppSettingsSnapshot(): AppSettings {
   };
 }
 
+type SettingsWriter = <T>(key: string, value: T) => Promise<unknown>;
+
 export async function writeAppSettingsDefaults(
-  write: typeof setStorage = setStorage,
+  write: SettingsWriter = setSetting,
 ) {
   await write(STORAGE_KEYS.ENTER_TO_SEND, APP_SETTINGS_DEFAULTS.enterToSend);
   await write(STORAGE_KEYS.SHOW_WORD_COUNT, APP_SETTINGS_DEFAULTS.showWordCount);
@@ -79,24 +81,24 @@ export async function writeAppSettingsDefaults(
  */
 export function useAppSettings() {
   // 聊天设置
-  const { value: enterToSend } = useLocalStorage(STORAGE_KEYS.ENTER_TO_SEND, APP_SETTINGS_DEFAULTS.enterToSend);
-  const { value: showWordCount } = useLocalStorage(STORAGE_KEYS.SHOW_WORD_COUNT, APP_SETTINGS_DEFAULTS.showWordCount);
-  const { value: enableMarkdown } = useLocalStorage(STORAGE_KEYS.ENABLE_MARKDOWN, APP_SETTINGS_DEFAULTS.enableMarkdown);
-  const { value: showMessageIndex } = useLocalStorage(STORAGE_KEYS.SHOW_MESSAGE_INDEX, APP_SETTINGS_DEFAULTS.showMessageIndex);
-  const { value: chatHistoryLimit } = useLocalStorage(STORAGE_KEYS.CHAT_HISTORY_LIMIT, APP_SETTINGS_DEFAULTS.chatHistoryLimit);
+  const { value: enterToSend } = useBackendSetting(STORAGE_KEYS.ENTER_TO_SEND, APP_SETTINGS_DEFAULTS.enterToSend);
+  const { value: showWordCount } = useBackendSetting(STORAGE_KEYS.SHOW_WORD_COUNT, APP_SETTINGS_DEFAULTS.showWordCount);
+  const { value: enableMarkdown } = useBackendSetting(STORAGE_KEYS.ENABLE_MARKDOWN, APP_SETTINGS_DEFAULTS.enableMarkdown);
+  const { value: showMessageIndex } = useBackendSetting(STORAGE_KEYS.SHOW_MESSAGE_INDEX, APP_SETTINGS_DEFAULTS.showMessageIndex);
+  const { value: chatHistoryLimit } = useBackendSetting(STORAGE_KEYS.CHAT_HISTORY_LIMIT, APP_SETTINGS_DEFAULTS.chatHistoryLimit);
 
   // 提示词设置
-  const { value: promptMergeMode } = useLocalStorage<MergeMode>(
+  const { value: promptMergeMode } = useBackendSetting<MergeMode>(
     STORAGE_KEYS.PROMPT_MERGE_MODE,
     APP_SETTINGS_DEFAULTS.promptMergeMode
   );
 
   // 会话压缩设置
-  const { value: compressionThresholdPercent } = useLocalStorage(
+  const { value: compressionThresholdPercent } = useBackendSetting(
     STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT,
     APP_SETTINGS_DEFAULTS.compressionThresholdPercent
   );
-  const { value: compressionMode } = useLocalStorage<ConversationCompressionMode>(
+  const { value: compressionMode } = useBackendSetting<ConversationCompressionMode>(
     STORAGE_KEYS.COMPRESSION_MODE,
     APP_SETTINGS_DEFAULTS.compressionMode
   );

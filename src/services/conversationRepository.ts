@@ -1,31 +1,47 @@
 import type { AICharacter, Conversation, Message } from '@/types';
-import { STORAGE_KEYS } from '@/constants';
-import { getStorage, setStorage } from '@/utils/storage';
 
 const TEMP_CONVERSATION_PREFIX = 'temp-';
 const PERSISTED_CONVERSATION_PREFIX = 'conv-';
 const TEMP_CONVERSATION_TITLE = '临时会话';
+const CONVERSATIONS_API_BASE = '/api/conversations';
 
 const createConversationTitle = (content: string): string => {
   return content.slice(0, 30) + (content.length > 30 ? '...' : '');
 };
 
-const clearCompressionIfSourceChanged = (
-  conversation: Conversation,
-  changedMessageIds: string[]
-): Partial<Conversation> => {
-  const sourceMessageIds = conversation.compression?.sourceMessageIds ?? [];
-  const changedCompressedSource = changedMessageIds.some(id => sourceMessageIds.includes(id));
-
-  return changedCompressedSource
-    ? { compressed: false, compression: undefined }
-    : {};
-};
-
 const cloneConversation = (conversation: Conversation): Conversation => ({
   ...conversation,
   messages: [...conversation.messages],
+  compression: conversation.compression ? { ...conversation.compression } : undefined,
 });
+
+async function readApiJson<T>(response: Response): Promise<T> {
+  if (response.ok) {
+    return await response.json() as T;
+  }
+
+  let message = `请求失败 (${response.status})`;
+  try {
+    const data = await response.json() as { error?: { message?: string }; message?: string };
+    message = data.error?.message || data.message || message;
+  } catch {
+    // 保留默认错误信息
+  }
+
+  throw new Error(message);
+}
+
+async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${CONVERSATIONS_API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  return readApiJson<T>(response);
+}
 
 export const isTemporaryConversationId = (id?: string): boolean => {
   return !!id && id.startsWith(TEMP_CONVERSATION_PREFIX);
@@ -42,7 +58,7 @@ export const createTemporaryConversation = (firstMessage: Message, now = Date.no
 export const createStoredConversation = (
   firstMessage: Message,
   character: AICharacter,
-  now = Date.now()
+  now = Date.now(),
 ): Conversation => ({
   id: `${PERSISTED_CONVERSATION_PREFIX}${now}`,
   title: createConversationTitle(firstMessage.content),
@@ -54,69 +70,67 @@ export const createStoredConversation = (
 });
 
 export async function loadStoredConversations(): Promise<Conversation[]> {
-  const stored = await getStorage<Conversation[]>(STORAGE_KEYS.CONVERSATIONS, []);
-  return Array.isArray(stored) ? stored : [];
+  const conversations = await requestJson<Conversation[]>('');
+  return Array.isArray(conversations) ? conversations.map(cloneConversation) : [];
 }
 
 export async function saveStoredConversations(conversations: Conversation[]): Promise<void> {
-  await setStorage(STORAGE_KEYS.CONVERSATIONS, conversations);
+  await requestJson<Conversation[]>('', {
+    method: 'PUT',
+    body: JSON.stringify({ conversations }),
+  });
 }
 
 export async function getStoredConversation(id: string): Promise<Conversation | undefined> {
-  const conversations = await loadStoredConversations();
-  const conversation = conversations.find(item => item.id === id);
-  return conversation ? cloneConversation(conversation) : undefined;
+  if (isTemporaryConversationId(id)) {
+    return undefined;
+  }
+
+  try {
+    return cloneConversation(await requestJson<Conversation>(`/${encodeURIComponent(id)}`));
+  } catch (error) {
+    if (error instanceof Error && error.message === '会话不存在') {
+      return undefined;
+    }
+
+    throw error;
+  }
 }
 
 export async function createConversationRecord(
   firstMessage: Message,
-  character?: AICharacter
+  character?: AICharacter,
 ): Promise<Conversation> {
   if (!character) {
     return createTemporaryConversation(firstMessage);
   }
 
-  const conversations = await loadStoredConversations();
-  const newConversation = createStoredConversation(firstMessage, character);
-
-  const existingIndex = conversations.findIndex(conversation => conversation.id === newConversation.id);
-  if (existingIndex !== -1) {
-    conversations[existingIndex] = newConversation;
-  } else {
-    conversations.push(newConversation);
-  }
-
-  await saveStoredConversations(conversations);
-
-  return cloneConversation(newConversation);
+  return cloneConversation(await requestJson<Conversation>('', {
+    method: 'POST',
+    body: JSON.stringify({ firstMessage, character }),
+  }));
 }
 
 export async function updateConversationRecord(
   id: string,
-  updates: Partial<Conversation>
+  updates: Partial<Conversation>,
 ): Promise<Conversation | undefined> {
   if (isTemporaryConversationId(id)) {
     return undefined;
   }
 
-  const conversations = await loadStoredConversations();
-  const index = conversations.findIndex(conversation => conversation.id === id);
+  try {
+    return cloneConversation(await requestJson<Conversation>(`/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ updates }),
+    }));
+  } catch (error) {
+    if (error instanceof Error && error.message === '会话不存在') {
+      return undefined;
+    }
 
-  if (index === -1) {
-    return undefined;
+    throw error;
   }
-
-  const existing = conversations[index]!;
-  const updated: Conversation = {
-    ...existing,
-    ...updates,
-    updatedAt: Date.now(),
-  };
-
-  conversations[index] = updated;
-  await saveStoredConversations(conversations);
-
-  return cloneConversation(updated);
 }
 
 export async function deleteConversationRecord(id: string): Promise<boolean> {
@@ -124,87 +138,79 @@ export async function deleteConversationRecord(id: string): Promise<boolean> {
     return false;
   }
 
-  const conversations = await loadStoredConversations();
-  const nextConversations = conversations.filter(conversation => conversation.id !== id);
-
-  if (nextConversations.length === conversations.length) {
-    return false;
-  }
-
-  await saveStoredConversations(nextConversations);
-  return true;
+  const result = await requestJson<{ deleted: boolean }>(`/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  return result.deleted;
 }
 
 export async function updateConversationMessages(
   id: string,
   messages: Message[],
-  updates: Partial<Conversation> = {}
+  updates: Partial<Conversation> = {},
 ): Promise<Conversation | undefined> {
-  if (messages.length === 0) {
+  if (messages.length === 0 || isTemporaryConversationId(id)) {
     return undefined;
   }
 
-  return updateConversationRecord(id, { ...updates, messages });
+  try {
+    return cloneConversation(await requestJson<Conversation>(`/${encodeURIComponent(id)}/messages`, {
+      method: 'PUT',
+      body: JSON.stringify({ messages, updates }),
+    }));
+  } catch (error) {
+    if (error instanceof Error && error.message === '会话不存在') {
+      return undefined;
+    }
+
+    throw error;
+  }
 }
 
 export async function editConversationMessage(
   conversationId: string,
   messageId: string,
-  newContent: string
+  newContent: string,
 ): Promise<Conversation | undefined> {
   if (isTemporaryConversationId(conversationId)) {
     return undefined;
   }
 
-  const conversation = await getStoredConversation(conversationId);
+  try {
+    return cloneConversation(await requestJson<Conversation>(
+      `/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ content: newContent }),
+      },
+    ));
+  } catch (error) {
+    if (error instanceof Error && error.message === '会话不存在') {
+      return undefined;
+    }
 
-  if (!conversation) {
-    return undefined;
+    throw error;
   }
-
-  const messageIndex = conversation.messages.findIndex(message => message.id === messageId);
-
-  if (messageIndex === -1) {
-    return undefined;
-  }
-
-  const originalMessage = conversation.messages[messageIndex]!;
-  const nextMessages = [...conversation.messages];
-  nextMessages[messageIndex] = {
-    id: originalMessage.id,
-    type: originalMessage.type,
-    content: newContent,
-    timestamp: originalMessage.timestamp,
-  };
-
-  return updateConversationRecord(conversationId, {
-    ...clearCompressionIfSourceChanged(conversation, [messageId]),
-    messages: nextMessages,
-  });
 }
 
 export async function deleteConversationMessage(
   conversationId: string,
-  messageId: string
+  messageId: string,
 ): Promise<Conversation | undefined> {
   if (isTemporaryConversationId(conversationId)) {
     return undefined;
   }
 
-  const conversation = await getStoredConversation(conversationId);
+  try {
+    return cloneConversation(await requestJson<Conversation>(
+      `/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
+      { method: 'DELETE' },
+    ));
+  } catch (error) {
+    if (error instanceof Error && error.message === '会话不存在') {
+      return undefined;
+    }
 
-  if (!conversation) {
-    return undefined;
+    throw error;
   }
-
-  const nextMessages = conversation.messages.filter(message => message.id !== messageId);
-
-  if (nextMessages.length === conversation.messages.length) {
-    return undefined;
-  }
-
-  return updateConversationRecord(conversationId, {
-    ...clearCompressionIfSourceChanged(conversation, [messageId]),
-    messages: nextMessages,
-  });
 }

@@ -1,5 +1,5 @@
 export { useTheme } from './useTheme';
-export { useLocalStorage } from './useLocalStorage';
+export { useBackendSetting } from './useBackendSetting';
 export { useConfirmDialog } from './useConfirmDialog';
 export { useConversations } from './useConversations';
 export { useRegexRules } from './useRegexRules';

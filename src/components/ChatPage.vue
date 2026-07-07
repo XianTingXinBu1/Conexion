@@ -202,7 +202,6 @@ const {
       v-bind="confirmDialogProps"
       @confirm="confirmDelete"
       @cancel="cancelDelete"
-      @update-show="cancelDelete"
     />
   </div>
 </template>

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import type { KnowledgeBase, KnowledgeEntry } from '../types';
+import type { KnowledgeBase, KnowledgeEntry } from '@/types';
 import { useKnowledgeBases } from '../composables/useKnowledgeBases';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import KnowledgeBaseListView from './knowledge/KnowledgeBaseListView.vue';
 import KnowledgeBaseDetailView from './knowledge/KnowledgeBaseDetailView.vue';
 import KnowledgeBaseFormModal from './knowledge/KnowledgeBaseFormModal.vue';
-import ConfirmDialog from './ConfirmDialog.vue';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 
 const router = useRouter();
 

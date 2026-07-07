@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import type { PromptPreset, PromptItem } from '../types';
+import type { PromptPreset, PromptItem } from '@/types';
 import { DEFAULT_PROMPT_ITEMS } from '../constants';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
@@ -15,7 +15,7 @@ import PresetHeader from './prompt/PresetHeader.vue';
 import PromptMenu from './prompt/PromptMenu.vue';
 import PromptItemList from './prompt/PromptItemList.vue';
 import PromptFormModal from './prompt/PromptFormModal.vue';
-import ConfirmDialog from './ConfirmDialog.vue';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 
 const router = useRouter();
 

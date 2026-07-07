@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import ConfirmDialog, { type ConfirmDialogProps } from '../components/ConfirmDialog.vue';
+import ConfirmDialog, { type ConfirmDialogProps } from '@/components/common/ConfirmDialog.vue';
 
 /**
  * 删除确认对话框 Composable

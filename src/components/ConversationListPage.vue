@@ -2,9 +2,9 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft, Plus, Clock, MessageSquare, Search, XCircle, SearchX } from 'lucide-vue-next';
-import type { AICharacter, Conversation } from '../types';
+import type { AICharacter, Conversation } from '@/types';
 import { CharacterSelector, ConversationItem } from './conversation';
-import ConfirmDialog from './ConfirmDialog.vue';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import Modal from './common/Modal.vue';
 import EmptyState from './common/EmptyState.vue';
 import PageHeader from './common/PageHeader.vue';

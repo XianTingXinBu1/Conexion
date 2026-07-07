@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { RegexRule } from '../types';
+import type { RegexRule } from '@/types';
 import { Plus, Hash } from 'lucide-vue-next';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PROMPT_PRESETS } from '@/constants';
 import type { PromptPreset } from '@/types';
-import { buildSystemMessagesUseCase } from '../buildSystemMessages.usecase';
+import { buildSystemMessagesUseCase } from '../application/buildChatSystemMessages.usecase';
 
-describe('buildSystemMessagesUseCase', () => {
+describe('buildChatSystemMessagesUseCase', () => {
   it('builds fallback messages without requiring Vue state', () => {
     const result = buildSystemMessagesUseCase({
       preset: null,

@@ -163,8 +163,8 @@ ChatPage.vue
 相关文件：
 
 ```txt
-src/features/chat/application/buildSystemMessages.usecase.ts
-src/composables/useChatPromptBuilder.ts
+src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts
+src/modules/chat-prompt/presentation/useChatPromptBuilder.ts
 src/features/chat/presentation/useChatPromptController.ts
 ```
 

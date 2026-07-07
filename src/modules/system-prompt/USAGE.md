@@ -62,7 +62,7 @@ ChatPage.vue
 示例：
 
 ```typescript
-import { buildSystemMessagesUseCase } from '@/features/chat/application/buildSystemMessages.usecase'
+import { buildSystemMessagesUseCase } from '@/modules/chat-prompt'
 
 const messages = buildSystemMessagesUseCase({
   preset,

@@ -1,12 +1,12 @@
 import { ref } from 'vue';
-import type { AICharacter, ChatMessage, KnowledgeBase, Message, PromptPreset, UserCharacter } from '../types';
-import type { MergeMode } from '../modules/system-prompt';
-import { logPrompt, logSystemPrompt } from '../modules/debug';
+import type { AICharacter, ChatMessage, KnowledgeBase, Message, PromptPreset, UserCharacter } from '@/types';
+import type { MergeMode } from '@/modules/system-prompt';
+import { logPrompt, logSystemPrompt } from '@/modules/debug';
 import {
   loadPromptPresets as loadPromptPresetsFromRepository,
   loadSelectedPromptPresetId,
 } from '@/repositories/promptPresetRepository';
-import { buildSystemMessagesUseCase } from '@/features/chat/application/buildSystemMessages.usecase';
+import { buildSystemMessagesUseCase } from '../application/buildChatSystemMessages.usecase';
 
 interface LastSystemPromptResult {
   estimatedTokens: number;

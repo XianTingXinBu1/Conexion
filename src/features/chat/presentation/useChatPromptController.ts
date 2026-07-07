@@ -1,8 +1,7 @@
 import type { Ref } from 'vue';
 import type { AICharacter, KnowledgeBase, Message, UserCharacter } from '@/types';
 import type { MergeMode } from '@/modules/system-prompt';
-import { useChatPromptBuilder } from '@/composables/useChatPromptBuilder';
-import { useChatPageController } from '@/composables/useChatPageController';
+import { useChatPromptBuilder, useChatPromptPanelController } from '@/modules/chat-prompt';
 
 interface UseChatPromptControllerOptions {
   currentCharacter: Ref<AICharacter | undefined>;
@@ -16,7 +15,7 @@ interface UseChatPromptControllerOptions {
 export function useChatPromptController(options: UseChatPromptControllerOptions) {
   const promptBuilder = useChatPromptBuilder();
 
-  const pageController = useChatPageController({
+  const pageController = useChatPromptPanelController({
     currentCharacter: options.currentCharacter,
     selectedUser: options.selectedUser,
     knowledgeBases: options.knowledgeBases,

@@ -1,8 +1,15 @@
 import { ref, computed } from 'vue';
 import type { UserCharacter, AICharacter, CharacterType } from '../types';
-import { DEFAULT_USER_CHARACTER, DEFAULT_AI_CHARACTERS, STORAGE_KEYS } from '../constants';
-import { getStorage, setStorage } from '@/utils/storage';
+import { DEFAULT_USER_CHARACTER, DEFAULT_AI_CHARACTERS } from '../constants';
 import { generalLogger } from '../modules/debug';
+import {
+  loadAICharacters as loadAICharactersFromRepository,
+  loadSelectedUserCharacterId,
+  loadUserCharacters as loadUserCharactersFromRepository,
+  saveAICharacters as saveAICharactersToRepository,
+  saveSelectedUserCharacterId,
+  saveUserCharacters as saveUserCharactersToRepository,
+} from '@/repositories/characterRepository';
 
 /**
  * 角色管理 Composable
@@ -31,12 +38,7 @@ export function useCharacters() {
    */
   const loadUserCharacters = async (): Promise<boolean> => {
     try {
-      const stored = await getStorage<UserCharacter[]>(STORAGE_KEYS.USER_CHARACTERS, [DEFAULT_USER_CHARACTER]);
-      if (stored && stored.length > 0) {
-        userCharacters.value = stored;
-      } else {
-        userCharacters.value = [DEFAULT_USER_CHARACTER];
-      }
+      userCharacters.value = await loadUserCharactersFromRepository();
       error.value = null;
       return true;
     } catch (err) {
@@ -53,12 +55,7 @@ export function useCharacters() {
    */
   const loadAICharacters = async (): Promise<boolean> => {
     try {
-      const stored = await getStorage<AICharacter[]>(STORAGE_KEYS.AI_CHARACTERS, [...DEFAULT_AI_CHARACTERS]);
-      if (stored && stored.length > 0) {
-        aiCharacters.value = stored;
-      } else {
-        aiCharacters.value = [...DEFAULT_AI_CHARACTERS];
-      }
+      aiCharacters.value = await loadAICharactersFromRepository();
       error.value = null;
       return true;
     } catch (err) {
@@ -74,7 +71,7 @@ export function useCharacters() {
    * 加载选中的用户角色
    */
   const loadSelectedUser = async () => {
-    const stored = await getStorage<string | null>(STORAGE_KEYS.SELECTED_USER_CHARACTER, null);
+    const stored = await loadSelectedUserCharacterId();
     if (stored) {
       selectedUserId.value = stored;
     } else if (userCharacters.value.length > 0) {
@@ -87,7 +84,7 @@ export function useCharacters() {
    */
   const saveUserCharacters = async (): Promise<boolean> => {
     try {
-      await setStorage(STORAGE_KEYS.USER_CHARACTERS, userCharacters.value);
+      await saveUserCharactersToRepository(userCharacters.value);
       error.value = null;
       return true;
     } catch (err) {
@@ -103,7 +100,7 @@ export function useCharacters() {
    */
   const saveAICharacters = async (): Promise<boolean> => {
     try {
-      await setStorage(STORAGE_KEYS.AI_CHARACTERS, aiCharacters.value);
+      await saveAICharactersToRepository(aiCharacters.value);
       error.value = null;
       return true;
     } catch (err) {
@@ -119,7 +116,7 @@ export function useCharacters() {
    */
   const saveSelectedUser = async () => {
     if (selectedUserId.value) {
-      await setStorage(STORAGE_KEYS.SELECTED_USER_CHARACTER, selectedUserId.value);
+      await saveSelectedUserCharacterId(selectedUserId.value);
     }
   };
 

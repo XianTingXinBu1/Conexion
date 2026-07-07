@@ -7,6 +7,44 @@ vi.mock('@/modules/notification', () => ({
   getNotificationMessage: vi.fn(() => ({ title: 'ok', message: 'done' })),
 }));
 
+const toGroupedDeps = (deps: any) => ({
+  state: {
+    messages: deps.messages,
+    requestMessages: deps.requestMessages,
+    regexRules: deps.regexRules,
+    currentCharacter: deps.currentCharacter,
+    selectedUser: deps.selectedUser,
+    knowledgeBases: deps.knowledgeBases,
+    promptMergeMode: deps.promptMergeMode,
+  },
+  compression: {
+    mode: deps.compressionMode,
+    canUse: deps.canUseConversationCompression,
+    thresholdReached: deps.isCompressionThresholdReached,
+    compress: deps.compressConversation,
+    isCompressing: deps.isCompressingConversation,
+    summary: deps.compressionSummary,
+  },
+  session: {
+    persistedConversationId: deps.persistedConversationId,
+    createNewConversation: deps.createNewConversation,
+    saveConversation: deps.saveConversation,
+  },
+  transport: {
+    resetUsage: deps.resetUsage,
+    loadRegexRules: deps.loadRegexRules,
+    sendStreamChatRequest: deps.sendStreamChatRequest,
+    cancelRequest: deps.cancelRequest,
+    buildSystemMessages: deps.buildSystemMessages,
+  },
+  uiEffects: {
+    onStreamFlush: deps.onStreamFlush,
+    onMessageSend: deps.onMessageSend,
+    showSuccess: deps.showSuccess,
+    showError: deps.showError,
+  },
+});
+
 describe('useChatSendFlow', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -51,7 +89,7 @@ describe('useChatSendFlow', () => {
       showError: vi.fn(),
     };
 
-    const { handleSendMessage } = useChatSendFlow(deps);
+    const { handleSendMessage } = useChatSendFlow(toGroupedDeps(deps));
     await handleSendMessage('hello');
 
     expect(sentMessages).toHaveLength(1);
@@ -102,7 +140,7 @@ describe('useChatSendFlow', () => {
       showError: vi.fn(),
     };
 
-    const { handleSendMessage } = useChatSendFlow(deps);
+    const { handleSendMessage } = useChatSendFlow(toGroupedDeps(deps));
     await handleSendMessage('hello');
 
     expect(compressConversation).not.toHaveBeenCalled();
@@ -159,7 +197,7 @@ describe('useChatSendFlow', () => {
       showError: vi.fn(),
     };
 
-    const { handleSendMessage } = useChatSendFlow(deps);
+    const { handleSendMessage } = useChatSendFlow(toGroupedDeps(deps));
     await handleSendMessage('go');
 
     const assistantMessage = messages.value.find(message => message.type === 'assistant');

@@ -1,9 +1,14 @@
 import { ref, computed, watch } from 'vue';
 import type { Preset, PresetFormData } from './types';
-import { STORAGE_KEYS, DEFAULT_API_PRESETS, DEFAULTS } from '../../constants';
+import { DEFAULT_API_PRESETS, DEFAULTS } from '../../constants';
 import { useConfirmDialog } from '../../composables/useConfirmDialog';
 import { useNotifications } from '../notification';
-import { getStorage, setStorage } from '@/utils/storage';
+import {
+  loadApiPresetsWithDefaults,
+  loadSelectedApiPresetId,
+  saveApiPresets,
+  saveSelectedApiPresetId,
+} from '@/repositories/apiPresetRepository';
 
 const DEFAULT_PRESET_FORM_DATA: PresetFormData = {
   url: '',
@@ -61,20 +66,17 @@ export function useApiPresets() {
 
   // 加载预设
   async function loadPresets() {
-    const saved = await getStorage<Preset[]>(STORAGE_KEYS.API_PRESETS, [...DEFAULT_API_PRESETS]);
-    if (saved && Array.isArray(saved) && saved.length > 0) {
-      presets.value = saved;
-    }
+    presets.value = await loadApiPresetsWithDefaults();
   }
 
   // 保存预设
   async function savePresets() {
-    await setStorage(STORAGE_KEYS.API_PRESETS, presets.value);
+    await saveApiPresets(presets.value);
   }
 
   // 加载选中的预设
   async function loadSelectedPreset() {
-    const saved = await getStorage<string>(STORAGE_KEYS.SELECTED_PRESET, '');
+    const saved = await loadSelectedApiPresetId();
     if (saved) {
       const exists = presets.value.find(p => p.id === saved);
       if (exists) {
@@ -92,7 +94,7 @@ export function useApiPresets() {
 
   // 保存选中的预设
   async function saveSelectedPreset(presetId: string) {
-    await setStorage(STORAGE_KEYS.SELECTED_PRESET, presetId);
+    await saveSelectedApiPresetId(presetId);
   }
 
   // 选择预设

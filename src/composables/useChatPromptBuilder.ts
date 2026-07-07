@@ -1,10 +1,12 @@
 import { ref } from 'vue';
 import type { AICharacter, ChatMessage, KnowledgeBase, Message, PromptPreset, UserCharacter } from '../types';
 import type { MergeMode } from '../modules/system-prompt';
-import { STORAGE_KEYS, DEFAULT_PROMPT_PRESETS } from '../constants';
-import { getStorage } from '@/utils/storage';
-import { buildSystemPrompt } from '../modules/system-prompt';
 import { logPrompt, logSystemPrompt } from '../modules/debug';
+import {
+  loadPromptPresets as loadPromptPresetsFromRepository,
+  loadSelectedPromptPresetId,
+} from '@/repositories/promptPresetRepository';
+import { buildSystemMessagesUseCase } from '@/features/chat/application/buildSystemMessages.usecase';
 
 interface LastSystemPromptResult {
   estimatedTokens: number;
@@ -37,19 +39,9 @@ export function useChatPromptBuilder() {
   const showPromptPreview = ref(false);
 
   const loadPromptPresets = async () => {
-    const stored = await getStorage<PromptPreset[]>(
-      STORAGE_KEYS.PROMPT_PRESETS,
-      [...DEFAULT_PROMPT_PRESETS].map(p => ({
-        ...p,
-        items: [...p.items],
-      }))
-    );
+    promptPresets.value = await loadPromptPresetsFromRepository();
 
-    if (stored) {
-      promptPresets.value = stored;
-    }
-
-    const selectedId = await getStorage<string>(STORAGE_KEYS.SELECTED_PROMPT_PRESET, '');
+    const selectedId = await loadSelectedPromptPresetId();
     if (selectedId) {
       const exists = promptPresets.value.some(p => p.id === selectedId);
       if (exists) {
@@ -62,70 +54,31 @@ export function useChatPromptBuilder() {
     return promptPresets.value.find(p => p.id === selectedPromptPresetId.value) || null;
   };
 
-  const buildFallbackSystemMessages = (aiCharacter?: AICharacter, compressionSummary?: string): ChatMessage[] => {
-    const messages: ChatMessage[] = [];
-
-    if (compressionSummary?.trim()) {
-      messages.push({
-        role: 'system',
-        content: compressionSummary.trim(),
-      });
-    }
-
-    if (!aiCharacter) return messages;
-
-    const parts: string[] = [];
-    if (aiCharacter.name) {
-      parts.push(`你的名字是：${aiCharacter.name}`);
-    }
-    if (aiCharacter.description) {
-      parts.push(`你的描述：${aiCharacter.description}`);
-    }
-    if (aiCharacter.personality) {
-      parts.push(`你的性格：${aiCharacter.personality}`);
-    }
-
-    if (parts.length === 0) return messages;
-
-    messages.push({
-      role: 'system' as const,
-      content: parts.join('\n'),
-    });
-
-    return messages;
-  };
-
   const buildSystemMessages = (context: BuildPromptContext): ChatMessage[] => {
     const currentPreset = getCurrentPromptPreset();
-    let systemMessages: ChatMessage[] = [];
 
     if (currentPreset) {
       logPrompt('使用提示词预设', { presetName: currentPreset.name, itemCount: currentPreset.items.length });
-      const result = buildSystemPrompt({
-        preset: currentPreset,
-        aiCharacter: context.aiCharacter,
-        userCharacter: context.userCharacter,
-        knowledgeBases: context.knowledgeBases.filter(kb => kb.globallyEnabled),
-        chatHistory: context.chatHistory,
-        userInstruction: context.includeUserInstructionMessage === false ? '' : context.userInstruction,
-        mergeMode: context.mergeMode,
-        compressionSummary: context.compressionSummary,
-      });
+    } else {
+      logPrompt('未找到提示词预设，使用默认构建');
+    }
 
-      systemMessages = result.messages;
-      lastSystemMessages.value = systemMessages;
-      lastSystemPromptResult.value = {
-        estimatedTokens: result.estimatedTokens,
-        metadata: result.metadata,
-      };
+    const result = buildSystemMessagesUseCase({
+      ...context,
+      preset: currentPreset,
+    });
 
+    lastSystemMessages.value = result.messages;
+    lastSystemPromptResult.value = result.promptResult;
+
+    if (currentPreset && result.fullResult) {
       logSystemPrompt({
         presetName: currentPreset.name,
-        messageCount: result.messages.length,
-        usedItems: result.usedItemIds.length,
-        skippedItems: result.skippedItemIds.length,
-        estimatedTokens: result.estimatedTokens,
-        userInstructionIncluded: result.userInstructionIncluded,
+        messageCount: result.fullResult.messages.length,
+        usedItems: result.fullResult.usedItemIds.length,
+        skippedItems: result.fullResult.skippedItemIds.length,
+        estimatedTokens: result.fullResult.estimatedTokens,
+        userInstructionIncluded: result.fullResult.userInstructionIncluded,
         allItems: currentPreset.items.map(item => ({
           id: item.id,
           name: item.name,
@@ -137,23 +90,14 @@ export function useChatPromptBuilder() {
           name: item.name,
           insertPosition: item.insertPosition,
         })),
-        messages: result.messages.map(msg => ({
+        messages: result.fullResult.messages.map(msg => ({
           role: msg.role,
           content: msg.content,
         })),
       });
-
-      return systemMessages;
     }
 
-    logPrompt('未找到提示词预设，使用默认构建');
-    systemMessages = buildFallbackSystemMessages(context.aiCharacter, context.compressionSummary);
-    lastSystemMessages.value = systemMessages;
-    lastSystemPromptResult.value = {
-      estimatedTokens: systemMessages.reduce((sum, msg) => sum + msg.content.length, 0),
-    };
-
-    return systemMessages;
+    return result.messages;
   };
 
   const showPromptAssistant = (context: Omit<BuildPromptContext, 'userInstruction'>) => {

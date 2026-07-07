@@ -13,6 +13,7 @@
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
+    "check:architecture": "node scripts/check-architecture-boundaries.js",
     "health-check": "node scripts/health-check/health-check.js",
     "health-check:quick": "node scripts/health-check/health-check.js --skip-tests --skip-build",
     "health-check:verbose": "node scripts/health-check/health-check.js --verbose"

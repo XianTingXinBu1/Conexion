@@ -9,6 +9,7 @@ import { runTypeCheck } from './type-check.js';
 import { runBuildCheck } from './build-check.js';
 import { runTestCheck } from './test-check.js';
 import { runDepsCheck } from './deps-check.js';
+import { runArchitectureCheck } from './architecture-check.js';
 
 // 定义所有检查项
 const CHECKS = [
@@ -29,6 +30,12 @@ const CHECKS = [
     description: '单元测试检查',
     critical: false,
     run: (opts) => runTestCheck(opts),
+  },
+  {
+    name: 'architecture-check',
+    description: '架构边界检查',
+    critical: true,
+    run: () => runArchitectureCheck(),
   },
   {
     name: 'build-check',

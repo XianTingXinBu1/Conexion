@@ -1,0 +1,530 @@
+Conexion 聊天耦合彻底治理方案
+================================
+
+目标
+----
+把当前“ChatPage.vue + useChatSendFlow.ts”形成的强耦合中心，治理成边界清晰、可测试、可扩展的聊天领域架构。
+
+最终效果：
+1. ChatPage.vue 只负责渲染和事件绑定，不再直接碰 storage / constants / API / regex / prompt / compression。
+2. useChatSendFlow 不再接收 20+ 个零散依赖，不再混合 UI 通知、滚动、持久化、prompt、压缩、streaming。
+3. 发送消息、构建提示词、会话压缩、会话持久化、正则处理都成为独立 use case。
+4. 所有核心业务逻辑可以在不挂载 Vue 组件的情况下单测。
+5. 模块边界用目录结构 + 导入规则固定下来，防止以后重新耦合。
+
+
+一、当前最严重的问题
+--------------------
+
+1. ChatPage.vue 是结构耦合中心
+
+现状：
+- 504 行。
+- 29 个 import，其中本地 import 26 个。
+- 同时连接：UI、路由、主题、设置、会话、角色、知识库、API 预设、正则、prompt、发送、压缩、token、通知、滚动、storage。
+
+问题：
+- 页面知道太多业务细节。
+- 改任意聊天能力都容易碰 ChatPage。
+- composable 虽然拆了，但依赖关系仍然暴露在页面里。
+
+
+2. useChatSendFlow.ts 是业务流程耦合中心
+
+现状：
+- deps 超过 20 个字段。
+- 同时处理：正则、会话创建保存、prompt 构建、自动压缩、API streaming、通知、滚动、错误处理。
+
+问题：
+- 发送流程不可独立测试，必须 mock 一堆 UI / Vue 状态。
+- 任何子流程变化都可能破坏主流程。
+- 它已经不只是 SendFlow，而是半个 Chat 应用服务。
+
+
+3. 页面层直接访问存储
+
+例子：
+- ChatPage.vue 直接 getStorage。
+- ChatPage.vue 直接引用 STORAGE_KEYS / DEFAULT_AI_CHARACTERS / DEFAULT_REGEX_SCRIPTS。
+
+问题：
+- 页面层知道 IndexedDB/localStorage 的 key 和默认值。
+- 以后迁移存储、改默认数据、加缓存都会牵连页面。
+
+
+二、目标架构
+------------
+
+采用“Feature Sliced + Use Case + Adapter”结构，不做空中楼阁，只围绕当前项目实际功能落地。
+
+推荐最终目录：
+
+src/
+  app/
+    providers/
+      AppProvider.vue
+    router/
+      index.ts
+
+  shared/
+    ui/
+      Modal.vue
+      ConfirmDialog.vue
+      PageHeader.vue
+    lib/
+      storage/
+      token/
+      markdown/
+      regex/
+    types/
+      common.ts
+
+  entities/
+    message/
+      model.ts
+    conversation/
+      model.ts
+    character/
+      model.ts
+    knowledge-base/
+      model.ts
+    prompt-preset/
+      model.ts
+    api-preset/
+      model.ts
+
+  features/
+    chat/
+      domain/
+        chatTypes.ts
+        chatPolicy.ts
+      application/
+        sendMessage.usecase.ts
+        handleStream.usecase.ts
+        compressConversation.usecase.ts
+        calculateChatStats.usecase.ts
+      infrastructure/
+        chatApiGateway.ts
+      presentation/
+        ChatPage.vue
+        useChatPageViewModel.ts
+        components/
+          ChatInput.vue
+          MessageItem.vue
+          ContextRing.vue
+          TokenDetailsPanel.vue
+
+    conversation/
+      application/
+        loadConversation.usecase.ts
+        saveConversation.usecase.ts
+        createConversation.usecase.ts
+        editMessage.usecase.ts
+        deleteMessage.usecase.ts
+      infrastructure/
+        conversationRepository.ts
+
+    prompt/
+      application/
+        buildSystemMessages.usecase.ts
+        previewPrompt.usecase.ts
+      infrastructure/
+        promptPresetRepository.ts
+
+    regex/
+      application/
+        loadRegexRules.usecase.ts
+        applyRegexRules.usecase.ts
+      infrastructure/
+        regexRuleRepository.ts
+
+    knowledge-base/
+      application/
+        loadKnowledgeBases.usecase.ts
+      infrastructure/
+        knowledgeBaseRepository.ts
+
+    character/
+      application/
+        loadAICharacter.usecase.ts
+        loadSelectedUser.usecase.ts
+      infrastructure/
+        characterRepository.ts
+
+    api-preset/
+      application/
+        loadApiPreset.usecase.ts
+      infrastructure/
+        apiPresetRepository.ts
+
+
+三、核心边界规则
+----------------
+
+必须固定以下导入方向：
+
+1. presentation 可以依赖 application。
+2. application 可以依赖 domain/entities 和抽象接口。
+3. infrastructure 实现 repository/gateway 接口。
+4. domain/entities 不允许依赖 Vue、不允许依赖 storage、不允许依赖 UI。
+5. shared 不允许反向依赖 features。
+6. Vue 页面不允许直接 import：
+   - utils/storage
+   - STORAGE_KEYS
+   - DEFAULT_XXX
+   - api/chat.ts
+   - conversationRepository
+   - regexEngine 原始实现
+
+推荐后续用 ESLint import boundaries 固化规则，否则靠自觉很容易回潮。
+
+
+四、最终核心数据流
+------------------
+
+发送消息最终应该是这样：
+
+ChatPage.vue
+  -> useChatPageViewModel
+    -> SendMessageUseCase
+      -> RegexService.applyUserInput
+      -> ConversationService.ensureConversation
+      -> PromptService.buildSystemMessages
+      -> ChatGateway.streamChat
+      -> StreamMessageAssembler
+      -> ConversationService.saveMessages
+      -> 返回 SendResult / StreamEvents
+    -> ViewModel 将结果映射为 UI 状态、通知、滚动
+
+关键点：
+- UseCase 不直接 showSuccess/showError。
+- UseCase 不直接操作 DOM / scroll。
+- UseCase 不直接知道 Vue 组件。
+- UI 通知、滚动、modal 是 presentation adapter 的职责。
+
+
+五、具体模块设计
+----------------
+
+1. ChatPage.vue
+
+最终职责：
+- 调用 useChatPageViewModel(props)。
+- 绑定模板状态。
+- 绑定 send/cancel/edit/delete/compress/openPromptPreview 等事件。
+
+禁止职责：
+- 禁止 getStorage。
+- 禁止 STORAGE_KEYS。
+- 禁止拼 system prompt。
+- 禁止直接保存会话。
+- 禁止直接 load regex / character / knowledge。
+
+目标行数：150~220 行以内。
+
+
+2. useChatPageViewModel.ts
+
+职责：
+- 当前聊天页面的 composition root。
+- 组合 use cases、repositories、UI adapters。
+- 持有 Vue ref/computed。
+- 把 use case 的纯结果转换成页面状态。
+
+允许知道：
+- Vue ref/computed/watch。
+- router。
+- notification adapter。
+- scroll adapter。
+
+不允许写复杂业务规则。复杂规则下沉到 use case。
+
+
+3. sendMessage.usecase.ts
+
+职责：
+- 发送消息主业务流程。
+
+输入：
+- content
+- chatContext
+- policies
+- repositories/gateways interfaces
+
+输出：
+- 事件流或结果对象，例如：
+  - userMessageCreated
+  - assistantMessageCreated
+  - assistantChunkReceived
+  - completed
+  - cancelled
+  - failed
+
+禁止：
+- 不直接 show toast。
+- 不直接 scroll。
+- 不直接 import Vue。
+- 不直接 import ChatPage。
+
+
+4. handleStream.usecase.ts / StreamMessageAssembler
+
+职责：
+- 处理 streaming chunk buffer。
+- 控制 flush 间隔。
+- 管理 raw assistant content 和 rendered assistant content。
+
+解决当前隐患：
+- streaming 期间反复 apply regex 的逻辑集中起来。
+- 后续可以统一改成“流式期间轻处理，结束后最终 regex”。
+
+
+5. buildSystemMessages.usecase.ts
+
+职责：
+- 统一真实发送和 prompt 预览的构建入口。
+
+要求：
+- send 和 preview 必须调用同一个 builder。
+- builder 返回：messages、estimatedTokens、metadata、used/skipped items。
+- 不允许 ChatPage 自己拼 prompt。
+
+
+6. conversation application 层
+
+拆分：
+- loadConversation.usecase.ts
+- createConversation.usecase.ts
+- saveConversation.usecase.ts
+- editMessage.usecase.ts
+- deleteMessage.usecase.ts
+
+职责：
+- 处理临时会话 / 已保存会话差异。
+- 处理 currentConversation 状态更新。
+- 只暴露业务动作，不暴露 storage key。
+
+
+7. repositories
+
+每类数据一个 repository：
+- conversationRepository
+- characterRepository
+- regexRuleRepository
+- promptPresetRepository
+- knowledgeBaseRepository
+- apiPresetRepository
+- appSettingsRepository
+
+职责：
+- 唯一允许碰 getStorage/setStorage/STORAGE_KEYS/DEFAULT_XXX 的地方。
+- 负责默认值、schema 兼容、错误包装。
+
+
+六、迁移步骤
+------------
+
+不要 big bang，一次性全改风险极高。采用“外观层先行，逐步抽芯”的方式。
+
+Phase 0：加防线，不改行为
+
+目标：建立测试和边界文档。
+
+动作：
+1. 为当前 chat 关键路径补 characterization tests：
+   - 创建临时会话发送。
+   - 已保存会话发送。
+   - 流式成功。
+   - 流式失败。
+   - 取消生成。
+   - 自动压缩触发。
+   - prompt preview 与 send 使用同一构建结果。
+2. 记录现有行为，不急着“修正”。
+3. 新增架构边界文档。
+
+验收：
+- npm run test:run 通过。
+- npm run build 通过。
+- 有最小聊天发送路径测试。
+
+
+Phase 1：Repository 下沉存储
+
+目标：页面和业务流程不再直接碰 storage keys。
+
+动作：
+1. 新增 characterRepository.loadAICharacters/loadAICharacterById。
+2. 新增 regexRuleRepository.loadRegexRules。
+3. 新增 promptPresetRepository。
+4. 新增 knowledgeBaseRepository。
+5. ChatPage 去掉 getStorage、STORAGE_KEYS、DEFAULT_XXX。
+
+验收：
+- ChatPage 不 import utils/storage/constants。
+- 行为不变。
+
+
+Phase 2：统一 Prompt 构建入口
+
+目标：send 和 preview 不再分叉。
+
+动作：
+1. 把 useChatPromptBuilder 中的构建逻辑迁到 buildSystemMessages.usecase.ts。
+2. useChatPromptBuilder 只保留 Vue 状态包装。
+3. prompt preview 和 send 都调用同一个 use case。
+4. 增加测试覆盖：同一 context 下 preview/send 的 system messages 一致。
+
+验收：
+- useChatPromptBuilder 不直接承担复杂业务。
+- buildSystemMessages.usecase 可纯单测。
+
+
+Phase 3：抽 ChatSession facade
+
+目标：ChatPage 不再散落会话加载/创建/保存/编辑/删除逻辑。
+
+动作：
+1. 新增 useChatSession。
+2. 包装：
+   - loadConversation
+   - createNewConversation
+   - saveConversation
+   - editMessage
+   - deleteMessage
+   - persistedConversationId
+   - canUseConversationCompression
+3. ChatPage 只调用 chatSession.xxx。
+
+验收：
+- ChatPage 不直接使用 useConversationManager。
+- 临时会话和已保存会话行为不变。
+
+
+Phase 4：拆 SendMessageUseCase
+
+目标：useChatSendFlow 不再是大杂烩。
+
+动作：
+1. 把纯业务步骤搬到 sendMessage.usecase.ts。
+2. 把流式 buffer/flush 搬到 handleStream.usecase.ts。
+3. useChatSendFlow 降级为 Vue adapter：
+   - 调 use case。
+   - 接收事件。
+   - 更新 refs。
+   - 调通知和滚动。
+4. deps 从 20+ 个零散字段收敛为 5 组：
+   - state
+   - session
+   - prompt
+   - transport
+   - uiEffects
+
+验收：
+- useChatSendFlow deps 明显减少。
+- sendMessage.usecase 无 Vue import。
+- 核心发送流程可单测。
+
+
+Phase 5：建立 useChatPageViewModel
+
+目标：ChatPage 成为纯渲染页。
+
+动作：
+1. 新增 features/chat/presentation/useChatPageViewModel.ts。
+2. 将 ChatPage script 中的大量 composition 迁进去。
+3. ChatPage 只保留：
+   - props
+   - const vm = useChatPageViewModel(props)
+   - template 绑定
+
+验收：
+- ChatPage.vue 目标 150~220 行。
+- ChatPage import 数小于 10。
+- ChatPage 不包含复杂 async 业务函数。
+
+
+Phase 6：目录重组与边界固化
+
+目标：防止耦合回潮。
+
+动作：
+1. 按 feature 迁移文件。
+2. 建立 public API：每个 feature 只从 index.ts 暴露必要能力。
+3. 引入 ESLint boundaries/import/no-restricted-imports。
+4. 禁止 presentation 直接 import infrastructure/storage。
+
+验收：
+- 违反边界会 lint fail。
+- 新功能必须通过 feature public API 接入。
+
+
+七、验收标准
+------------
+
+最终必须满足：
+
+1. ChatPage.vue
+   - <= 220 行。
+   - 本地 import <= 10。
+   - 不 import storage/constants/repository/api 原始实现。
+
+2. useChatSendFlow.ts
+   - 不再直接承载全部业务。
+   - deps 不超过 5 个分组对象。
+   - 或完全被 useChatMessageSender / useChatPageViewModel 替代。
+
+3. 核心 use case
+   - sendMessage.usecase 无 Vue import。
+   - buildSystemMessages.usecase 无 Vue import。
+   - compressConversation.usecase 无 UI import。
+
+4. 测试
+   - prompt builder 有单测。
+   - send message 成功/失败/取消有单测。
+   - conversation compression 有单测。
+   - repository 至少有存储 mock 测试。
+
+5. 架构边界
+   - 页面层不能直接 import storage。
+   - 页面层不能直接 import STORAGE_KEYS。
+   - features 间不能随意互相深层 import，只能走 public API。
+
+
+八、风险与应对
+--------------
+
+风险 1：大改导致聊天行为回归
+应对：先写 characterization tests，再迁移。
+
+风险 2：只是把大文件搬成另一个大 composable
+应对：useChatPageViewModel 只做组合，不写复杂业务规则；复杂流程必须进入 use case。
+
+风险 3：抽象过度
+应对：只围绕当前真实功能抽象：发送、压缩、prompt、会话、regex、repository。不做插件系统、不做事件总线幻想。
+
+风险 4：边界以后又被打穿
+应对：用 ESLint no-restricted-imports 固化。
+
+
+九、推荐实施顺序摘要
+--------------------
+
+1. 补测试，锁现有行为。
+2. repository 化，页面不碰 storage。
+3. 统一 prompt builder。
+4. 抽 useChatSession。
+5. 拆 sendMessage.usecase + stream assembler。
+6. 建 useChatPageViewModel，瘦身 ChatPage。
+7. feature 目录重组。
+8. ESLint 边界规则锁死。
+
+
+十、一句话方案
+--------------
+
+不是继续随手拆 composable，而是把 Chat 从“页面驱动的一团依赖”改成：
+
+页面 View -> ViewModel -> UseCases -> Repositories/Gateways -> Storage/API
+
+UI 副作用留在 ViewModel，业务规则进入 UseCase，存储/API 进入 Infrastructure。
+这样才是真正能长期维持低耦合的方案。

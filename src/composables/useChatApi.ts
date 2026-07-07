@@ -10,14 +10,17 @@ import type {
   Message,
   Preset,
 } from '../types';
-import { STORAGE_KEYS } from '../constants';
 import {
   logApi,
   logApiError,
   logApiWarn,
 } from '../modules/debug';
-import { getStorage, setStorage } from '@/utils/storage';
 import { ChatApi, type ApiClientConfig } from '@/api';
+import {
+  loadApiPresets,
+  loadCurrentApiPreset,
+  saveSelectedApiPresetId,
+} from '@/repositories/apiPresetRepository';
 
 export type ChatRequestStatus = 'idle' | 'sending' | 'streaming' | 'cancelled' | 'error' | 'completed';
 
@@ -88,35 +91,23 @@ export function useChatApi() {
    */
   async function loadCurrentPreset(): Promise<Preset | null> {
     try {
-      // 1. 加载预设列表
-      const presets = await getStorage<Preset[]>(STORAGE_KEYS.API_PRESETS, []);
+      const presets = await loadApiPresets();
 
       if (presets.length === 0) {
         logApiWarn('API 预设列表为空');
         return null;
       }
 
-      // 2. 加载或设置选中的预设ID
-      let selectedPresetId = await getStorage<string>(STORAGE_KEYS.SELECTED_PRESET, '');
-
-      if (!selectedPresetId) {
-        selectedPresetId = presets[0]!.id;
-        await setStorage(STORAGE_KEYS.SELECTED_PRESET, selectedPresetId);
-      }
-
-      // 3. 查找预设
-      const preset = presets.find((p: Preset) => p.id === selectedPresetId);
+      const preset = await loadCurrentApiPreset();
 
       if (!preset) {
-        // 尝试使用第一个预设
-        const fallbackPreset = presets[0];
-        if (fallbackPreset) {
-          await setStorage(STORAGE_KEYS.SELECTED_PRESET, fallbackPreset.id);
-          logApi('使用备用预设', { name: fallbackPreset.name, id: fallbackPreset.id });
-          return fallbackPreset;
-        }
         logApiError('未找到可用的预设');
         return null;
+      }
+
+      if (!presets.some(item => item.id === preset.id)) {
+        await saveSelectedApiPresetId(preset.id);
+        logApi('使用备用预设', { name: preset.name, id: preset.id });
       }
 
       // 检查必需字段

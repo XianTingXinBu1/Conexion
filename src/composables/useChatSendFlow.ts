@@ -10,9 +10,9 @@ import type {
 import { getNotificationMessage } from '../modules/notification';
 import type { MergeMode } from '../modules/system-prompt';
 import type { Ref } from 'vue';
-import { applyRules } from '../utils/regexEngine';
+import { SendMessageUseCase } from '@/features/chat/application/sendMessage.usecase';
 
-interface SendFlowDeps {
+interface SendFlowStateDeps {
   messages: { value: Message[] };
   requestMessages: Ref<Message[]>;
   regexRules: Ref<RegexRule[]>;
@@ -20,19 +20,26 @@ interface SendFlowDeps {
   selectedUser: { value: UserCharacter | undefined };
   knowledgeBases: { value: KnowledgeBase[] };
   promptMergeMode: Ref<MergeMode>;
-  compressionMode: Ref<'manual' | 'auto'>;
-  canUseConversationCompression: Ref<boolean>;
-  isCompressionThresholdReached: Ref<boolean>;
-  compressConversation: () => Promise<boolean>;
-  isCompressingConversation: Ref<boolean>;
-  compressionSummary: Ref<string>;
+}
+
+interface SendFlowCompressionDeps {
+  mode: Ref<'manual' | 'auto'>;
+  canUse: Ref<boolean>;
+  thresholdReached: Ref<boolean>;
+  compress: () => Promise<boolean>;
+  isCompressing: Ref<boolean>;
+  summary: Ref<string>;
+}
+
+interface SendFlowSessionDeps {
   persistedConversationId: { value: string | undefined };
-  resetUsage: () => void;
-  loadRegexRules: () => Promise<void>;
   createNewConversation: (firstMessage: Message) => Promise<unknown>;
   saveConversation: () => Promise<void>;
-  onStreamFlush: () => void;
-  onMessageSend: () => void;
+}
+
+interface SendFlowTransportDeps {
+  resetUsage: () => void;
+  loadRegexRules: () => Promise<void>;
   sendStreamChatRequest: (
     messages: Message[],
     onChunk: (chunk: string) => void,
@@ -52,12 +59,24 @@ interface SendFlowDeps {
     includeUserInstructionMessage?: boolean;
     compressionSummary?: string;
   }) => ChatMessage[];
+}
+
+interface SendFlowUiEffectsDeps {
+  onStreamFlush: () => void;
+  onMessageSend: () => void;
   showSuccess: (title: string, message?: string) => void;
   showError: (title: string, message?: string) => void;
 }
 
+interface SendFlowDeps {
+  state: SendFlowStateDeps;
+  compression: SendFlowCompressionDeps;
+  session: SendFlowSessionDeps;
+  transport: SendFlowTransportDeps;
+  uiEffects: SendFlowUiEffectsDeps;
+}
+
 export function useChatSendFlow(deps: SendFlowDeps) {
-  const STREAM_FLUSH_INTERVAL_MS = 50;
   const isSending = ref(false);
 
   const handleCancelSend = () => {
@@ -65,181 +84,55 @@ export function useChatSendFlow(deps: SendFlowDeps) {
       return;
     }
 
-    deps.cancelRequest();
+    deps.transport.cancelRequest();
   };
 
   const handleSendMessage = async (content: string) => {
-    if (isSending.value || deps.isCompressingConversation.value) {
+    if (isSending.value || deps.compression.isCompressing.value) {
       return;
     }
 
-    deps.resetUsage();
-    await deps.loadRegexRules();
-
-    const processedContent = applyRules(content, 'user', 'after-macro', deps.regexRules.value);
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: processedContent,
-      timestamp: Date.now(),
-    };
-
-    if (
-      deps.canUseConversationCompression.value
-      && deps.compressionMode.value === 'auto'
-      && deps.isCompressionThresholdReached.value
-    ) {
-      try {
-        await deps.compressConversation();
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '压缩失败';
-        const notificationMsg = getNotificationMessage('CHAT_COMPRESSION_FAILED', { error: errorMessage });
-        deps.showError(notificationMsg.title, notificationMsg.message);
-        return;
-      }
-    }
-
-    const chatHistoryBeforeSend = [...deps.requestMessages.value];
-    const messagesForRequest = [...chatHistoryBeforeSend, userMessage];
-    deps.messages.value.push(userMessage);
-
-    if (!deps.persistedConversationId.value) {
-      await deps.createNewConversation(userMessage);
-    } else {
-      await deps.saveConversation();
-    }
-
-    await deps.onMessageSend();
-
-    const assistantMessageId = (Date.now() + 1).toString();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      type: 'assistant',
-      content: '',
-      timestamp: Date.now(),
-    };
-    deps.messages.value.push(assistantMessage);
     isSending.value = true;
 
-    const systemMessages = deps.buildSystemMessages({
-      aiCharacter: deps.currentCharacter.value,
-      userCharacter: deps.selectedUser.value,
-      knowledgeBases: deps.knowledgeBases.value,
-      chatHistory: chatHistoryBeforeSend,
-      userInstruction: processedContent,
-      mergeMode: deps.promptMergeMode.value,
-      includeUserInstructionMessage: false,
-      compressionSummary: deps.compressionSummary.value,
+    const useCase = new SendMessageUseCase({
+      getMessages: () => deps.state.messages.value,
+      getRequestMessages: () => deps.state.requestMessages.value,
+      getRegexRules: () => deps.state.regexRules.value,
+      getCurrentCharacter: () => deps.state.currentCharacter.value,
+      getSelectedUser: () => deps.state.selectedUser.value,
+      getKnowledgeBases: () => deps.state.knowledgeBases.value,
+      getPromptMergeMode: () => deps.state.promptMergeMode.value,
+      getCompressionMode: () => deps.compression.mode.value,
+      canUseConversationCompression: () => deps.compression.canUse.value,
+      isCompressionThresholdReached: () => deps.compression.thresholdReached.value,
+      compressConversation: deps.compression.compress,
+      getCompressionSummary: () => deps.compression.summary.value,
+      getPersistedConversationId: () => deps.session.persistedConversationId.value,
+      resetUsage: deps.transport.resetUsage,
+      loadRegexRules: deps.transport.loadRegexRules,
+      createNewConversation: deps.session.createNewConversation,
+      saveConversation: deps.session.saveConversation,
+      onStreamFlush: deps.uiEffects.onStreamFlush,
+      onMessageSend: deps.uiEffects.onMessageSend,
+      sendStreamChatRequest: deps.transport.sendStreamChatRequest,
+      buildSystemMessages: deps.transport.buildSystemMessages,
+      onSuccess: () => {
+        const notificationMsg = getNotificationMessage('CHAT_SEND_SUCCESS');
+        deps.uiEffects.showSuccess(notificationMsg.title, notificationMsg.message);
+      },
+      onError: (kind, error) => {
+        const notificationMsg = getNotificationMessage(
+          kind === 'compression' ? 'CHAT_COMPRESSION_FAILED' : 'CHAT_SEND_FAILED',
+          { error },
+        );
+        deps.uiEffects.showError(notificationMsg.title, notificationMsg.message);
+      },
     });
 
-    let streamBuffer = '';
-    let assistantRawContent = '';
-    let flushTimer: ReturnType<typeof setTimeout> | null = null;
-    let isCancelled = false;
-    let hasCompleted = false;
-
-    const flushBufferedContent = () => {
-      if (!streamBuffer) return;
-
-      const msg = deps.messages.value.find(m => m.id === assistantMessageId);
-      if (!msg) {
-        streamBuffer = '';
-        return;
-      }
-
-      assistantRawContent += streamBuffer;
-      msg.content = applyRules(
-        assistantRawContent,
-        'assistant',
-        'after-macro',
-        deps.regexRules.value
-      );
-      streamBuffer = '';
-
-      deps.onStreamFlush();
-    };
-
-    const clearFlushTimer = () => {
-      if (!flushTimer) return;
-      clearTimeout(flushTimer);
-      flushTimer = null;
-    };
-
-    const scheduleFlush = () => {
-      if (flushTimer) return;
-      flushTimer = setTimeout(() => {
-        flushTimer = null;
-        flushBufferedContent();
-      }, STREAM_FLUSH_INTERVAL_MS);
-    };
-
-    const finalizeSend = async () => {
-      clearFlushTimer();
-      flushBufferedContent();
-      isSending.value = false;
-      await deps.saveConversation();
-    };
-
     try {
-      await deps.sendStreamChatRequest(
-        messagesForRequest,
-        (chunk: string) => {
-          streamBuffer += chunk;
-          scheduleFlush();
-        },
-        async () => {
-          hasCompleted = true;
-          await finalizeSend();
-
-          const notificationMsg = getNotificationMessage('CHAT_SEND_SUCCESS');
-          deps.showSuccess(notificationMsg.title, notificationMsg.message);
-        },
-        async (error: string) => {
-          isCancelled = error === '请求已取消';
-          await finalizeSend();
-
-          const msg = deps.messages.value.find(m => m.id === assistantMessageId);
-          if (!msg) return;
-
-          if (isCancelled) {
-            if (!msg.content.trim()) {
-              msg.content = '已停止生成';
-            }
-            return;
-          }
-
-          msg.content = `错误: ${error}`;
-          const notificationMsg = getNotificationMessage('CHAT_SEND_FAILED', { error });
-          deps.showError(notificationMsg.title, notificationMsg.message);
-        },
-        undefined,
-        systemMessages.length > 0 ? systemMessages : undefined
-      );
-    } catch (err) {
-      if (hasCompleted || isCancelled) {
-        return;
-      }
-
-      clearFlushTimer();
-      streamBuffer = '';
+      await useCase.execute(content);
+    } finally {
       isSending.value = false;
-      const msg = deps.messages.value.find(m => m.id === assistantMessageId);
-      if (!msg) return;
-
-      const errorMessage = err instanceof Error ? err.message : '发送失败';
-      if (errorMessage === '请求已取消') {
-        if (!msg.content.trim()) {
-          msg.content = '已停止生成';
-        }
-        await deps.saveConversation();
-        return;
-      }
-
-      msg.content = `错误: ${errorMessage}`;
-      await deps.saveConversation();
-      const notificationMsg = getNotificationMessage('CHAT_SEND_FAILED', { error: errorMessage });
-      deps.showError(notificationMsg.title, notificationMsg.message);
     }
   };
 

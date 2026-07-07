@@ -1,9 +1,12 @@
 import { ref, computed } from 'vue';
 import type { KnowledgeBase, KnowledgeEntry } from '../types';
-import { STORAGE_KEYS, DEFAULT_KNOWLEDGE_BASES } from '../constants';
-import { getStorage, setStorage } from '@/utils/storage';
+import { DEFAULT_KNOWLEDGE_BASES } from '../constants';
 import { generalLogger } from '../modules/debug';
-import type { AICharacter } from '../types';
+import {
+  loadKnowledgeBases as loadKnowledgeBasesFromRepository,
+  saveKnowledgeBases as saveKnowledgeBasesToRepository,
+} from '@/repositories/knowledgeBaseRepository';
+import { clearKnowledgeBaseReferenceFromAICharacters } from '@/repositories/characterRepository';
 
 /**
  * 知识库管理 Composable
@@ -30,10 +33,7 @@ export function useKnowledgeBases() {
   const loadKnowledgeBases = async (): Promise<boolean> => {
     isLoading.value = true;
     try {
-      const saved = await getStorage<KnowledgeBase[]>(STORAGE_KEYS.KNOWLEDGE_BASES, [...DEFAULT_KNOWLEDGE_BASES]);
-      if (saved && Array.isArray(saved)) {
-        knowledgeBases.value = saved;
-      }
+      knowledgeBases.value = await loadKnowledgeBasesFromRepository();
       error.value = null;
       return true;
     } catch (err) {
@@ -51,7 +51,7 @@ export function useKnowledgeBases() {
    */
   const saveKnowledgeBases = async (): Promise<boolean> => {
     try {
-      await setStorage(STORAGE_KEYS.KNOWLEDGE_BASES, knowledgeBases.value);
+      await saveKnowledgeBasesToRepository(knowledgeBases.value);
       error.value = null;
       return true;
     } catch (err) {
@@ -111,18 +111,8 @@ export function useKnowledgeBases() {
     const initialLength = knowledgeBases.value.length;
     knowledgeBases.value = knowledgeBases.value.filter(kb => kb.id !== id);
     if (knowledgeBases.value.length < initialLength) {
-      const aiCharacters = await getStorage<AICharacter[]>(STORAGE_KEYS.AI_CHARACTERS, []);
-      const normalizedAICharacters = (Array.isArray(aiCharacters) ? aiCharacters : []).map(character =>
-        character.knowledgeBaseId === id
-          ? { ...character, knowledgeBaseId: undefined }
-          : character
-      );
-      const aiCharactersChanged = normalizedAICharacters.some((character, index) => character !== aiCharacters[index]);
-
       await saveKnowledgeBases();
-      if (aiCharactersChanged) {
-        await setStorage(STORAGE_KEYS.AI_CHARACTERS, normalizedAICharacters);
-      }
+      await clearKnowledgeBaseReferenceFromAICharacters(id);
       // 如果删除的是当前选中的知识库，清空选中状态
       if (selectedKnowledgeBaseId.value === id) {
         selectedKnowledgeBaseId.value = null;

@@ -1,18 +1,28 @@
 # 调试系统模块
 
-提供调试日志记录和分类管理功能。
+调试系统模块提供分类日志、日志历史和调试开关，主要用于开发期观察 API、Prompt、会话等内部流程。
 
 ## 功能特性
 
-- **分类日志**：API、PRESET、PROMPT、CONVERSATION、SYSTEM、GENERAL
-- **日志级别**：log、warn、error、info
-- **历史记录**：最多保留 100 条日志
-- **分组显示**：支持展开/折叠分组显示复杂对象
-- **调试模式**：全局开关，关闭时不记录日志
+- 分类日志：`API`、`PRESET`、`PROMPT`、`CONVERSATION`、`SYSTEM`、`GENERAL`
+- 日志级别：`log`、`warn`、`error`、`info`
+- 历史记录：最多保留 100 条日志
+- 分组显示：支持展开 / 折叠复杂对象
+- 调试模式：全局开关，关闭时不记录日志
+- 便捷分类方法：如 `logApi`、`logPrompt`、`logConversationInfo`
 
-## API
+## 主要文件
 
-### Logger 模块
+```txt
+src/modules/debug/
+├── index.ts
+├── logger.ts
+├── categories.ts
+├── types.ts
+└── README.md
+```
+
+## 模块入口
 
 ```typescript
 import {
@@ -25,33 +35,59 @@ import {
   clearLogHistory,
   exportLogHistory,
   showDebugHelp,
-} from '@/modules/debug/logger'
+  logApi,
+  logApiWarn,
+  logApiError,
+  logPrompt,
+  logPromptWarn,
+  logConversation,
+  logConversationInfo,
+  logSystem,
+  logSystemWarn,
+  logSystemError,
+} from '@/modules/debug'
+```
 
-// 设置调试模式
+也可以直接使用：
+
+```typescript
+import { useDebugLogger } from '@/composables/useDebugLogger'
+```
+
+## 基本用法
+
+```typescript
+import { setDebugMode, logApi, logApiError } from '@/modules/debug'
+
 setDebugMode(true)
 
-// 记录日志
+logApi('请求发送', { url: '/api/models' })
+
+try {
+  // ...
+} catch (error) {
+  logApiError('请求失败', error)
+}
+```
+
+## Logger API
+
+```typescript
+setDebugMode(true)
+
 log('log', 'API', 'API 请求发送', { url: 'https://api.example.com' })
 log('error', 'API', '请求失败', error)
 
-// 分组显示
 logGroup('PRESET', '当前预设', preset)
 logGroupCollapsed('API', 'API 响应', response)
 
-// 获取日志历史
 const history = getLogHistory()
-
-// 清空日志
 clearLogHistory()
-
-// 导出日志
 exportLogHistory()
-
-// 显示帮助
 showDebugHelp()
 ```
 
-### useDebugLogger Composable
+## useDebugLogger
 
 ```typescript
 import { useDebugLogger } from '@/composables/useDebugLogger'
@@ -59,30 +95,25 @@ import { useDebugLogger } from '@/composables/useDebugLogger'
 const {
   debugMode,
   logHistory,
-  logApi,           // API 日志
-  logApiWarn,       // API 警告
-  logApiError,      // API 错误
-  logPreset,        // 预设日志
-  logPresetWarn,    // 预设警告
-  logCurrentPreset, // 当前预设
-  logPrompt,        // 提示词日志
-  logPromptWarn,    // 提示词警告
-  logSystemPrompt,  // 系统提示词
-  logKnowledgeBase, // 知识库
-  logConversation,  // 会话日志
-  logConversationInfo, // 会话信息
-  logSystem,        // 系统日志
-  logSystemWarn,    // 系统警告
-  logSystemError,   // 系统错误
+  logApi,
+  logApiWarn,
+  logApiError,
+  logPreset,
+  logPresetWarn,
+  logCurrentPreset,
+  logPrompt,
+  logPromptWarn,
+  logSystemPrompt,
+  logKnowledgeBase,
+  logConversation,
+  logConversationInfo,
+  logSystem,
+  logSystemWarn,
+  logSystemError,
   clearLogHistory,
   exportLogHistory,
   showDebugHelp,
 } = useDebugLogger()
-
-// 使用便捷方法
-logApi('请求发送', { url, method })
-logApiError('请求失败', error)
-logCurrentPreset(preset)
 ```
 
 ## 分类
@@ -98,12 +129,12 @@ logCurrentPreset(preset)
 
 ## 日志级别
 
-| 级别 | 颜色 | 用途 |
-|------|------|------|
-| log | indigo-500 | 普通日志 |
-| warn | amber-500 | 警告 |
-| error | red-500 | 错误 |
-| info | blue-500 | 信息 |
+| 级别 | 用途 |
+|------|------|
+| log | 普通日志 |
+| warn | 警告 |
+| error | 错误 |
+| info | 信息 |
 
 ## 类型
 
@@ -120,35 +151,16 @@ interface DebugLogItem {
 }
 ```
 
-## 配置
+## 适用场景
 
-```typescript
-const MAX_LOG_HISTORY = 100  // 最大日志数量
-```
+- API 请求 / 响应排查
+- Prompt 构建排查
+- 会话保存和加载排查
+- 设置和预设切换排查
+- 开发期临时观察内部状态
 
-## 使用示例
+## 注意事项
 
-```vue
-<script setup lang="ts">
-import { useDebugLogger } from '@/composables/useDebugLogger'
-import { onMounted } from 'vue'
-
-const { logApi, logApiError, debugMode } = useDebugLogger()
-
-async function fetchData() {
-  logApi('开始请求数据')
-  try {
-    const response = await fetch('https://api.example.com')
-    logApi('请求成功', { status: response.status })
-  } catch (error) {
-    logApiError('请求失败', error)
-  }
-}
-
-onMounted(() => {
-  if (debugMode.value) {
-    console.log('调试模式已启用')
-  }
-})
-</script>
-```
+- 调试日志面向开发期，不应作为用户可见错误提示。
+- 不要在日志中主动打印完整 API Key。
+- 生产环境若关闭 debug mode，日志不会记录。

@@ -1,13 +1,52 @@
 # API 预设模块
 
-提供 API 预设的 CRUD 管理功能，支持模型配置和代理设置。
+API 预设模块负责管理 OpenAI 兼容上游接口配置，包括 base URL、API Key、模型和生成参数。
+
+当前项目的真实请求链路是：
+
+```txt
+ApiPresetPage / useApiPresets
+  -> src/api/models.ts / src/api/chat.ts
+    -> 本地 /api 代理
+      -> server/index.ts
+        -> 上游 OpenAI-compatible API
+```
+
+因此 API 预设保存的是“上游配置”，请求会通过内建后端代理转发，不再维护旧版 query/header proxy 配置。
 
 ## 功能特性
 
-- **CRUD 操作**：创建、读取、更新、删除预设
-- **模型管理**：支持模型列表管理和参数配置
-- **代理支持**：支持 query 和 header 两种代理类型
-- **持久化存储**：自动保存到 IndexedDB
+- 预设 CRUD：创建、读取、更新、删除、重命名。
+- 当前预设选择：保存并恢复选中的预设 ID。
+- 表单适配：将预设数据映射为页面表单数据。
+- 模型配置：保存模型名、stream 开关、temperature、上下文和输出 token 参数。
+- 内建后端状态：页面表单会检查 `/api/health`。
+- 持久化存储：通过 `apiPresetRepository` 读写本地存储。
+
+## 主要文件
+
+```txt
+src/modules/api-preset/
+├── index.ts
+├── types.ts
+├── useApiPresets.ts
+├── components/
+│   ├── ApiConfigForm.vue
+│   ├── ModelSelector.vue
+│   ├── ParameterSettings.vue
+│   └── PresetSelector.vue
+└── README.md
+```
+
+相关文件：
+
+```txt
+src/components/ApiPresetPage.vue
+src/repositories/apiPresetRepository.ts
+src/api/models.ts
+src/api/chat.ts
+server/index.ts
+```
 
 ## API
 
@@ -17,65 +56,71 @@
 import { useApiPresets } from '@/modules/api-preset'
 
 const {
-  presets,              // 预设列表
-  selectedPreset,       // 选中的预设 ID
-  currentPreset,        // 当前预设对象
-  showNewPresetDialog,  // 显示新建对话框
-  showRenameDialog,     // 显示重命名对话框
-  ConfirmDialog,        // 确认对话框组件
-  // 方法
-  loadPresets,          // 加载预设
-  loadSelectedPreset,   // 加载选中的预设
-  selectPreset,         // 选择预设
-  saveCurrentPreset,    // 保存当前预设
-  createNewPreset,      // 创建新预设
-  deletePreset,         // 删除预设
-  openRenameDialog,     // 打开重命名对话框
-  renamePreset,         // 重命名预设
-  loadPresetToForm,     // 加载预设到表单
-  onPresetChange,       // 监听预设变化
-} = useApiPresets()
+  presets,
+  selectedPreset,
+  currentPreset,
+  showNewPresetDialog,
+  showRenameDialog,
+  newPresetName,
+  renamePresetName,
+  canCreatePreset,
+  canRenamePreset,
+  confirmDialogProps,
+  ConfirmDialog,
 
-// 保存当前预设
-saveCurrentPreset({
+  loadPresets,
+  loadSelectedPreset,
+  selectPreset,
+  saveCurrentPreset,
+  createNewPreset,
+  deletePreset,
+  handleConfirmDelete,
+  openRenameDialog,
+  renamePreset,
+  openCreateNewDialog,
+  loadPresetToForm,
+  createDefaultPresetFormData,
+  cancelDelete,
+  onPresetChange,
+} = useApiPresets()
+```
+
+常用操作：
+
+```typescript
+await loadPresets()
+await loadSelectedPreset()
+
+await selectPreset('default')
+
+await saveCurrentPreset({
   url: 'https://api.openai.com/v1',
   apiKey: 'sk-xxx',
-  model: 'gpt-4',
+  model: 'gpt-4o-mini',
   streamEnabled: true,
   temperature: 0.7,
-  maxTokens: 2048,
-  maxOutputTokens: 4096,
-  proxy: {
-    enabled: false,
-    url: '',
-    type: 'query',
-    targetEndpoint: '',
-  },
+  maxTokens: 8192,
+  maxOutputTokens: 2048,
 })
 
-// 创建新预设
 openCreateNewDialog()
-createNewPreset(formData)
+await createNewPreset()
 
-// 删除预设
 deletePreset('preset-id')
-
-// 监听预设变化
-onPresetChange((preset) => {
-  console.log('预设已切换:', preset)
-})
+await handleConfirmDelete()
 ```
 
 ## 类型
 
 ```typescript
-type ProxyType = 'query' | 'header'
-
-interface ProxyConfig {
-  enabled: boolean;
+interface ApiConfig {
   url: string;
-  type: ProxyType;
-  targetEndpoint?: string;
+  apiKey: string;
+  model: string;
+  streamEnabled: boolean;
+  temperature: number;
+  maxTokens: number;
+  maxOutputTokens: number;
 }
 
 interface Preset {
@@ -88,7 +133,6 @@ interface Preset {
   temperature: number;
   maxTokens: number;
   maxOutputTokens: number;
-  proxy: ProxyConfig;
   createdAt: number;
   updatedAt: number;
 }
@@ -101,7 +145,6 @@ interface PresetFormData {
   temperature: number;
   maxTokens: number;
   maxOutputTokens: number;
-  proxy: ProxyConfig;
 }
 ```
 
@@ -109,57 +152,85 @@ interface PresetFormData {
 
 ### ApiConfigForm
 
-API 配置表单组件，用于编辑预设配置。
+API 配置表单组件。
+
+职责：
+
+- 编辑上游 URL。
+- 编辑 API Key。
+- 检查内建后端 `/api/health` 状态。
+- 校验 URL 格式。
 
 ### ModelSelector
 
-模型选择器组件，用于选择和配置模型。
+模型选择器组件。
+
+职责：
+
+- 展示模型列表。
+- 支持手动输入模型名。
+- 触发模型加载。
+- 触发连接测试。
+
+### ParameterSettings
+
+参数设置组件。
+
+职责：
+
+- stream 开关。
+- temperature。
+- maxTokens。
+- maxOutputTokens。
 
 ### PresetSelector
 
-预设选择器组件，用于选择预设。
+预设选择器组件。
 
-## 使用示例
+职责：
 
-```vue
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useApiPresets } from '@/modules/api-preset'
+- 切换预设。
+- 创建预设。
+- 重命名预设。
+- 删除预设。
 
-const {
-  presets,
-  selectedPreset,
-  selectPreset,
-  saveCurrentPreset,
-} = useApiPresets()
+## 后端代理接口
 
-const formData = ref({
-  url: '',
-  apiKey: '',
-  model: '',
-  streamEnabled: true,
-  temperature: 0.7,
-  maxTokens: 2048,
-  maxOutputTokens: 4096,
-  proxy: {
-    enabled: false,
-    url: '',
-    type: 'query',
-    targetEndpoint: '',
-  },
-})
+API 预设相关页面会间接使用这些后端接口：
 
-function handleSave() {
-  saveCurrentPreset(formData.value)
-}
-</script>
+```txt
+GET  /api/health
+GET  /api/models
+POST /api/models
+POST /api/connection-test
+POST /api/chat/completions
+```
 
-<template>
-  <select v-model="selectedPreset" @change="selectPreset(selectedPreset)">
-    <option v-for="p in presets" :key="p.id" :value="p.id">
-      {{ p.name }}
-    </option>
-  </select>
-  <button @click="handleSave">保存</button>
-</template>
+注意：
+
+- `baseURL` 会由后端校验，只允许 `http` / `https`。
+- 默认在后端绑定本机时允许本机 / 内网上游。
+- 如果后端绑定公网地址，默认禁止本机 / 内网上游。
+- 如确有需要，可通过 `ALLOW_PRIVATE_UPSTREAMS=true` 显式允许。
+
+## 开发注意事项
+
+- 不要恢复旧版 `proxy` 字段；当前类型中没有 `proxy`。
+- API Key 不应写死在代码中。
+- 页面不应直接读写 storage key，统一走 repository / composable。
+- 连接测试和模型加载应通过内建 `/api` 代理执行。
+
+## 验证建议
+
+修改 API 预设模块后建议运行：
+
+```bash
+npm run test:run
+npm run build
+```
+
+如果涉及聊天发送或后端代理，再运行：
+
+```bash
+npm run health-check
 ```

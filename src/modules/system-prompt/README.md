@@ -1,216 +1,86 @@
-# 系统提示词构建模块 (System Prompt Builder)
+# 系统提示词构建模块
 
-一个用于动态构建 OpenAI 格式提示词的 Vue 3 + TypeScript 模块。
+系统提示词构建模块负责把 Prompt 预设、角色、用户设定、知识库、聊天历史、用户当前输入和压缩摘要组合成 OpenAI Chat API 格式的 `messages` 数组。
+
+它是聊天真实发送和 Prompt 预览的底层构建能力。
 
 ## 功能特性
 
-### 核心功能
+- 根据 Prompt 预设动态构建 `messages`。
+- 自动填充特殊条目：角色设定、用户设定、知识库、聊天历史、用户指令。
+- 支持会话压缩摘要注入。
+- 支持 `insertPosition` 排序。
+- 支持 `system` / `user` / `assistant` 三种角色类型。
+- 支持消息合并：`none` / `adjacent` / `all`。
+- 提供粗略 token 估算。
+- 返回构建元数据，方便 Prompt 预览和调试。
 
-- **动态提示词构建**: 根据提示词预设中的条目自动构建 OpenAI 格式的 messages 数组
-- **智能内容填充**: 自动识别并填充特殊条目（角色设定、用户设定、知识库、聊天历史）
-- **灵活排序**: 支持通过 `insertPosition` 自定义条目顺序
-- **角色类型支持**: 支持 `system`、`user`、`assistant` 三种角色类型
-- **消息合并**: 支持合并相邻同类型消息，减少 token 消耗
-- **Token 估算**: 提供粗略的 token 数量估算功能
+## 目录结构
 
-### 特殊条目
+```txt
+src/modules/system-prompt/
+├── index.ts
+├── types.ts
+├── core/
+│   ├── index.ts
+│   ├── builder.ts
+│   ├── content-filler.ts
+│   └── merger.ts
+├── utils/
+│   ├── index.ts
+│   └── constants.ts
+├── __tests__/
+│   └── builder.test.ts
+├── README.md
+├── USAGE.md
+└── SUMMARY.md
+```
+
+## 快速开始
+
+```typescript
+import { buildSystemPrompt } from '@/modules/system-prompt'
+
+const result = buildSystemPrompt({
+  preset: promptPreset,
+  aiCharacter,
+  userCharacter,
+  knowledgeBases,
+  chatHistory: messages,
+  userInstruction: userInput,
+  compressionSummary,
+  mergeMode: 'adjacent',
+  filterEmptyPrompts: true,
+})
+
+console.log(result.messages)
+console.log(result.estimatedTokens)
+console.log(result.metadata)
+```
+
+## 特殊条目自动填充
 
 以下条目名称会被自动识别并填充内容：
 
 | 条目名称 | 占位符类型 | 数据来源 | 描述 |
 |---------|-----------|---------|------|
-| 角色设定 | character | aiCharacter | AI 角色的人设和性格 |
-| 用户设定 | user | userCharacter | 用户的身份信息 |
-| 知识库 | knowledge | knowledgeBases | 知识库中的已启用条目 |
-| 聊天历史 | chat-history | chatHistory | 对话历史记录 |
-| 用户指令 | user-instruction | userInstruction | 当前用户输入的指令 |
+| 角色设定 | `character` | `aiCharacter` | AI 角色的人设和性格 |
+| 用户设定 | `user` | `userCharacter` | 用户身份信息 |
+| 知识库 | `knowledge` | `knowledgeBases` | 全局启用知识库中的已启用条目 |
+| 聊天历史 | `chat-history` | `chatHistory` | 对话历史记录 |
+| 用户指令 | `user-instruction` | `userInstruction` | 当前用户输入 |
 
-## 目录结构
-
-```
-src/modules/system-prompt/
-├── index.ts                    # 模块入口
-├── types.ts                    # 类型定义
-├── core/
-│   ├── index.ts               # 核心功能导出
-│   ├── builder.ts             # 核心构建器
-│   ├── content-filler.ts      # 内容填充器
-│   └── merger.ts              # 消息合并器
-├── utils/
-│   ├── index.ts               # 工具函数
-│   └── constants.ts           # 常量定义
-├── __tests__/
-│   └── example.test.ts        # 使用示例
-├── USAGE.md                   # 使用文档
-└── README.md                  # 本文件
-```
-
-## 快速开始
-
-### 基本用法
-
-```typescript
-import { buildSystemPrompt } from '@/modules/system-prompt';
-
-const result = buildSystemPrompt({
-  preset: promptPreset,           // 提示词预设
-  aiCharacter: character,         // AI 角色（可选）
-  userCharacter: user,            // 用户角色（可选）
-  knowledgeBases: knowledgeBases, // 知识库列表（可选）
-  chatHistory: messages,          // 聊天历史（可选）
-  mergeMode: 'adjacent',          // 合并模式：'none' | 'adjacent' | 'all'
-  filterEmptyPrompts: true,       // 是否过滤空的 prompt
-});
-
-// 使用构建的 messages 数组
-console.log(result.messages);      // OpenAI 格式的 messages 数组
-console.log(result.estimatedTokens); // 估算的 token 数量
-```
-
-### 在聊天页面中使用
-
-```typescript
-<script setup lang="ts">
-import { buildSystemPrompt } from '@/modules/system-prompt';
-import { useCharacters } from '@/composables/useCharacters';
-import { useKnowledgeBases } from '@/composables/useKnowledgeBases';
-import { usePromptPresets } from '@/composables/usePromptPresets';
-
-const { selectedAICharacter, selectedUserCharacter } = useCharacters();
-const { knowledgeBases } = useKnowledgeBases();
-const { selectedPreset } = usePromptPresets();
-
-// 构建系统提示词
-const buildMessages = () => {
-  const result = buildSystemPrompt({
-    preset: selectedPreset.value,
-    aiCharacter: selectedAICharacter.value,
-    userCharacter: selectedUserCharacter.value,
-    knowledgeBases: knowledgeBases.value,
-    chatHistory: conversation.value.messages,
-    mergeMode: 'adjacent',
-  });
-
-  return result.messages;
-};
-
-// 发送消息
-const sendMessage = async (userMessage: string) => {
-  const messages = buildMessages();
-
-  // 添加用户消息
-  messages.push({
-    role: 'user',
-    content: userMessage,
-  });
-
-  // 调用 API
-  const response = await fetchChatCompletion(messages);
-  // ...
-};
-</script>
-```
+此外，`compressionSummary` 会在构建开始时作为 system message 注入。
 
 ## API 参考
 
-### buildSystemPrompt(config: SystemPromptConfig): SystemPromptResult
-
-构建系统提示词的核心函数。
-
-**参数：**
-
-| 参数 | 类型 | 必填 | 默认值 | 描述 |
-|-----|------|------|--------|------|
-| preset | PromptPreset | 是 | - | 提示词预设 |
-| aiCharacter | AICharacter | 否 | - | AI 角色 |
-| userCharacter | UserCharacter | 否 | - | 用户角色 |
-| knowledgeBases | KnowledgeBase[] | 否 | - | 知识库列表 |
-| chatHistory | Message[] | 否 | - | 聊天历史 |
-| userInstruction | string | 否 | - | 当前用户输入的指令 |
-| mergeMode | MergeMode | 否 | 'adjacent' | 合并模式 |
-| filterEmptyPrompts | boolean | 否 | true | 是否过滤空的 prompt |
-
-**返回值：**
-
-| 属性 | 类型 | 描述 |
-|-----|------|------|
-| messages | ChatMessage[] | 构建后的 messages 数组 |
-| usedItemIds | string[] | 使用的条目 ID 列表 |
-| skippedItemIds | string[] | 被跳过的条目 ID 列表 |
-| chatHistoryCount | number | 聊天历史消息数量 |
-| userInstructionIncluded | boolean | 是否包含用户指令 |
-| estimatedTokens | number | 总 token 数估算 |
-| metadata | BuildMetadata | 构建元数据 |
-
-### 工具函数
-
-#### estimateTokens(text: string): number
-
-估算文本的 token 数量（粗略估算：1 token ≈ 4 字符）。
+### buildSystemPrompt(config)
 
 ```typescript
-const tokenCount = estimateTokens('这是一段文本');
+function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResult
 ```
 
-#### estimateMessagesTokens(messages: ChatMessage[]): number
-
-估算 messages 数组的总 token 数量。
-
-```typescript
-const totalTokens = estimateMessagesTokens(messages);
-```
-
-#### normalizeContent(content: string): string
-
-格式化内容（去除首尾空白，规范化换行）。
-
-```typescript
-const normalized = normalizeContent('  Hello\nWorld  ');
-// 结果: 'Hello\nWorld'
-```
-
-#### isContentEmpty(content: string): boolean
-
-检查内容是否为空（只包含空白字符）。
-
-```typescript
-const isEmpty = isContentEmpty('   ');
-// 结果: true
-```
-
-#### isValidRoleType(role: string): boolean
-
-验证角色类型是否有效。
-
-```typescript
-const isValid = isValidRoleType('system');
-// 结果: true
-```
-
-### 消息合并
-
-#### mergeMessages(messages: ChatMessage[], mode: MergeMode): MergeResult
-
-根据合并模式合并消息。
-
-**合并模式：**
-
-| 模式 | 描述 |
-|-----|------|
-| none | 不合并 |
-| adjacent | 合并相邻同类型的消息（推荐） |
-| all | 合并所有消息到一个 system 消息中 |
-
-```typescript
-const result = mergeMessages(messages, 'adjacent');
-console.log('Merged messages:', result.messages);
-console.log('Merge count:', result.mergeCount);
-console.log('Saved messages:', result.savedMessages);
-```
-
-## 类型定义
-
-### SystemPromptConfig
+参数：
 
 ```typescript
 interface SystemPromptConfig {
@@ -220,12 +90,13 @@ interface SystemPromptConfig {
   knowledgeBases?: KnowledgeBase[];
   chatHistory?: Message[];
   userInstruction?: string;
+  compressionSummary?: string;
   mergeMode?: MergeMode;
   filterEmptyPrompts?: boolean;
 }
 ```
 
-### SystemPromptResult
+返回：
 
 ```typescript
 interface SystemPromptResult {
@@ -242,36 +113,89 @@ interface SystemPromptResult {
 ### MergeMode
 
 ```typescript
-type MergeMode = 'none' | 'adjacent' | 'all';
+type MergeMode = 'none' | 'adjacent' | 'all'
+```
+
+| 模式 | 描述 |
+|------|------|
+| `none` | 不合并 |
+| `adjacent` | 合并相邻同类型消息，推荐默认值 |
+| `all` | 合并所有消息到一个 system message 中 |
+
+### 工具函数
+
+```typescript
+estimateTokens(text: string): number
+estimateMessagesTokens(messages: ChatMessage[]): number
+normalizeContent(content: string): string
+isContentEmpty(content: string): boolean
+isValidRoleType(role: string): boolean
+mergeMessages(messages: ChatMessage[], mode: MergeMode): MergeResult
+```
+
+## 构建流程
+
+1. 读取配置并设置默认值。
+2. 如存在 `compressionSummary`，先注入 system message。
+3. 按 `insertPosition` 对预设条目排序。
+4. 跳过未启用条目。
+5. 对特殊条目执行内容填充。
+6. 将聊天历史和用户指令转换为独立 message。
+7. 根据配置过滤空内容。
+8. 按 `mergeMode` 合并消息。
+9. 估算 token。
+10. 返回 messages、使用条目、跳过条目和元数据。
+
+## 在聊天模块中的位置
+
+聊天模块不应在页面中直接调用底层 builder。
+
+当前推荐链路：
+
+```txt
+ChatPage.vue
+  -> useChatPageViewModel
+    -> useChatPromptController / useChatSendFlow
+      -> buildSystemMessagesUseCase
+        -> buildSystemPrompt
+```
+
+相关文件：
+
+```txt
+src/features/chat/application/buildSystemMessages.usecase.ts
+src/composables/useChatPromptBuilder.ts
+src/features/chat/presentation/useChatPromptController.ts
 ```
 
 ## 设计原则
 
-1. **类型安全**: 使用 TypeScript 严格模式，提供完整的类型定义
-2. **灵活性**: 支持多种配置选项，适应不同场景
-3. **可测试性**: 模块化设计，便于单元测试
-4. **可扩展性**: 易于添加新的占位符类型和功能
-5. **性能优化**: 提供消息合并功能，减少 token 消耗
+1. 类型安全：所有输入输出都有 TypeScript 类型。
+2. 可测试：核心构建逻辑不依赖 Vue 和 DOM。
+3. 单一职责：只负责构建 messages，不负责请求 API。
+4. 可解释：返回 metadata 供 UI 展示和调试。
+5. 可扩展：可继续增加特殊占位符和合并策略。
 
 ## 注意事项
 
-1. Token 估算是粗略的，实际 token 数量可能会有差异
-2. 知识库只收集全局启用的知识库中的已启用条目
-3. 聊天历史条目会被拆分为多个消息，每个消息保留原始类型
-4. 条目按 `insertPosition` 排序，数字越小越靠前
-5. 未启用或内容为空的条目会被跳过
-6. 用户指令会作为特殊占位符 `user-instruction` 填充，适合用于动态插入用户当前输入
-7. BuildMetadata 中的 `filledPlaceholders` 记录了每个特殊占位符的填充结果
+- token 估算是粗略估算，不等于真实模型 tokenizer 结果。
+- 知识库只收集全局启用知识库中的已启用条目。
+- 聊天历史条目会拆为多个 message，并保留 user / assistant 角色。
+- `insertPosition` 数字越小越靠前，缺省值靠后。
+- 未启用或空内容条目会进入 `skippedItemIds`。
+- 不要在页面层直接拼接 system prompt。
 
-## 未来改进
+## 验证建议
 
-- 支持自定义占位符类型
-- 支持更精确的 token 计算
-- 支持上下文窗口限制管理
-- 支持提示词模板系统
-- 支持多语言提示词
+修改本模块后运行：
 
-## 相关文档
+```bash
+npm run test:run
+npm run build
+```
 
-- [使用示例 (USAGE.md)](./USAGE.md)
-- [示例测试 (__tests__/example.test.ts)](./__tests__/example.test.ts)
+如果涉及聊天发送链路，再运行：
+
+```bash
+npm run check:architecture
+```

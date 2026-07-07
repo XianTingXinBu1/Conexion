@@ -1,208 +1,272 @@
 # ChatPage 重构蓝图
 
-这份文档不追求大而全，只回答一个问题：
+这份文档记录 `src/components/ChatPage.vue` 当前状态和后续重构方向。
 
-**`src/components/ChatPage.vue` 该怎么继续拆，才不容易把现有行为拆坏。**
+## 当前状态
 
----
+`ChatPage.vue` 已经不再是早期的大型业务页面。
 
-## 现在是什么情况
+当前职责：
 
-`ChatPage.vue` 还是这个项目里最重的页面。
+- 调用 `useChatPageViewModel(props)`。
+- 渲染聊天头部、消息列表、输入框、Token 详情、编辑弹窗、Prompt 预览、删除确认。
+- 绑定页面事件。
 
-虽然已经先拆出去两块：
+当前主要业务逻辑已经迁出到：
 
-- `useChatViewport`
-- `useChatStats`
+```txt
+src/features/chat/presentation/useChatPageViewModel.ts
+src/features/chat/presentation/useChatSessionFacade.ts
+src/features/chat/presentation/useChatCompressionController.ts
+src/features/chat/presentation/useChatPromptController.ts
+src/features/chat/presentation/useChatLifecycleController.ts
+src/composables/useChatSendFlow.ts
+src/features/chat/application/sendMessage.usecase.ts
+src/features/chat/application/buildSystemMessages.usecase.ts
+src/features/chat/application/streamMessageAssembler.ts
+```
 
-但它现在仍然负责：
+## 已完成的重构
 
-- 页面初始化
-- 会话装配
-- Prompt 预览与构建
-- 发送消息主流程
-- regex 处理
-- streaming 更新
-- 编辑 / 删除消息
-- 一堆页面内状态切换
+### 1. ChatPage 瘦身
 
-所以它已经比以前轻了一点，但还远远没到“只是装配层”的程度。
+`ChatPage.vue` 当前主要是 View，不再直接承担：
 
----
+- 会话存储读写
+- Prompt 构建
+- regex 加载和应用
+- streaming 组装
+- 发送主流程
+- 压缩主流程
 
-## 已经拆出去的部分
+### 2. Prompt 构建入口统一
 
-### `useChatViewport`
+真实发送和 Prompt 预览都经由：
 
-负责：
+```txt
+src/features/chat/application/buildSystemMessages.usecase.ts
+```
 
-- 消息显示窗口
-- 历史消息分段加载
-- 加载更多
-- 滚动到底部
-- 保持加载前后的滚动位置
+底层使用：
 
-这块本身偏 UI 协调，先拆它是对的，风险也相对低。
+```txt
+src/modules/system-prompt/core/builder.ts
+```
 
-### `useChatStats`
+### 3. 会话行为收口
 
-负责：
+聊天页会话相关行为已收口到：
 
-- 当前上下文计数
-- 最大上下文长度
-- 用户 / AI token 统计
-- 消息数量统计
+```txt
+src/features/chat/presentation/useChatSessionFacade.ts
+```
 
-这块是纯派生逻辑，越早挪出去越划算。
-
----
-
-## 现在还留在页面里的重头戏
-
-### 1. Prompt 相关
-
-页面里现在还在做：
-
-- 提示词预设加载
-- 当前预设选择
-- Prompt 预览
-- 真实发送时的 system prompt 构建
-
-这意味着：
-**预览逻辑和真实发送逻辑之间仍然可能重复。**
-
----
-
-### 2. 会话装配
-
-虽然底层存储已经开始走 `conversationRepository`，但页面本身还是要处理：
-
-- 当前会话加载
-- 新会话创建
-- 临时会话与已保存会话的区别
-- 编辑 / 删除消息后的页面回写
-
-这部分更像“页面适配层”，还没完全抽干净。
-
----
-
-### 3. 发送主流程
-
-这是最重的一块。
-
-现在页面里还直接串着这些步骤：
-
-- 用户输入处理
-- regex 处理
-- 用户消息入列
-- assistant 占位消息插入
-- system prompt 构建
-- chat history 组装
-- 调接口
-- streaming 更新 assistant 内容
-- 保存会话
-- 成功 / 失败通知
-
-这条链一旦动错，很容易引发细碎回归。
-
----
-
-## 为什么不建议一口气大拆
-
-因为 `ChatPage.vue` 不是单纯的“代码很多”，而是：
-
-- UI 状态
-- 业务状态
-- 持久化
-- streaming
-- prompt 构建
-- 页面副作用
-
-这些东西缠在一起。
-
-如果一口气拆成 5~7 个 composable，很可能只是把一团线搬到别的文件里，不是真的变清楚。
-
-所以更稳的思路是：
-**先拆纯派生和页面适配层，再碰发送编排。**
-
----
-
-## 建议的下一步
-
-### 第一优先：抽 Prompt 构建入口
-
-目标不是先动 UI，而是先把“预览”和“真实发送”共用的 Prompt 构建能力收成一个入口。
-
-理想状态：
-
-- 页面不再各写一套 system prompt 拼装逻辑
-- Preview 和 send 使用同一个 builder
-- `lastSystemMessages` / `lastSystemPromptResult` 这类结果可以从统一入口拿到
-
-这一步做完之后，后面拆发送链路会稳很多。
-
----
-
-### 第二优先：抽 `useChatSession`
-
-让页面层不再直接散着处理会话相关动作，而是有一个更像 adapter 的东西统一接住：
+它负责：
 
 - 加载会话
 - 创建会话
 - 保存会话
 - 编辑消息
 - 删除消息
-- 判断是不是临时会话
+- 判断是否允许会话压缩
 
-这一步的重点不是改底层存储，而是把页面上的会话动作收干净。
+### 4. 发送流程下沉
 
----
+发送主流程已进入：
 
-### 第三优先：最后再碰发送编排
+```txt
+src/features/chat/application/sendMessage.usecase.ts
+```
 
-可以考虑未来抽一个 `useChatFlow`，但不建议现在立刻动。
+它负责：
 
-原因很简单：
-如果 prompt、session、viewport 这些边界还没先收干净，`useChatFlow` 很容易变成另一个大杂烩。
+- 重置 usage
+- 加载 regex
+- 处理用户输入规则
+- 自动压缩判断
+- 创建 / 保存会话
+- 构建 system messages
+- 插入 assistant 占位消息
+- 驱动 stream 请求
+- 保存最终结果
 
-所以它应该是最后处理，而不是第一刀。
+### 5. 架构边界检查
 
----
+脚本：
 
-## 现在最值得盯的风险点
+```txt
+scripts/check-architecture-boundaries.js
+```
 
-### 1. `watch(messages, { deep: true })`
+命令：
 
-streaming 过程中每个 chunk 都可能触发显示窗口同步和滚动控制。
+```bash
+npm run check:architecture
+```
 
-短期内不一定有问题，但如果后面出现性能或滚动体验问题，这里大概率是第一热点。
+当前会限制：
 
-### 2. assistant streaming 期间反复跑 regex
+- `ChatPage.vue` 不直接依赖业务 composable / repository / service / module / api。
+- chat presentation 不直接访问 raw storage / constants。
+- chat application 不依赖 Vue / UI / storage / notification / composables。
 
-现在 assistant 内容在 streaming 过程中会不断叠加，再反复 apply 规则。
+## 当前仍值得关注的点
 
-如果规则不是幂等的，这里后面可能会出副作用。
+### 1. `useChatPageViewModel` 是新的装配中心
 
-这个问题值得记住，但不建议和当前重构一起动，不然会把“结构整理”和“行为变化”搅在一起。
+文件：
 
-### 3. 页面仍然承担太多装配工作
+```txt
+src/features/chat/presentation/useChatPageViewModel.ts
+```
 
-页面现在还是很多 `init/load/watch/handler` 的汇合点。
+它需要组装许多依赖，天然会偏长。
 
-所以接下来真正该追求的目标不是“继续减行数”本身，而是：
-**让 `ChatPage.vue` 逐步变成装配页，而不是业务总控页。**
+原则：
 
----
+- 可以做 composition root。
+- 不要写复杂业务规则。
+- 复杂流程继续下沉到 controller / facade / usecase。
 
-## 推荐顺序
+如果继续增长，可按区域拆出：
 
-如果继续做，建议按这个顺序：
+```txt
+useChatPageDataSources.ts
+useChatPageControllers.ts
+useChatPageUiState.ts
+```
 
-1. 统一 Prompt 构建入口
-2. 抽 `useChatSession`
-3. 再考虑 `useMessageEditor`
-4. 最后才抽 `useChatFlow`
+但只有在真的变复杂时再拆，避免空中楼阁。
 
-一句话总结就是：
+### 2. `useChatSendFlow` 仍在全局 composables
 
-**先拆稳的，再拆重的；先收边界，再动主流程。**
+文件：
+
+```txt
+src/composables/useChatSendFlow.ts
+```
+
+它现在是 Vue adapter，不是发送业务本体。
+
+后续可考虑迁到：
+
+```txt
+src/features/chat/presentation/useChatSendFlow.ts
+```
+
+收益：
+
+- 聊天专属逻辑更靠近 chat feature。
+- 全局 composables 更干净。
+
+风险：
+
+- 需要同步调整测试和 import。
+- 不应顺手改行为。
+
+建议作为独立小任务处理。
+
+### 3. stream 与 regex 的行为边界
+
+当前发送流程中：
+
+- 用户输入 regex 在 `SendMessageUseCase` 中处理。
+- assistant stream 内容由 `StreamMessageAssembler` 累积和 flush。
+
+需要注意：
+
+- assistant regex 应尽量保持幂等。
+- 不要在结构重构时混入 regex 行为变更。
+
+### 4. 自动压缩时机
+
+当前自动压缩由 `SendMessageUseCase` 在发送前判断。
+
+需要注意：
+
+- 压缩失败应中止发送并提示。
+- 压缩摘要参与 Prompt 构建。
+- 不要让 UI controller 和 usecase 各自判断一套压缩规则。
+
+## 后续建议路线
+
+### 第一阶段：只做边界清理
+
+目标：不改变行为，只移动和命名更清楚。
+
+建议任务：
+
+1. 将 `useChatSendFlow` 迁到 `features/chat/presentation`。
+2. 更新相关测试路径。
+3. 跑 `npm run test:run` 和 `npm run check:architecture`。
+
+### 第二阶段：继续瘦 ViewModel
+
+触发条件：
+
+- `useChatPageViewModel` 继续明显增长。
+- 新增功能需要更多依赖装配。
+
+可拆方向：
+
+- 数据源初始化
+- 控制器组装
+- UI 状态导出
+
+原则：
+
+- 不为拆而拆。
+- 拆出来的文件必须职责清晰。
+- 不要让多个文件互相传递一大坨未命名 deps。
+
+### 第三阶段：会话领域继续收口
+
+候选目标：
+
+```txt
+conversation application usecases
+conversation repository
+conversation presentation adapters
+```
+
+收益：
+
+- 会话列表页和聊天页共享更清晰的会话能力。
+- 降低 `useConversationManager` 与页面之间的耦合。
+
+### 第四阶段：页面级测试补强
+
+优先测试：
+
+- 发送消息成功路径
+- 发送取消路径
+- 发送失败路径
+- 自动压缩触发路径
+- Prompt 预览刷新路径
+
+## 不建议做的事
+
+- 不建议一口气把整个项目迁入 feature sliced 目录。
+- 不建议在迁文件时顺手改发送、压缩、regex 行为。
+- 不建议为了减少行数拆出无语义的 `utils`。
+- 不建议让 usecase 直接调用 notification、router、DOM scroll。
+
+## 验证命令
+
+聊天相关结构调整后建议运行：
+
+```bash
+npm run test:run
+npm run check:architecture
+npm run build
+```
+
+提交前可运行：
+
+```bash
+npm run health-check
+```
+
+## 一句话总结
+
+`ChatPage.vue` 的核心瘦身已经完成。下一步重点不是继续追求页面行数，而是防止 `useChatPageViewModel` 和 `useChatSendFlow` 变成新的耦合中心。

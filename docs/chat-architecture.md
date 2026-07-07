@@ -1,25 +1,31 @@
 # Chat Architecture
 
-本文档说明 Conexion 聊天模块重构后的分层、职责和边界规则。
+本文档说明 Conexion 当前聊天模块的分层、职责和边界规则。
 
-## 目标
+## 当前状态
 
-聊天模块遵循：
+聊天页已经从早期的“大页面总控”收敛为较薄的 View：
+
+```txt
+src/components/ChatPage.vue
+```
+
+当前核心分层：
 
 ```txt
 View -> ViewModel -> Controller/Facade -> UseCase -> Repository/Gateway -> Storage/API
 ```
 
-核心目标：
+目标：
 
-- 页面只渲染和绑定事件。
-- ViewModel 只做页面组合。
-- Controller/Facade 管一类页面行为。
+- 页面只负责渲染和事件绑定。
+- ViewModel 负责组装页面依赖。
+- Controller / Facade 管一类页面行为。
 - UseCase 承载可测试的业务流程。
-- Repository 是唯一接触存储 key/default 的入口。
+- Repository 是接触存储 key / default 的入口。
 - 架构边界由 `npm run check:architecture` 检查。
 
-## 当前关键文件
+## 关键文件
 
 ### View
 
@@ -38,7 +44,7 @@ src/components/ChatPage.vue
 
 - 不直接 import `@/utils/storage`。
 - 不直接 import `@/constants`。
-- 不直接 import repository/service/api/composable 业务细节。
+- 不直接 import repository / service / api / module / composable 业务细节。
 - 不写发送、压缩、prompt、会话保存逻辑。
 
 ### ViewModel
@@ -50,13 +56,14 @@ src/features/chat/presentation/useChatPageViewModel.ts
 职责：
 
 - 聊天页面的 composition root。
-- 组装 settings/theme/api/notifications/viewport/scroll/controller/facade/useChatSendFlow。
+- 组装 settings / theme / api / notifications / viewport / scroll / controller / facade / send flow。
 - 把多个 controller 暴露为页面模板需要的数据。
 
 注意：
 
-- ViewModel 可以较长，但不能写复杂业务规则。
-- 复杂业务必须下沉到 controller/usecase/repository。
+- ViewModel 可以承担装配职责。
+- 复杂业务规则不要写在 ViewModel 中。
+- 复杂业务应下沉到 controller / usecase / repository。
 
 ### Presentation Controllers / Facades
 
@@ -88,7 +95,10 @@ src/composables/useChatSendFlow.ts
 - 管理 `isSending`。
 - 将通知和 UI effect 分组传给 usecase。
 
-它不再直接承载完整发送业务流程。
+注意：
+
+- 它不应重新承载完整发送业务流程。
+- 后续可考虑迁入 `features/chat/presentation`，减少全局 composables 的聊天专属逻辑。
 
 ### Application UseCases
 
@@ -108,7 +118,7 @@ src/features/chat/application/buildSystemMessages.usecase.ts
 
 - 不 import Vue。
 - 不 import UI 组件。
-- 不 import notification/composables/storage。
+- 不 import notification / composables / storage。
 
 ### Repositories
 
@@ -122,7 +132,8 @@ src/repositories/apiPresetRepository.ts
 
 职责：
 
-- 唯一接触 `STORAGE_KEYS`、`DEFAULT_*`、`getStorage`、`setStorage` 的新存储适配层。
+- 作为新存储适配层。
+- 集中接触 `STORAGE_KEYS`、默认值、`getStorage`、`setStorage`。
 - 为 composables / controllers / usecases 提供语义化读写方法。
 
 ## 发送消息调用链
@@ -134,6 +145,7 @@ ChatPage.vue
       -> SendMessageUseCase.execute
         -> loadRegexRules
         -> apply user regex
+        -> auto compression if needed
         -> create/save conversation
         -> buildSystemMessagesUseCase
         -> sendStreamChatRequest
@@ -164,7 +176,28 @@ TokenDetailsPanel / compression warning
         -> saveConversation
 ```
 
-压缩通知只在 presentation controller 中处理，压缩核心逻辑仍在 composable/utility 层。
+压缩通知只在 presentation controller 中处理，压缩核心逻辑仍在 composable / utility 层。
+
+## API 代理链路
+
+前端 API client 不直接请求上游大模型接口，而是请求本地后端代理：
+
+```txt
+src/api/*
+  -> /api/*
+    -> server/index.ts
+      -> upstream OpenAI-compatible API
+```
+
+后端当前支持：
+
+```txt
+GET  /api/health
+GET  /api/models
+POST /api/models
+POST /api/connection-test
+POST /api/chat/completions
+```
 
 ## 架构边界检查
 
@@ -204,13 +237,13 @@ npm run health-check
 
 ### 新 UI
 
-放在：
+优先放在：
 
 ```txt
 src/components/chat/
 ```
 
-或后续迁到：
+如果后续继续 feature 化，可迁到：
 
 ```txt
 src/features/chat/presentation/components/
@@ -232,7 +265,7 @@ src/features/chat/presentation/useXxxController.ts
 src/features/chat/application/xxx.usecase.ts
 ```
 
-要求可单测，不能 import Vue/UI/storage。
+要求可单测，不能 import Vue / UI / storage。
 
 ### 新存储读写
 
@@ -251,6 +284,11 @@ src/repositories/xxxRepository.ts
 ```bash
 npm run test:run
 npm run check:architecture
+```
+
+涉及类型、构建或较大改动时再跑：
+
+```bash
 npm run build
 ```
 

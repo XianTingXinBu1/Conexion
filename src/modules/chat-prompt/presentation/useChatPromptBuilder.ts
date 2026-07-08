@@ -1,6 +1,6 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import type { AICharacter, ChatMessage, KnowledgeBase, Message, PromptPreset, UserCharacter } from '@/types';
-import type { MergeMode } from '@/modules/system-prompt';
+import type { BuildMetadata, MergeMode } from '@/modules/system-prompt';
 import { logPrompt, logSystemPrompt } from '@/modules/debug';
 import {
   loadPromptPresets as loadPromptPresetsFromRepository,
@@ -10,14 +10,7 @@ import { buildSystemMessagesUseCase } from '../application/buildChatSystemMessag
 
 interface LastSystemPromptResult {
   estimatedTokens: number;
-  metadata?: {
-    filledPlaceholders?: Record<string, {
-      placeholder?: 'character' | 'user' | 'knowledge' | 'chat-history' | 'user-instruction';
-      contentLength: number;
-    }>;
-    totalItems: number;
-    enabledItems: number;
-  };
+  metadata?: BuildMetadata;
 }
 
 interface BuildPromptContext {
@@ -53,6 +46,8 @@ export function useChatPromptBuilder() {
   const getCurrentPromptPreset = (): PromptPreset | null => {
     return promptPresets.value.find(p => p.id === selectedPromptPresetId.value) || null;
   };
+
+  const currentPromptPreset = computed(() => getCurrentPromptPreset());
 
   const buildSystemMessages = (context: BuildPromptContext): ChatMessage[] => {
     const currentPreset = getCurrentPromptPreset();
@@ -119,6 +114,7 @@ export function useChatPromptBuilder() {
   return {
     promptPresets,
     selectedPromptPresetId,
+    currentPromptPreset,
     lastSystemPromptResult,
     lastSystemMessages,
     showPromptPreview,

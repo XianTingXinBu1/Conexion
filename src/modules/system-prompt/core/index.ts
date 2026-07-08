@@ -3,5 +3,5 @@
  */
 
 export { buildSystemPrompt } from './builder';
-export { fillItemContent, isChatHistoryItem } from './content-filler';
+export { fillItemContent, isChatHistoryItem, isUserInstructionItem, isCompressionSummaryItem } from './content-filler';
 export { mergeMessages, mergeAdjacentMessages, mergeAllMessages } from './merger';

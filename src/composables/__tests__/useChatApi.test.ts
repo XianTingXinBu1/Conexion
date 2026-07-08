@@ -63,7 +63,7 @@ describe('useChatApi', () => {
 
     const api = useChatApi();
     const result = await api.sendChatRequest([
-      { id: '1', type: 'user', content: 'hi', timestamp: Date.now() },
+      { role: 'user', content: 'hi' },
     ]);
 
     expect(result).toBe('summary');
@@ -101,7 +101,7 @@ describe('useChatApi', () => {
     const onError = vi.fn();
 
     const pending = api.sendStreamChatRequest(
-      [{ id: '1', type: 'user', content: 'hi', timestamp: Date.now() }],
+      [{ role: 'user', content: 'hi' }],
       vi.fn(),
       vi.fn(),
       onError,
@@ -138,7 +138,7 @@ describe('useChatApi', () => {
     const onError = vi.fn();
 
     await api.sendStreamChatRequest(
-      [{ id: '1', type: 'user', content: 'hi', timestamp: Date.now() }],
+      [{ role: 'user', content: 'hi' }],
       vi.fn(),
       vi.fn(),
       onError,
@@ -178,7 +178,7 @@ describe('useChatApi', () => {
     const onComplete = vi.fn();
 
     await api.sendStreamChatRequest(
-      [{ id: '1', type: 'user', content: 'hi', timestamp: Date.now() }],
+      [{ role: 'user', content: 'hi' }],
       onChunk,
       onComplete,
       vi.fn(),
@@ -229,7 +229,7 @@ describe('useChatApi', () => {
     let settled = false;
 
     const pending = api.sendStreamChatRequest(
-      [{ id: '1', type: 'user', content: 'hi', timestamp: Date.now() }],
+      [{ role: 'user', content: 'hi' }],
       vi.fn(),
       async () => {
         await completionGate;
@@ -274,7 +274,7 @@ describe('useChatApi', () => {
     const onError = vi.fn();
 
     const pending = api.sendStreamChatRequest(
-      [{ id: '1', type: 'user', content: 'hi', timestamp: Date.now() }],
+      [{ role: 'user', content: 'hi' }],
       vi.fn(),
       vi.fn(),
       onError,

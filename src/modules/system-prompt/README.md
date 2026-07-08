@@ -2,18 +2,19 @@
 
 系统提示词构建模块负责把 Prompt 预设、角色、用户设定、知识库、聊天历史、用户当前输入和压缩摘要组合成 OpenAI Chat API 格式的 `messages` 数组。
 
-它是聊天真实发送和 Prompt 预览的底层构建能力。
+它现在是聊天**真实发送 / Prompt 预览 / 上下文统计**共用的底层构建能力。
 
 ## 功能特性
 
-- 根据 Prompt 预设动态构建 `messages`。
-- 自动填充特殊条目：角色设定、用户设定、知识库、聊天历史、用户指令。
+- 根据 Prompt 预设动态构建最终 `ChatMessage[]`。
+- 自动填充特殊条目：角色设定、用户设定、知识库、压缩摘要、聊天历史、用户指令。
 - 支持会话压缩摘要注入。
 - 支持 `insertPosition` 排序。
 - 支持 `system` / `user` / `assistant` 三种角色类型。
 - 支持消息合并：`none` / `adjacent` / `all`。
 - 提供粗略 token 估算。
 - 返回构建元数据，方便 Prompt 预览和调试。
+- 对缺少 `compression-summary` 条目的旧预设保留兼容行为。
 
 ## 目录结构
 
@@ -60,17 +61,21 @@ console.log(result.metadata)
 
 ## 特殊条目自动填充
 
-以下条目名称会被自动识别并填充内容：
+以下条目名称或内置条目 ID 会被自动识别并填充内容：
 
-| 条目名称 | 占位符类型 | 数据来源 | 描述 |
+| 条目名称 / ID | 占位符类型 | 数据来源 | 描述 |
 |---------|-----------|---------|------|
-| 角色设定 | `character` | `aiCharacter` | AI 角色的人设和性格 |
-| 用户设定 | `user` | `userCharacter` | 用户身份信息 |
-| 知识库 | `knowledge` | `knowledgeBases` | 全局启用知识库中的已启用条目 |
-| 聊天历史 | `chat-history` | `chatHistory` | 对话历史记录 |
-| 用户指令 | `user-instruction` | `userInstruction` | 当前用户输入 |
+| 角色设定 / `character-setting` | `character` | `aiCharacter` | AI 角色的人设和性格 |
+| 用户设定 / `user-setting` | `user` | `userCharacter` | 用户身份信息 |
+| 知识库 / `knowledge-base` | `knowledge` | `knowledgeBases` | 全局启用知识库中的已启用条目 |
+| 压缩摘要 / `compression-summary` | `compression-summary` | `compressionSummary` | 已压缩历史上下文摘要 |
+| 聊天历史 / `chat-history` | `chat-history` | `chatHistory` | 对话历史记录 |
+| 用户指令 / `user-instruction` | `user-instruction` | `userInstruction` | 当前用户输入 |
 
-此外，`compressionSummary` 会在构建开始时作为 system message 注入。
+兼容说明：
+
+- 如果预设里已经包含 `compression-summary` 条目，则压缩摘要会在该条目的插入位置进入结果。
+- 如果旧预设里没有该条目，但调用方传了 `compressionSummary`，模块会保留旧行为，默认把它前置注入为一条 `system` message。
 
 ## API 参考
 
@@ -136,15 +141,16 @@ mergeMessages(messages: ChatMessage[], mode: MergeMode): MergeResult
 ## 构建流程
 
 1. 读取配置并设置默认值。
-2. 如存在 `compressionSummary`，先注入 system message。
-3. 按 `insertPosition` 对预设条目排序。
-4. 跳过未启用条目。
-5. 对特殊条目执行内容填充。
-6. 将聊天历史和用户指令转换为独立 message。
-7. 根据配置过滤空内容。
-8. 按 `mergeMode` 合并消息。
-9. 估算 token。
-10. 返回 messages、使用条目、跳过条目和元数据。
+2. 按 `insertPosition` 对预设条目排序。
+3. 跳过未启用条目。
+4. 对特殊条目执行内容填充。
+5. 将 `chat-history` 和 `user-instruction` 转换为独立 message。
+6. 按需在 `compression-summary` 条目位置注入压缩摘要。
+7. 对旧预设执行压缩摘要兼容前置注入。
+8. 根据配置过滤空内容。
+9. 按 `mergeMode` 合并消息。
+10. 估算 token。
+11. 返回 messages、使用条目、跳过条目和元数据。
 
 ## 在聊天模块中的位置
 
@@ -155,7 +161,7 @@ mergeMessages(messages: ChatMessage[], mode: MergeMode): MergeResult
 ```txt
 ChatPage.vue
   -> useChatPageViewModel
-    -> useChatPromptController / useChatSendFlow
+    -> useChatPromptController / useChatSendFlow / useChatStats
       -> buildSystemMessagesUseCase
         -> buildSystemPrompt
 ```
@@ -166,24 +172,28 @@ ChatPage.vue
 src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts
 src/modules/chat-prompt/presentation/useChatPromptBuilder.ts
 src/features/chat/presentation/useChatPromptController.ts
+src/features/chat/application/sendMessage.usecase.ts
+src/composables/useChatStats.ts
 ```
 
 ## 设计原则
 
 1. 类型安全：所有输入输出都有 TypeScript 类型。
 2. 可测试：核心构建逻辑不依赖 Vue 和 DOM。
-3. 单一职责：只负责构建 messages，不负责请求 API。
+3. 单一职责：只负责构建最终消息数组，不负责请求 API。
 4. 可解释：返回 metadata 供 UI 展示和调试。
 5. 可扩展：可继续增加特殊占位符和合并策略。
+6. 单一真源：发送 / 预览 / 统计尽量共用同一条构建链。
 
 ## 注意事项
 
 - token 估算是粗略估算，不等于真实模型 tokenizer 结果。
 - 知识库只收集全局启用知识库中的已启用条目。
 - 聊天历史条目会拆为多个 message，并保留 user / assistant 角色。
+- 用户指令条目会把当前输入放到预设指定的位置。
 - `insertPosition` 数字越小越靠前，缺省值靠后。
 - 未启用或空内容条目会进入 `skippedItemIds`。
-- 不要在页面层直接拼接 system prompt。
+- 不要在页面层直接拼接 system prompt 或再次手动拼接历史消息。
 
 ## 验证建议
 

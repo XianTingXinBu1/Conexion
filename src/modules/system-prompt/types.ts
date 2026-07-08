@@ -8,11 +8,12 @@ import type { PromptPreset, UserCharacter, AICharacter, KnowledgeBase, Message, 
  * 内容占位符类型
  */
 export type ContentPlaceholder =
-  | 'character'           // 角色设定
-  | 'user'                // 用户设定
-  | 'knowledge'           // 知识库
-  | 'chat-history'        // 聊天历史
-  | 'user-instruction';   // 用户指令（当前输入）
+  | 'character'             // 角色设定
+  | 'user'                  // 用户设定
+  | 'knowledge'             // 知识库
+  | 'compression-summary'   // 压缩摘要
+  | 'chat-history'          // 聊天历史
+  | 'user-instruction';     // 用户指令（当前输入）
 
 /**
  * 合并模式

@@ -1,5 +1,5 @@
 import type { Ref } from 'vue';
-import type { Conversation, Message } from '@/types';
+import type { ChatMessage, Conversation, Message } from '@/types';
 import { getNotificationMessage } from '@/modules/notification/messages';
 import { useConversationCompression } from './useConversationCompression';
 
@@ -8,11 +8,7 @@ interface UseChatCompressionControllerOptions {
   currentConversation: Ref<Conversation | undefined>;
   canUseConversationCompression: Ref<boolean>;
   saveConversation: (messages: Message[], updates?: Partial<Conversation>) => Promise<void>;
-  sendChatRequest: (
-    messages: Message[],
-    systemPrompt?: string,
-    systemMessages?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
-  ) => Promise<string>;
+  sendChatRequest: (messages: ChatMessage[]) => Promise<string>;
   showInfo: (title: string, message?: string) => void;
   showSuccess: (title: string, message?: string) => void;
   showError: (title: string, message?: string) => void;

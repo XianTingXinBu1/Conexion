@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type { Theme, Preset, ConversationCompressionMode } from '@/types';
 
-type PlaceholderType = 'character' | 'user' | 'knowledge' | 'chat-history' | 'user-instruction';
+type PlaceholderType = 'character' | 'user' | 'knowledge' | 'compression-summary' | 'chat-history' | 'user-instruction';
 
 interface BuildMetadata {
   filledPlaceholders?: Record<string, {
@@ -279,6 +279,18 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
               <div class="stat-row" v-if="placeholderStats.knowledge">
                 <span class="stat-label">知识库</span>
                 <span class="stat-value">{{ placeholderStats.knowledge.toLocaleString() }}</span>
+              </div>
+              <div class="stat-row" v-if="placeholderStats['compression-summary']">
+                <span class="stat-label">压缩摘要</span>
+                <span class="stat-value">{{ placeholderStats['compression-summary'].toLocaleString() }}</span>
+              </div>
+              <div class="stat-row" v-if="placeholderStats['chat-history']">
+                <span class="stat-label">历史嵌入</span>
+                <span class="stat-value">{{ placeholderStats['chat-history'].toLocaleString() }}</span>
+              </div>
+              <div class="stat-row" v-if="placeholderStats['user-instruction']">
+                <span class="stat-label">当前输入</span>
+                <span class="stat-value">{{ placeholderStats['user-instruction'].toLocaleString() }}</span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">启用</span>

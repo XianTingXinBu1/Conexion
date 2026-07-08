@@ -5,7 +5,7 @@
  */
 
 import { ApiClient, type ApiClientConfig } from './base';
-import type { ChatCompletionRequest, ChatCompletionResponse, ChatMessage, Message } from '@/types';
+import type { ChatCompletionRequest, ChatCompletionResponse, ChatMessage } from '@/types';
 import { logApi, logApiError } from '@/modules/debug';
 import { parseStreamChunk, type StreamUsagePayload } from './stream';
 
@@ -33,31 +33,28 @@ export class ChatApi extends ApiClient {
     this.activeStreamCleanup = null;
   }
 
-  /**
-   * 转换消息格式
-   */
-  private convertMessages(messages: Message[], systemPrompt?: string, systemMessages?: ChatMessage[]): ChatMessage[] {
-    const apiMessages: ChatMessage[] = [];
-
-    // 如果有预构建的系统消息数组，直接使用
-    if (systemMessages && systemMessages.length > 0) {
-      apiMessages.push(...systemMessages);
-      logApi('使用系统消息数组', { count: systemMessages.length });
-    } else if (systemPrompt) {
-      // 兼容旧代码，从 systemPrompt 字符串构建
-      apiMessages.push({ role: 'system', content: systemPrompt });
-      logApi('使用系统提示词', { length: systemPrompt.length });
-    }
-
-    // 转换聊天历史消息
-    const chatMessages: ChatMessage[] = messages.map(msg => ({
-      role: (msg.type === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-      content: msg.content,
+  private normalizeMessages(messages: ChatMessage[]): ChatMessage[] {
+    return messages.map(message => ({
+      role: message.role,
+      content: message.content,
     }));
+  }
 
-    apiMessages.push(...chatMessages);
-
-    return apiMessages;
+  private buildRequestBody(
+    messages: ChatMessage[],
+    options: {
+      temperature?: number;
+      maxTokens?: number;
+      stream: boolean;
+    },
+  ): ChatCompletionRequest {
+    return {
+      model: this.model,
+      messages: this.normalizeMessages(messages),
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.maxTokens ?? 2048,
+      stream: options.stream,
+    };
   }
 
   private getStreamIdleTimeoutMs(): number {
@@ -92,25 +89,17 @@ export class ChatApi extends ApiClient {
    * 发送聊天请求（非流式）
    */
   async sendMessage(
-    messages: Message[],
+    messages: ChatMessage[],
     options: {
-      systemPrompt?: string;
-      systemMessages?: ChatMessage[];
       temperature?: number;
       maxTokens?: number;
     } = {}
   ): Promise<ChatCompletionResponse> {
-    const { systemPrompt, systemMessages, temperature, maxTokens } = options;
-
-    const apiMessages = this.convertMessages(messages, systemPrompt, systemMessages);
-
-    const requestBody: ChatCompletionRequest = {
-      model: this.model,
-      messages: apiMessages,
-      temperature: temperature ?? 0.7,
-      max_tokens: maxTokens ?? 2048,
+    const requestBody = this.buildRequestBody(messages, {
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
       stream: false,
-    };
+    });
 
     logApiRequest(requestBody);
 
@@ -125,10 +114,8 @@ export class ChatApi extends ApiClient {
    * 发送流式聊天请求
    */
   async *sendStreamMessage(
-    messages: Message[],
+    messages: ChatMessage[],
     options: {
-      systemPrompt?: string;
-      systemMessages?: ChatMessage[];
       temperature?: number;
       maxTokens?: number;
       onChunk?: (chunk: string) => void;
@@ -136,20 +123,16 @@ export class ChatApi extends ApiClient {
       onError?: (error: string) => void | Promise<void>;
     } = {}
   ): AsyncGenerator<string> {
-    const { systemPrompt, systemMessages, temperature, maxTokens, onChunk, onComplete, onError } = options;
+    const { temperature, maxTokens, onChunk, onComplete, onError } = options;
 
     try {
       this.validateUrl(this.baseURL);
 
-      const apiMessages = this.convertMessages(messages, systemPrompt, systemMessages);
-
-      const requestBody: ChatCompletionRequest = {
-        model: this.model,
-        messages: apiMessages,
-        temperature: temperature ?? 0.7,
-        max_tokens: maxTokens ?? 2048,
+      const requestBody = this.buildRequestBody(messages, {
+        temperature,
+        maxTokens,
         stream: true,
-      };
+      });
 
       logApiRequest(requestBody);
 
@@ -268,11 +251,11 @@ export class ChatApi extends ApiClient {
 /**
  * 辅助函数：记录 API 请求日志
  */
-function logApiRequest(requestBody: any): void {
+function logApiRequest(requestBody: ChatCompletionRequest): void {
   logApi('发送聊天请求', {
     messageCount: requestBody.messages.length,
     temperature: requestBody.temperature,
-    maxTokens: requestBody.maxTokens,
+    maxTokens: requestBody.max_tokens,
     stream: requestBody.stream,
   });
 }

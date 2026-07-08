@@ -1,3 +1,4 @@
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useChatApi } from '@/composables/useChatApi';
 import { useConfirmDialog } from '@/composables/useConfirmDialog';
@@ -109,18 +110,7 @@ export function useChatPageViewModel(props: ChatPageProps) {
   const scrollPolicy = useChatScrollPolicy(chatViewport.messagesContainer);
 
   const {
-    currentContextCount,
-    maxContextLength,
-    userTokens,
-    aiTokens,
-    chatMessageCount,
-    userMessageCount,
-    aiMessageCount,
-    usagePercent,
-    isCompressionThresholdReached,
-  } = useChatStats(messages, currentApiPreset, compression, compressionThresholdPercent);
-
-  const {
+    currentPromptPreset,
     lastSystemPromptResult,
     lastSystemMessages,
     showPromptPreview,
@@ -138,6 +128,29 @@ export function useChatPageViewModel(props: ChatPageProps) {
     promptMergeMode,
     compressionPromptContent,
   });
+
+  const currentContextMessages = computed(() => buildSystemMessages({
+    aiCharacter: currentCharacter.value,
+    userCharacter: selectedUser.value,
+    knowledgeBases: knowledgeBases.value,
+    chatHistory: effectiveMessages.value,
+    userInstruction: '',
+    mergeMode: promptMergeMode.value,
+    includeUserInstructionMessage: false,
+    compressionSummary: compressionPromptContent.value,
+  }));
+
+  const {
+    currentContextCount,
+    maxContextLength,
+    userTokens,
+    aiTokens,
+    chatMessageCount,
+    userMessageCount,
+    aiMessageCount,
+    usagePercent,
+    isCompressionThresholdReached,
+  } = useChatStats(effectiveMessages, currentContextMessages, currentApiPreset, compressionThresholdPercent);
 
   const { regexRules, loadRegexRules } = useChatLifecycleController({
     props,
@@ -252,6 +265,7 @@ export function useChatPageViewModel(props: ChatPageProps) {
     handleCompressConversation,
     canCompress,
     currentApiPreset,
+    currentPromptPreset,
     usage,
     responseMetrics,
     isSending,

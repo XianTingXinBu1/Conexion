@@ -17,7 +17,7 @@ function resolveVendorChunk(id: string) {
     }
   }
 
-  return 'vendor'
+  return undefined
 }
 
 // https://vite.dev/config/
@@ -29,6 +29,7 @@ export default defineConfig({
     },
   },
   build: {
+    chunkSizeWarningLimit: 2500,
     rollupOptions: {
       output: {
         manualChunks(id) {

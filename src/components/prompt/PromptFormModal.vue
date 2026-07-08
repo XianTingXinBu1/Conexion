@@ -40,7 +40,7 @@ const canSave = computed(() => {
 });
 
 // 不显示提示词的系统预设条目 ID
-const NO_PROMPT_ITEMS = ['character-setting', 'knowledge-base', 'user-setting', 'chat-history'];
+const NO_PROMPT_ITEMS = ['character-setting', 'knowledge-base', 'user-setting', 'compression-summary', 'chat-history', 'user-instruction'];
 
 // 计算是否应该显示提示词输入框
 const shouldShowPrompt = computed(() => {

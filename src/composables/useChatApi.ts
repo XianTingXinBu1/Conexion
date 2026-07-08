@@ -7,7 +7,6 @@
 import { computed, ref } from 'vue';
 import type {
   ChatMessage,
-  Message,
   Preset,
 } from '@/types';
 import {
@@ -128,11 +127,7 @@ export function useChatApi() {
   /**
    * 发送聊天请求（非流式）
    */
-  async function sendChatRequest(
-    messages: Message[],
-    systemPrompt?: string,
-    systemMessages?: ChatMessage[]
-  ): Promise<string> {
+  async function sendChatRequest(messages: ChatMessage[]): Promise<string> {
     error.value = null;
     wasCancelled.value = false;
     requestTelemetry.value = {
@@ -164,8 +159,6 @@ export function useChatApi() {
       activeChatApi = chatApi;
 
       const response = await chatApi.sendMessage(messages, {
-        systemPrompt,
-        systemMessages,
         temperature: preset.temperature,
         maxTokens: preset.maxOutputTokens,
       });
@@ -220,12 +213,10 @@ export function useChatApi() {
    * 发送流式聊天请求
    */
   async function sendStreamChatRequest(
-    messages: Message[],
+    messages: ChatMessage[],
     onChunk: (chunk: string) => void,
     onComplete: () => void | Promise<void>,
     onError: (error: string) => void | Promise<void>,
-    systemPrompt?: string,
-    systemMessages?: ChatMessage[]
   ): Promise<void> {
     error.value = null;
     wasCancelled.value = false;
@@ -289,8 +280,6 @@ export function useChatApi() {
       setRequestStatus('streaming');
 
       for await (const _chunk of chatApi.sendStreamMessage(messages, {
-        systemPrompt,
-        systemMessages,
         temperature: preset.temperature,
         maxTokens: preset.maxOutputTokens,
         onChunk: (content) => {

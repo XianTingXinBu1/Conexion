@@ -48,12 +48,10 @@ interface SendFlowTransportDeps {
   resetUsage: () => void;
   loadRegexRules: () => Promise<void>;
   sendStreamChatRequest: (
-    messages: Message[],
+    messages: ChatMessage[],
     onChunk: (chunk: string) => void,
     onComplete: () => void | Promise<void>,
     onError: (error: string) => void | Promise<void>,
-    systemPrompt?: string,
-    systemMessages?: ChatMessage[]
   ) => Promise<void>;
   cancelRequest: () => void;
   buildSystemMessages: (context: {

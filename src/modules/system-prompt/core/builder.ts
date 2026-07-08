@@ -6,7 +6,12 @@
 
 import { DEFAULT_MERGE_MODE } from '../utils/constants';
 import { estimateMessagesTokens, isContentEmpty } from '../utils';
-import { fillItemContent, isChatHistoryItem, isUserInstructionItem } from './content-filler';
+import {
+  fillItemContent,
+  isChatHistoryItem,
+  isCompressionSummaryItem,
+  isUserInstructionItem,
+} from './content-filler';
 import { mergeMessages } from './merger';
 import type { ChatMessage } from '@/types';
 import type { SystemPromptConfig, SystemPromptResult, BuildMetadata } from '../types';
@@ -62,20 +67,18 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
   };
 
   const messages: ChatMessage[] = [];
-  const compressionMessage = processCompressionSummaryItem(compressionSummary);
-  if (compressionMessage) {
-    messages.push(compressionMessage);
-  }
   const usedItemIds: string[] = [];
   const skippedItemIds: string[] = [];
   const filledPlaceholders: BuildMetadata['filledPlaceholders'] = {};
   let chatHistoryCount = 0;
   let userInstructionIncluded = false;
+  let compressionSummaryIncluded = false;
 
   // 按插入位置排序
-  const sortedItems = [...preset.items].sort((a, b) => 
+  const sortedItems = [...preset.items].sort((a, b) =>
     (a.insertPosition ?? 999) - (b.insertPosition ?? 999)
   );
+  const hasCompressionSummaryItem = sortedItems.some(item => item.enabled && isCompressionSummaryItem(item));
 
   // 处理每个条目
   for (const item of sortedItems) {
@@ -85,18 +88,53 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
       continue;
     }
 
+    // 压缩摘要条目
+    if (isCompressionSummaryItem(item)) {
+      const compressionMessage = processCompressionSummaryItem(compressionSummary);
+      filledPlaceholders[item.id] = {
+        placeholder: 'compression-summary',
+        success: Boolean(compressionMessage),
+        contentLength: compressionMessage?.content.length ?? 0,
+      };
+
+      if (compressionMessage) {
+        messages.push(compressionMessage);
+        compressionSummaryIncluded = true;
+        usedItemIds.push(item.id);
+      } else {
+        skippedItemIds.push(item.id);
+      }
+      continue;
+    }
+
     // 聊天历史条目
     if (isChatHistoryItem(item)) {
       const historyMessages = processChatHistoryItem(chatHistory);
-      messages.push(...historyMessages);
       chatHistoryCount = historyMessages.length;
-      usedItemIds.push(item.id);
+      filledPlaceholders[item.id] = {
+        placeholder: 'chat-history',
+        success: historyMessages.length > 0,
+        contentLength: historyMessages.reduce((total, message) => total + message.content.length, 0),
+      };
+
+      if (historyMessages.length > 0) {
+        messages.push(...historyMessages);
+        usedItemIds.push(item.id);
+      } else {
+        skippedItemIds.push(item.id);
+      }
       continue;
     }
 
     // 用户指令条目
     if (isUserInstructionItem(item)) {
       const instructionMessage = processUserInstructionItem(userInstruction);
+      filledPlaceholders[item.id] = {
+        placeholder: 'user-instruction',
+        success: Boolean(instructionMessage),
+        contentLength: instructionMessage?.content.length ?? 0,
+      };
+
       if (instructionMessage) {
         messages.push(instructionMessage);
         userInstructionIncluded = true;
@@ -127,6 +165,14 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
 
     messages.push({ role: item.roleType, content });
     usedItemIds.push(item.id);
+  }
+
+  // 兼容旧预设：如果还没有“压缩摘要”条目，则维持旧行为，默认前置注入
+  if (!compressionSummaryIncluded && !hasCompressionSummaryItem) {
+    const compressionMessage = processCompressionSummaryItem(compressionSummary);
+    if (compressionMessage) {
+      messages.unshift(compressionMessage);
+    }
   }
 
   // 合并消息

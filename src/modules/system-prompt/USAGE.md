@@ -33,28 +33,32 @@ console.log('Metadata:', result.metadata)
 
 ## 特殊条目自动填充
 
-以下条目名称会被自动识别并填充内容：
+以下条目名称或内置条目 ID 会被自动识别并填充内容：
 
-| 条目名称 | 占位符类型 | 数据来源 |
+| 条目名称 / ID | 占位符类型 | 数据来源 |
 |---------|-----------|---------|
-| 角色设定 | `character` | `aiCharacter` |
-| 用户设定 | `user` | `userCharacter` |
-| 知识库 | `knowledge` | `knowledgeBases` |
-| 聊天历史 | `chat-history` | `chatHistory` |
-| 用户指令 | `user-instruction` | `userInstruction` |
+| 角色设定 / `character-setting` | `character` | `aiCharacter` |
+| 用户设定 / `user-setting` | `user` | `userCharacter` |
+| 知识库 / `knowledge-base` | `knowledge` | `knowledgeBases` |
+| 压缩摘要 / `compression-summary` | `compression-summary` | `compressionSummary` |
+| 聊天历史 / `chat-history` | `chat-history` | `chatHistory` |
+| 用户指令 / `user-instruction` | `user-instruction` | `userInstruction` |
 
-压缩摘要不依赖特殊条目名；只要传入 `compressionSummary`，就会作为 system message 注入。
+说明：
+
+- `chat-history` 和 `user-instruction` 是结构性占位符，会被转换成独立消息，而不是普通字符串模板。
+- `compression-summary` 会优先走正式条目位置；老预设缺少此条目时，会退回兼容前置注入。
 
 ## 推荐在聊天模块中的用法
 
-页面层不要直接拼 system prompt。
+页面层不要直接拼 system prompt，也不要再额外拼接一份聊天历史。
 
 推荐链路：
 
 ```txt
 ChatPage.vue
   -> useChatPageViewModel
-    -> useChatPromptController / useChatSendFlow
+    -> useChatPromptController / useChatSendFlow / useChatStats
       -> buildSystemMessagesUseCase
         -> buildSystemPrompt
 ```
@@ -64,7 +68,7 @@ ChatPage.vue
 ```typescript
 import { buildSystemMessagesUseCase } from '@/modules/chat-prompt'
 
-const messages = buildSystemMessagesUseCase({
+const result = buildSystemMessagesUseCase({
   preset,
   aiCharacter,
   userCharacter,
@@ -74,6 +78,8 @@ const messages = buildSystemMessagesUseCase({
   compressionSummary,
   mergeMode: 'adjacent',
 })
+
+console.log(result.messages) // 最终 ChatMessage[]
 ```
 
 如果只是写纯模块测试或工具函数，可以直接使用 `buildSystemPrompt`。
@@ -117,7 +123,7 @@ const preset = {
   name: '默认预设',
   items: [
     {
-      id: 'character',
+      id: 'character-setting',
       name: '角色设定',
       description: '',
       enabled: true,
@@ -135,7 +141,7 @@ const preset = {
       insertPosition: 2,
     },
     {
-      id: 'knowledge',
+      id: 'knowledge-base',
       name: '知识库',
       description: '',
       enabled: true,
@@ -144,13 +150,31 @@ const preset = {
       insertPosition: 3,
     },
     {
-      id: 'instruction',
+      id: 'compression-summary',
+      name: '压缩摘要',
+      description: '',
+      enabled: true,
+      prompt: '',
+      roleType: 'system',
+      insertPosition: 4,
+    },
+    {
+      id: 'chat-history',
+      name: '聊天历史',
+      description: '',
+      enabled: true,
+      prompt: '',
+      roleType: 'system',
+      insertPosition: 5,
+    },
+    {
+      id: 'user-instruction',
       name: '用户指令',
       description: '',
       enabled: true,
       prompt: '',
       roleType: 'user',
-      insertPosition: 4,
+      insertPosition: 6,
     },
   ],
   createdAt: Date.now(),
@@ -160,17 +184,25 @@ const preset = {
 
 ## 常见问题
 
-### 为什么用户输入可能不在 system messages 里？
+### 为什么当前用户输入可能不在结果里？
 
 取决于是否启用“用户指令”特殊条目，以及调用方是否传入 `userInstruction`。
 
-真实发送链路中，用户消息本身仍会作为聊天消息发送；Prompt 构建中的 `userInstruction` 主要用于模板化地把当前输入插入 Prompt。
+如果调用方显式传入 `includeUserInstructionMessage: false`，那么当前输入会被排除在本次构建结果之外。
+
+### 为什么压缩摘要没有出现在结果里？
+
+请检查：
+
+1. `compressionSummary` 是否为空。
+2. 预设是否启用了 `compression-summary` 条目。
+3. 如果是旧预设，没有该条目时，是否仍走了兼容 fallback 注入。
 
 ### 为什么知识库没有出现在结果里？
 
 请检查：
 
-1. 是否存在名为“知识库”的启用条目。
+1. 是否存在名为“知识库”或 id 为 `knowledge-base` 的启用条目。
 2. `knowledgeBases` 是否传入。
 3. 对应知识库是否 `globallyEnabled=true`。
 4. 知识库条目是否 `enabled=true`。

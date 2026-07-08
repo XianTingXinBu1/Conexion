@@ -139,7 +139,7 @@ const canRenamePreset = computed(() => renamePresetName.value.trim());
       />
     </div>
     <div class="form-hint">
-      新预设将默认包含所有基本条目（主提示词、聊天历史等）
+      新预设将默认包含所有基本条目（主提示词、压缩摘要、聊天历史、用户指令等）
     </div>
     <template #footer>
       <div class="modal-footer-actions">

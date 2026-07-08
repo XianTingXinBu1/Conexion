@@ -1,5 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue';
-import type { Conversation, ConversationCompression, Message } from '@/types';
+import type { ChatMessage, Conversation, ConversationCompression, Message } from '@/types';
 import {
   buildCompressionSystemMessages,
   canCompressMessages,
@@ -14,11 +14,7 @@ interface UseConversationCompressionOptions {
   messages: Ref<Message[]>;
   currentConversation: Ref<Conversation | undefined>;
   saveConversation: (messages: Message[], updates?: Partial<Conversation>) => Promise<void>;
-  sendChatRequest: (
-    messages: Message[],
-    systemPrompt?: string,
-    systemMessages?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
-  ) => Promise<string>;
+  sendChatRequest: (messages: ChatMessage[]) => Promise<string>;
 }
 
 export function useConversationCompression(options: UseConversationCompressionOptions) {
@@ -69,11 +65,14 @@ export function useConversationCompression(options: UseConversationCompressionOp
 
     try {
       const contextBeforeCompression = getEffectiveConversationTokenCount(messages.value, compression.value);
-      const summaryContent = (await sendChatRequest(
-        compressibleMessages,
-        undefined,
-        buildCompressionSystemMessages(compression.value?.summaryContent),
-      )).trim();
+      const requestMessages: ChatMessage[] = [
+        ...buildCompressionSystemMessages(compression.value?.summaryContent),
+        ...compressibleMessages.map((message): ChatMessage => ({
+          role: message.type === 'assistant' ? 'assistant' : 'user',
+          content: message.content,
+        })),
+      ];
+      const summaryContent = (await sendChatRequest(requestMessages)).trim();
 
       if (!summaryContent) {
         throw new Error('压缩结果为空');

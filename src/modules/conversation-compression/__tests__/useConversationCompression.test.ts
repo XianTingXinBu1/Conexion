@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { nextTick, ref } from 'vue';
 import { useConversationCompression } from '../presentation/useConversationCompression';
-import type { Conversation, Message } from '@/types';
+import type { ChatMessage, Conversation, Message } from '@/types';
 
 const createMessage = (id: string, type: Message['type'], content: string): Message => ({
   id,
@@ -9,6 +9,11 @@ const createMessage = (id: string, type: Message['type'], content: string): Mess
   content,
   timestamp: Number(id),
 });
+
+const toChatMessages = (messages: Message[]): ChatMessage[] => messages.map(message => ({
+  role: message.type === 'assistant' ? 'assistant' : 'user',
+  content: message.content,
+}));
 
 describe('useConversationCompression', () => {
   it('compresses all visible messages for manual compression and saves metadata', async () => {
@@ -43,16 +48,13 @@ describe('useConversationCompression', () => {
     const result = await compression.compressConversation({ keepRecentCount: 0 });
 
     expect(result).toBe(true);
-    expect(sendChatRequest).toHaveBeenCalledWith(
-      messages.value,
-      undefined,
-      expect.arrayContaining([
-        expect.objectContaining({
-          role: 'system',
-          content: expect.stringContaining('会话压缩助手'),
-        }),
-      ]),
-    );
+    expect(sendChatRequest).toHaveBeenCalledWith([
+      expect.objectContaining({
+        role: 'system',
+        content: expect.stringContaining('会话压缩助手'),
+      }),
+      ...toChatMessages(messages.value),
+    ]);
     expect(saveConversation).toHaveBeenCalledWith(messages.value, expect.objectContaining({
       compressed: true,
       compression: expect.objectContaining({
@@ -114,16 +116,17 @@ describe('useConversationCompression', () => {
     const result = await compression.compressConversation({ keepRecentCount: 0 });
 
     expect(result).toBe(true);
-    expect(sendChatRequest).toHaveBeenCalledWith(
-      [messages.value[2], messages.value[3]],
-      undefined,
-      expect.arrayContaining([
-        expect.objectContaining({
-          role: 'system',
-          content: expect.stringContaining('已有摘要'),
-        }),
-      ]),
-    );
+    expect(sendChatRequest).toHaveBeenCalledWith([
+      expect.objectContaining({
+        role: 'system',
+        content: expect.stringContaining('会话压缩助手'),
+      }),
+      expect.objectContaining({
+        role: 'system',
+        content: expect.stringContaining('已有摘要'),
+      }),
+      ...toChatMessages([messages.value[2]!, messages.value[3]!]),
+    ]);
     expect(currentConversation.value.compression?.sourceMessageIds).toEqual(['1', '2', '3', '4']);
     expect(compression.effectiveMessages.value).toEqual([]);
   });

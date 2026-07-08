@@ -24,12 +24,10 @@ export interface SendMessageUseCaseDeps {
   onStreamFlush: () => void;
   onMessageSend: () => void;
   sendStreamChatRequest: (
-    messages: Message[],
+    messages: ChatMessage[],
     onChunk: (chunk: string) => void,
     onComplete: () => void | Promise<void>,
     onError: (error: string) => void | Promise<void>,
-    systemPrompt?: string,
-    systemMessages?: ChatMessage[]
   ) => Promise<void>;
   buildSystemMessages: (context: {
     aiCharacter?: AICharacter;
@@ -82,7 +80,6 @@ export class SendMessageUseCase {
     }
 
     const chatHistoryBeforeSend = [...this.deps.getRequestMessages()];
-    const messagesForRequest = [...chatHistoryBeforeSend, userMessage];
     this.deps.getMessages().push(userMessage);
 
     if (!this.deps.getPersistedConversationId()) {
@@ -102,14 +99,14 @@ export class SendMessageUseCase {
     };
     this.deps.getMessages().push(assistantMessage);
 
-    const systemMessages = this.deps.buildSystemMessages({
+    const requestMessages = this.deps.buildSystemMessages({
       aiCharacter: this.deps.getCurrentCharacter(),
       userCharacter: this.deps.getSelectedUser(),
       knowledgeBases: this.deps.getKnowledgeBases(),
       chatHistory: chatHistoryBeforeSend,
       userInstruction: processedContent,
       mergeMode: this.deps.getPromptMergeMode(),
-      includeUserInstructionMessage: false,
+      includeUserInstructionMessage: true,
       compressionSummary: this.deps.getCompressionSummary(),
     });
 
@@ -119,11 +116,11 @@ export class SendMessageUseCase {
     const streamAssembler = new StreamMessageAssembler({
       flushIntervalMs: this.flushIntervalMs,
       getRegexRules: this.deps.getRegexRules,
-      onFlush: (processedContent) => {
+      onFlush: (processedAssistantContent) => {
         const msg = this.findMessage(assistantMessageId);
         if (!msg) return;
 
-        msg.content = processedContent;
+        msg.content = processedAssistantContent;
         this.deps.onStreamFlush();
       },
     });
@@ -135,7 +132,7 @@ export class SendMessageUseCase {
 
     try {
       await this.deps.sendStreamChatRequest(
-        messagesForRequest,
+        requestMessages,
         (chunk: string) => {
           streamAssembler.append(chunk);
         },
@@ -164,8 +161,6 @@ export class SendMessageUseCase {
           msg.content = `错误: ${error}`;
           this.deps.onError('send', error);
         },
-        undefined,
-        systemMessages.length > 0 ? systemMessages : undefined,
       );
     } catch (err) {
       if (hasCompleted || isCancelled) {

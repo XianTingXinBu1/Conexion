@@ -20,6 +20,10 @@ export const SPECIAL_ITEM_NAMES: Record<string, ContentPlaceholder> = {
   '知识库': 'knowledge',
   'knowledge-base': 'knowledge',
 
+  // 压缩摘要
+  '压缩摘要': 'compression-summary',
+  'compression-summary': 'compression-summary',
+
   // 聊天历史
   '聊天历史': 'chat-history',
   'chat-history': 'chat-history',
@@ -52,6 +56,9 @@ export const DEFAULT_PROMPT_TEMPLATES: Record<ContentPlaceholder, string> = {
   knowledge: `以下是与本次对话相关的知识库内容：
 
 {{knowledge_entries}}`,
+
+  'compression-summary': `以下是本会话已压缩的历史摘要，请将其视为此前对话上下文，并在后续回答中保持连续性：
+{{compression_summary}}`,
 
   'chat-history': `以下是对话历史记录：
 

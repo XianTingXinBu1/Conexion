@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import { useChatSendFlow } from '../useChatSendFlow';
-import type { AICharacter, Message, RegexRule, UserCharacter } from '@/types';
+import type { AICharacter, ChatMessage, Message, RegexRule, UserCharacter } from '@/types';
 
 vi.mock('@/modules/notification', () => ({
   getNotificationMessage: vi.fn(() => ({ title: 'ok', message: 'done' })),
@@ -57,7 +57,7 @@ describe('useChatSendFlow', () => {
     const messages = ref<Message[]>([]);
     const requestMessages = ref<Message[]>([]);
     const regexRules = ref<RegexRule[]>([]);
-    const sentMessages: Message[][] = [];
+    const sentMessages: ChatMessage[][] = [];
 
     const deps = {
       messages,
@@ -80,14 +80,14 @@ describe('useChatSendFlow', () => {
       saveConversation: vi.fn(async () => undefined),
       onStreamFlush: vi.fn(),
       onMessageSend: vi.fn(async () => undefined),
-      sendStreamChatRequest: vi.fn(async (requestMessages: Message[], onChunk, onComplete) => {
+      sendStreamChatRequest: vi.fn(async (requestMessages: ChatMessage[], onChunk, onComplete) => {
         sentMessages.push(requestMessages.map(message => ({ ...message })));
         onChunk('reply');
         await vi.advanceTimersByTimeAsync(60);
         await onComplete();
       }),
       cancelRequest: vi.fn(),
-      buildSystemMessages: vi.fn(() => [{ role: 'system' as const, content: 'system only' }]),
+      buildSystemMessages: vi.fn((context) => [{ role: 'user' as const, content: context.userInstruction }]),
       showSuccess: vi.fn(),
       showError: vi.fn(),
     };
@@ -97,11 +97,11 @@ describe('useChatSendFlow', () => {
 
     expect(sentMessages).toHaveLength(1);
     expect(sentMessages[0]).toHaveLength(1);
-    expect(sentMessages[0]?.[0]?.type).toBe('user');
+    expect(sentMessages[0]?.[0]?.role).toBe('user');
     expect(sentMessages[0]?.[0]?.content).toBe('hello');
     expect(deps.buildSystemMessages).toHaveBeenCalledWith(expect.objectContaining({
       userInstruction: 'hello',
-      includeUserInstructionMessage: false,
+      includeUserInstructionMessage: true,
     }));
   });
 
@@ -132,7 +132,7 @@ describe('useChatSendFlow', () => {
       saveConversation: vi.fn(async () => undefined),
       onStreamFlush: vi.fn(),
       onMessageSend: vi.fn(async () => undefined),
-      sendStreamChatRequest: vi.fn(async (_requestMessages: Message[], onChunk, onComplete) => {
+      sendStreamChatRequest: vi.fn(async (_requestMessages: ChatMessage[], onChunk, onComplete) => {
         onChunk('reply');
         await vi.advanceTimersByTimeAsync(60);
         await onComplete();
@@ -187,7 +187,7 @@ describe('useChatSendFlow', () => {
       saveConversation: vi.fn(async () => undefined),
       onStreamFlush: vi.fn(),
       onMessageSend: vi.fn(async () => undefined),
-      sendStreamChatRequest: vi.fn(async (_requestMessages: Message[], onChunk, onComplete) => {
+      sendStreamChatRequest: vi.fn(async (_requestMessages: ChatMessage[], onChunk, onComplete) => {
         onChunk('a');
         await vi.advanceTimersByTimeAsync(60);
         onChunk('a');

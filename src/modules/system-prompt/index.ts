@@ -1,11 +1,17 @@
 /**
  * 系统提示词构建模块
  *
- * 提供动态提示词构建功能，将提示词预设中的条目转换为 OpenAI 格式的 messages 数组
+ * 提供动态提示词构建功能，将提示词预设中的条目转换为 OpenAI 格式的 messages 数组。
+ *
+ * 当前架构中，这个模块产出的 messages 会同时服务于：
+ * - 真实聊天发送
+ * - Prompt 预览
+ * - 上下文 / Token 统计
  *
  * 核心功能：
  * - 根据提示词预设的条目顺序、启用状态、角色类型构建 messages
- * - 自动填充特殊条目内容（角色设定、用户设定、知识库、聊天历史）
+ * - 自动填充特殊条目内容（角色设定、用户设定、知识库、压缩摘要、聊天历史、用户指令）
+ * - 支持旧预设在缺少“压缩摘要”条目时的兼容注入
  * - 支持合并相邻同类型消息
  * - Token 数量估算
  *
@@ -17,12 +23,14 @@
  *   preset: promptPreset,
  *   aiCharacter: character,
  *   userCharacter: user,
- *   knowledgeBases: knowledgeBases,
+ *   knowledgeBases,
  *   chatHistory: messages,
+ *   userInstruction: userInput,
+ *   compressionSummary,
  *   mergeMode: 'adjacent',
  * });
  *
- * console.log(result.messages); // OpenAI 格式的 messages 数组
+ * console.log(result.messages); // 最终 ChatMessage[]
  * console.log(result.estimatedTokens); // 估算的 token 数量
  * ```
  */

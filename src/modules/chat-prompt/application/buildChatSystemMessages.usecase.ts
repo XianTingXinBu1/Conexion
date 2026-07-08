@@ -24,7 +24,20 @@ export interface BuildSystemMessagesResult {
   usedFallback: boolean;
 }
 
-function buildFallbackSystemMessages(aiCharacter?: AICharacter, compressionSummary?: string): ChatMessage[] {
+function toChatHistoryMessages(messages: Message[]): ChatMessage[] {
+  return messages.map(message => ({
+    role: message.type === 'assistant' ? 'assistant' : 'user',
+    content: message.content,
+  }));
+}
+
+function buildFallbackMessages(
+  aiCharacter?: AICharacter,
+  chatHistory: Message[] = [],
+  userInstruction = '',
+  compressionSummary?: string,
+  includeUserInstructionMessage = true,
+): ChatMessage[] {
   const messages: ChatMessage[] = [];
 
   if (compressionSummary?.trim()) {
@@ -34,32 +47,50 @@ function buildFallbackSystemMessages(aiCharacter?: AICharacter, compressionSumma
     });
   }
 
-  if (!aiCharacter) return messages;
+  if (aiCharacter) {
+    const parts: string[] = [];
+    if (aiCharacter.name) {
+      parts.push(`你的名字是：${aiCharacter.name}`);
+    }
+    if (aiCharacter.description) {
+      parts.push(`你的描述：${aiCharacter.description}`);
+    }
+    if (aiCharacter.personality) {
+      parts.push(`你的性格：${aiCharacter.personality}`);
+    }
 
-  const parts: string[] = [];
-  if (aiCharacter.name) {
-    parts.push(`你的名字是：${aiCharacter.name}`);
-  }
-  if (aiCharacter.description) {
-    parts.push(`你的描述：${aiCharacter.description}`);
-  }
-  if (aiCharacter.personality) {
-    parts.push(`你的性格：${aiCharacter.personality}`);
+    if (parts.length > 0) {
+      messages.push({
+        role: 'system',
+        content: parts.join('\n'),
+      });
+    }
   }
 
-  if (parts.length === 0) return messages;
+  messages.push(...toChatHistoryMessages(chatHistory));
 
-  messages.push({
-    role: 'system',
-    content: parts.join('\n'),
-  });
+  if (includeUserInstructionMessage && userInstruction.trim()) {
+    messages.push({
+      role: 'user',
+      content: userInstruction.trim(),
+    });
+  }
 
   return messages;
 }
 
 export function buildSystemMessagesUseCase(context: BuildSystemMessagesContext): BuildSystemMessagesResult {
+  const includeUserInstructionMessage = context.includeUserInstructionMessage !== false;
+
   if (!context.preset) {
-    const messages = buildFallbackSystemMessages(context.aiCharacter, context.compressionSummary);
+    const messages = buildFallbackMessages(
+      context.aiCharacter,
+      context.chatHistory,
+      context.userInstruction,
+      context.compressionSummary,
+      includeUserInstructionMessage,
+    );
+
     return {
       messages,
       promptResult: {
@@ -75,7 +106,7 @@ export function buildSystemMessagesUseCase(context: BuildSystemMessagesContext):
     userCharacter: context.userCharacter,
     knowledgeBases: context.knowledgeBases.filter(kb => kb.globallyEnabled),
     chatHistory: context.chatHistory,
-    userInstruction: context.includeUserInstructionMessage === false ? '' : context.userInstruction,
+    userInstruction: includeUserInstructionMessage ? context.userInstruction : '',
     mergeMode: context.mergeMode,
     compressionSummary: context.compressionSummary,
   });

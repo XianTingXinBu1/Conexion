@@ -54,12 +54,13 @@ const FILLER_STRATEGIES: Record<ContentPlaceholder, ContentFillerStrategy> = {
     if (!entries.length) return '';
     return DEFAULT_PROMPT_TEMPLATES.knowledge.replace('{{knowledge_entries}}', entries.join('\n\n'));
   },
-  'chat-history': () => '', // 由构建器单独处理
-  'user-instruction': (context) => {
-    const { userInstruction } = context;
-    if (!userInstruction?.trim()) return '';
-    return DEFAULT_PROMPT_TEMPLATES['user-instruction'].replace('{{user_instruction}}', userInstruction.trim());
+  'compression-summary': (context) => {
+    const { compressionSummary } = context;
+    if (!compressionSummary?.trim()) return '';
+    return DEFAULT_PROMPT_TEMPLATES['compression-summary'].replace('{{compression_summary}}', compressionSummary.trim());
   },
+  'chat-history': () => '', // 由构建器单独处理
+  'user-instruction': () => '', // 由构建器单独处理
 };
 
 /**
@@ -68,6 +69,16 @@ const FILLER_STRATEGIES: Record<ContentPlaceholder, ContentFillerStrategy> = {
 function getPlaceholderType(item: PromptItem): ContentPlaceholder | null {
   // 如果有自定义内容，不使用自动填充
   if (item.prompt?.trim()) return null;
+
+  const exactIdMatch = item.id ? SPECIAL_ITEM_NAMES[item.id] : undefined;
+  if (exactIdMatch) {
+    return exactIdMatch;
+  }
+
+  const exactNameMatch = SPECIAL_ITEM_NAMES[item.name];
+  if (exactNameMatch) {
+    return exactNameMatch;
+  }
 
   // 查找匹配的特殊条目名称
   const matchedKey = Object.keys(SPECIAL_ITEM_NAMES).find(
@@ -107,4 +118,9 @@ export function isChatHistoryItem(item: PromptItem): boolean {
 export function isUserInstructionItem(item: PromptItem): boolean {
   const placeholder = getPlaceholderType(item);
   return placeholder === 'user-instruction';
+}
+
+export function isCompressionSummaryItem(item: PromptItem): boolean {
+  const placeholder = getPlaceholderType(item);
+  return placeholder === 'compression-summary';
 }

@@ -153,13 +153,22 @@ export const DEFAULT_PROMPT_ITEMS = [
     insertPosition: 3
   },
   {
-    id: 'chat-history',
-    name: '聊天历史',
-    description: '管理聊天历史记录',
+    id: 'compression-summary',
+    name: '压缩摘要',
+    description: '已压缩历史上下文摘要（自动填充，不可编辑）',
     enabled: true,
     prompt: '',
     roleType: 'system' as const,
     insertPosition: 4
+  },
+  {
+    id: 'chat-history',
+    name: '聊天历史',
+    description: '管理聊天历史记录（自动填充，不可编辑）',
+    enabled: true,
+    prompt: '',
+    roleType: 'system' as const,
+    insertPosition: 5
   },
   {
     id: 'user-instruction',
@@ -168,7 +177,7 @@ export const DEFAULT_PROMPT_ITEMS = [
     enabled: true,
     prompt: '',
     roleType: 'user' as const,
-    insertPosition: 5
+    insertPosition: 6
   }
 ] as const;
 

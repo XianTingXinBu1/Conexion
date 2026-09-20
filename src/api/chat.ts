@@ -8,6 +8,8 @@ import { ApiClient, type ApiClientConfig } from './base';
 import type { ChatCompletionRequest, ChatCompletionResponse, ChatMessage } from '@/types';
 import { logApi, logApiError } from '@/modules/debug';
 import { parseStreamChunk, type StreamUsagePayload } from './stream';
+import { ApiRequestError, ApiTimeoutError, parseApiErrorMessage } from './errors';
+import { createTimeoutController } from './transport';
 
 class StreamTimeoutError extends Error {
   constructor(message: string) {
@@ -138,7 +140,7 @@ export class ChatApi extends ApiClient {
 
       this.cancelActiveStream();
 
-      const { controller, cleanup } = this.createAbortController();
+      const { controller, cleanup } = createTimeoutController(this.timeout);
       this.activeStreamCleanup = () => {
         controller.abort();
         cleanup();
@@ -161,13 +163,14 @@ export class ChatApi extends ApiClient {
       cleanup();
 
       if (!response.ok) {
-        const errorText = await response.text();
-        const errorMessage = this.parseErrorMessage(errorText);
-        const error = new Error(`API 请求失败 (${response.status}): ${errorMessage || response.statusText}`);
+        const serverMessage = parseApiErrorMessage(await response.text());
 
-        logApiError('流式请求失败', { status: response.status, message: errorMessage });
+        logApiError('流式请求失败', { status: response.status, message: serverMessage });
 
-        throw error;
+        throw new ApiRequestError(
+          `API 请求失败 (${response.status}): ${serverMessage || response.statusText}`,
+          { status: response.status, serverMessage }
+        );
       }
 
       if (!response.body) {
@@ -234,6 +237,10 @@ export class ChatApi extends ApiClient {
     } catch (error) {
       let errorMessage = '请求失败';
       if (error instanceof StreamTimeoutError) {
+        errorMessage = error.message;
+      } else if (error instanceof ApiTimeoutError) {
+        // 总请求超时。必须与用户主动取消（AbortError）区分开，
+        // 否则会把超时误报成「请求已取消」。
         errorMessage = error.message;
       } else if (error instanceof Error) {
         errorMessage = error.name === 'AbortError' ? '请求已取消' : error.message;

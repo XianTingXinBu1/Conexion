@@ -7,6 +7,8 @@
 import { ApiClient, type ApiClientConfig } from './base';
 import type { Model } from '@/types';
 import { logApi, logApiError } from '@/modules/debug';
+import { ApiRequestError, parseApiErrorMessage } from './errors';
+import { createTimeoutController } from './transport';
 
 /**
  * 模型 API 服务
@@ -102,7 +104,7 @@ export class ModelsApi extends ApiClient {
   private async testBackendConnection(): Promise<void> {
     this.validateUrl(this.baseURL);
 
-    const { controller, cleanup } = this.createAbortController();
+    const { controller, cleanup } = createTimeoutController(this.timeout);
     const headers = this.buildHeaders();
     const url = this.buildBackendUrl('/connection-test');
 
@@ -118,8 +120,12 @@ export class ModelsApi extends ApiClient {
       });
 
       if (!response.ok) {
-        const errorMessage = this.parseErrorMessage(await response.text());
-        throw new Error(`连接测试失败 (${response.status}): ${errorMessage || response.statusText}`);
+        const serverMessage = parseApiErrorMessage(await response.text());
+
+        throw new ApiRequestError(
+          `连接测试失败 (${response.status}): ${serverMessage || response.statusText}`,
+          { status: response.status, serverMessage }
+        );
       }
     } finally {
       cleanup();

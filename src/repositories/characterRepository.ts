@@ -1,4 +1,5 @@
 import { requestJson } from '@/api/http';
+import { ApiRequestError } from '@/api/errors';
 import type { AICharacter, UserCharacter } from '@/types';
 import { DEFAULT_AI_CHARACTERS, DEFAULT_USER_CHARACTER, STORAGE_KEYS } from '@/constants';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
@@ -37,7 +38,7 @@ export async function loadAICharacterById(id: string): Promise<AICharacter | und
   try {
     return await requestCharacters<AICharacter>(`/ai/${encodeURIComponent(id)}`);
   } catch (error) {
-    if (error instanceof Error && error.message === '角色不存在') {
+    if (error instanceof ApiRequestError && error.serverMessage === '角色不存在') {
       return undefined;
     }
 

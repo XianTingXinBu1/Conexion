@@ -33,11 +33,30 @@ export class ApiClient {
   public timeout: number;
   public backendBaseURL: string;
 
+  /**
+   * 当前非流式请求的中止句柄。
+   *
+   * 同一实例同时只应有一次请求在飞（调用方每次发送都会新建实例），
+   * 因此用单个句柄足够；新的请求会接管它。
+   */
+  private activeRequestAbort: (() => void) | null = null;
+
   constructor(config: ApiClientConfig) {
     this.baseURL = config.baseURL.replace(/\/$/, '');
     this.apiKey = config.apiKey;
     this.timeout = config.timeout ?? 60000;
     this.backendBaseURL = '/api';
+  }
+
+  /**
+   * 取消当前进行中的非流式请求。请求会以 AbortError 结束。
+   *
+   * 与 cancelActiveStream 对称：流式与非流式是两条不同的传输路径，
+   * 调用方通常两条都试一下即可，未在飞的那条是空操作。
+   */
+  public cancelActiveRequest(): void {
+    this.activeRequestAbort?.();
+    this.activeRequestAbort = null;
   }
 
   /**
@@ -77,6 +96,7 @@ export class ApiClient {
     this.validateUrl(this.baseURL);
 
     const { controller, cleanup } = createTimeoutController(this.timeout);
+    this.activeRequestAbort = () => controller.abort();
 
     try {
       const headers = this.buildHeaders(options.headers);
@@ -127,6 +147,7 @@ export class ApiClient {
 
       throw new Error('未知错误');
     } finally {
+      this.activeRequestAbort = null;
       cleanup();
     }
   }

@@ -120,6 +120,41 @@ describe('useChatApi', () => {
     expect(onError).toHaveBeenCalledWith('请求已取消');
   });
 
+  it('cancels an in-flight non-stream request', async () => {
+    let markRequestStarted: () => void = () => undefined;
+    const requestStarted = new Promise<void>(resolve => { markRequestStarted = resolve; });
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/api-presets') {
+        return createApiPresetResponse();
+      }
+      if (String(input) === '/api/settings/conexion_selected_preset') {
+        return new Response(JSON.stringify({ value: 'preset-1' }), { status: 200 });
+      }
+
+      // 挂住聊天请求，等取消来中断它
+      return new Promise<Response>((_resolve, reject) => {
+        markRequestStarted();
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+      });
+    }) as typeof fetch;
+
+    const api = useChatApi();
+    const pending = api.sendChatRequest([{ role: 'user', content: 'hi' }]).catch(e => e);
+
+    await requestStarted;
+    expect(api.isRequestActive.value).toBe(true);
+
+    api.cancelRequest();
+    const error = await pending;
+
+    expect((error as Error).message).toBe('请求已取消');
+    expect(api.requestStatus.value).toBe('cancelled');
+    expect(api.wasCancelled.value).toBe(true);
+    // 取消不应被当成失败写入 error 状态
+    expect(api.error.value).toBeNull();
+  });
+
   it('reports stream errors only once', async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input) === '/api/api-presets') {

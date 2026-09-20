@@ -8,7 +8,7 @@ import { ApiClient, type ApiClientConfig } from './base';
 import type { ChatCompletionRequest, ChatCompletionResponse, ChatMessage } from '@/types';
 import { logApi, logApiError } from '@/modules/debug';
 import { parseStreamChunk, type StreamUsagePayload } from './stream';
-import { ApiRequestError, ApiTimeoutError, parseApiErrorMessage } from './errors';
+import { ApiRequestError, ApiTimeoutError, REQUEST_CANCELLED_MESSAGE, parseApiErrorMessage } from './errors';
 import { createTimeoutController } from './transport';
 
 class StreamTimeoutError extends Error {
@@ -243,7 +243,7 @@ export class ChatApi extends ApiClient {
         // 否则会把超时误报成「请求已取消」。
         errorMessage = error.message;
       } else if (error instanceof Error) {
-        errorMessage = error.name === 'AbortError' ? '请求已取消' : error.message;
+        errorMessage = error.name === 'AbortError' ? REQUEST_CANCELLED_MESSAGE : error.message;
       }
 
       logApiError('流式请求异常', { error: errorMessage });

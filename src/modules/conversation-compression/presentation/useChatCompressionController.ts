@@ -1,6 +1,7 @@
 import type { Ref } from 'vue';
 import type { ChatMessage, Conversation, Message } from '@/types';
 import { getNotificationMessage } from '@/modules/notification/messages';
+import { REQUEST_CANCELLED_MESSAGE } from '@/api/errors';
 import { useConversationCompression } from './useConversationCompression';
 
 interface UseChatCompressionControllerOptions {
@@ -48,6 +49,13 @@ export function useChatCompressionController(options: UseChatCompressionControll
       options.showSuccess(msg.title, msg.message);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '压缩失败';
+
+      // 用户主动取消不是失败，不弹错误提示。
+      if (errorMessage === REQUEST_CANCELLED_MESSAGE) {
+        options.showInfo('已取消压缩', '已停止本次压缩请求。');
+        return;
+      }
+
       const msg = getNotificationMessage('CHAT_COMPRESSION_FAILED', { error: errorMessage });
       options.showError(msg.title, msg.message);
     }

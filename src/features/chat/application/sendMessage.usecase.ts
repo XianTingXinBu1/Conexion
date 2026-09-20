@@ -1,5 +1,6 @@
 import type { AICharacter, ChatMessage, KnowledgeBase, Message, RegexRule, UserCharacter } from '@/types';
 import type { MergeMode } from '@/modules/system-prompt';
+import { REQUEST_CANCELLED_MESSAGE } from '@/api/errors';
 import { applyRules } from '@/utils/regexEngine';
 import { StreamMessageAssembler } from './streamMessageAssembler';
 
@@ -145,7 +146,7 @@ export class SendMessageUseCase {
           this.deps.onSuccess('send');
         },
         async (error: string) => {
-          isCancelled = error === '请求已取消';
+          isCancelled = error === REQUEST_CANCELLED_MESSAGE;
           await finalizeSend();
 
           const msg = this.findMessage(assistantMessageId);
@@ -172,7 +173,7 @@ export class SendMessageUseCase {
       if (!msg) return;
 
       const errorMessage = err instanceof Error ? err.message : '发送失败';
-      if (errorMessage === '请求已取消') {
+      if (errorMessage === REQUEST_CANCELLED_MESSAGE) {
         if (!msg.content.trim()) {
           msg.content = '已停止生成';
         }
@@ -203,6 +204,12 @@ export class SendMessageUseCase {
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '压缩失败';
+
+      // 用户主动取消：不算失败，不报错，并中断本次发送。
+      if (errorMessage === REQUEST_CANCELLED_MESSAGE) {
+        return false;
+      }
+
       this.deps.onError('compression', errorMessage);
       return !blockOnFailure;
     }

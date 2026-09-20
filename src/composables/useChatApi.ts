@@ -14,7 +14,7 @@ import {
   logApiError,
   logApiWarn,
 } from '@/modules/debug';
-import { ChatApi, type ApiClientConfig } from '@/api';
+import { ChatApi, REQUEST_CANCELLED_MESSAGE, type ApiClientConfig } from '@/api';
 import {
   loadApiPresets,
   loadCurrentApiPreset,
@@ -190,9 +190,17 @@ export function useChatApi() {
 
       throw new Error('API 返回数据格式错误');
     } catch (err) {
-      let errorMessage = '请求失败';
-      if (err instanceof Error) {
-        errorMessage = err.message;
+      // 用户主动取消不应被当成失败：不写 error 状态，文案统一为固定值。
+      const cancelled = wasCancelled.value
+        || (err instanceof Error && err.name === 'AbortError');
+      const errorMessage = cancelled
+        ? REQUEST_CANCELLED_MESSAGE
+        : (err instanceof Error ? err.message : '请求失败');
+
+      if (cancelled) {
+        logApi('已取消当前请求');
+        setRequestStatus('cancelled');
+        throw new Error(errorMessage);
       }
 
       error.value = errorMessage;
@@ -202,7 +210,7 @@ export function useChatApi() {
     } finally {
       activeChatApi = null;
       if (requestStatus.value === 'sending') {
-        setRequestStatus('idle');
+        setRequestStatus(wasCancelled.value ? 'cancelled' : 'idle');
       }
     }
   }
@@ -236,7 +244,7 @@ export function useChatApi() {
     // （占位消息标记为已停止生成并落库）。
     if (wasCancelled.value) {
       logApi('预设加载期间已取消，跳过流式请求');
-      await onError('请求已取消');
+      await onError(REQUEST_CANCELLED_MESSAGE);
       return;
     }
 
@@ -369,8 +377,10 @@ export function useChatApi() {
     wasCancelled.value = true;
     error.value = null;
     setRequestStatus('cancelled');
+    // 流式与非流式是两条不同的传输路径，都试一下；未在飞的那条是空操作。
     activeChatApi?.cancelActiveStream();
-    logApi('已取消当前流式请求');
+    activeChatApi?.cancelActiveRequest();
+    logApi('已取消当前请求');
   }
 
   return {

@@ -59,6 +59,35 @@ describe('ApiClient 不再重试', () => {
     expect(calls).toBe(1);
   });
 
+  it('cancelActiveRequest 能中止进行中的非流式请求', async () => {
+    let aborted = false;
+    vi.stubGlobal('fetch', vi.fn(async (_url: unknown, init: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          aborted = true;
+          reject(init.signal?.reason);
+        }, { once: true });
+      });
+    }));
+
+    const client = createClient();
+    const pending = client.post('/chat/completions', { model: 'm' }).catch(e => e);
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+    client.cancelActiveRequest();
+
+    const error = await pending;
+
+    expect(aborted).toBe(true);
+    expect((error as Error).name).toBe('AbortError');
+  });
+
+  it('没有在飞请求时 cancelActiveRequest 是空操作', () => {
+    const client = createClient();
+
+    expect(() => client.cancelActiveRequest()).not.toThrow();
+  });
+
   it('成功路径仍正常返回', async () => {
     let calls = 0;
     vi.stubGlobal('fetch', vi.fn(async () => {

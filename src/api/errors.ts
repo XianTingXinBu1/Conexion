@@ -19,6 +19,14 @@ export interface ApiErrorResponseBody {
 }
 
 /**
+ * 请求被用户主动取消时的固定文案。
+ *
+ * 取消以字符串形式在传输层与业务层之间传递（`onError(error: string)`），
+ * 因此这里提供唯一来源，避免各处硬编码同一个魔法字符串。
+ */
+export const REQUEST_CANCELLED_MESSAGE = '请求已取消';
+
+/**
  * API 请求错误。
  *
  * 仅用于「带 HTTP 状态」的失败，例如响应非 2xx。

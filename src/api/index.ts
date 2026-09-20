@@ -5,7 +5,7 @@
  */
 
 // 错误类型与错误体解析
-export { ApiRequestError, ApiTimeoutError, extractApiErrorMessage, parseApiErrorMessage } from './errors';
+export { ApiRequestError, ApiTimeoutError, REQUEST_CANCELLED_MESSAGE, extractApiErrorMessage, parseApiErrorMessage } from './errors';
 export type { ApiErrorResponseBody } from './errors';
 
 // 传输原语（超时 / 取消）

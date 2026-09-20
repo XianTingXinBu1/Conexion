@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 interface Props {
   modelValue: string | number | undefined;
@@ -57,10 +57,21 @@ const handleBlur = (event: FocusEvent) => {
 const handleKeydown = (event: KeyboardEvent) => {
   emit('keydown', event);
 };
+
+const inputRef = ref<HTMLInputElement | null>(null);
+
+// 供父组件通过模板 ref 调用（模板 ref 拿到的是组件实例，
+// 不 expose 的话 value.focus 是 undefined，调用即抛错）。
+defineExpose({
+  focus: () => inputRef.value?.focus(),
+  blur: () => inputRef.value?.blur(),
+  select: () => inputRef.value?.select(),
+});
 </script>
 
 <template>
   <input
+    ref="inputRef"
     :type="type"
     :class="inputClasses"
     :placeholder="placeholder"

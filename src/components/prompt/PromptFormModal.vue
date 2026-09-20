@@ -32,7 +32,8 @@ const formData = ref<Partial<PromptItem> & { name: string; description: string; 
 
 // 表单错误状态
 const formError = ref('');
-const nameInputRef = ref<HTMLInputElement | null>(null);
+// FormInput 通过 defineExpose 暴露 focus()，模板 ref 拿到的是组件实例而不是原生元素
+const nameInputRef = ref<{ focus: () => void } | null>(null);
 
 // 计算是否可以保存
 const canSave = computed(() => {

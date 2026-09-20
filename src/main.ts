@@ -1,3 +1,6 @@
+// 全局共享样式：所有页面组件（含懒加载页面）都依赖其中的公共类，
+// 必须由入口引入，不能挂在某个懒加载页面上。
+import './styles/common.css';
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';

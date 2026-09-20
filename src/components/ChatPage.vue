@@ -6,7 +6,6 @@ import { ChatInput, MessageItem, ContextRing } from './chat';
 import { CompressionSummaryCard } from '@/modules/conversation-compression/components';
 import { useChatPageViewModel } from '@/features/chat/presentation/useChatPageViewModel';
 
-import '../styles/common.css';
 import '../styles/chat.css';
 
 const props = defineProps<ChatPageProps>();

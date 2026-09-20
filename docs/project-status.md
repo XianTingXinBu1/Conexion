@@ -76,6 +76,15 @@ server/                内建后端代理
 View -> ViewModel -> Controller/Facade -> UseCase -> Repository/Gateway -> Storage/API
 ```
 
+### 样式
+
+- 全局共享样式（`src/styles/common.css`：`.page` / `.section` / `.card` / `.btn`
+  / `.modal-btn` / `.dropdown` / `.tabs-container` 等）**只能由 `src/main.ts`
+  引入**。页面组件一律懒加载，把全局样式挂在某个页面上会导致其他页面从深链接
+  直接进入时样式整体失效（而且只在「先访问过那个页面」时才会碰巧正常）。
+- 页面私有样式（`src/styles/chat.css` 等）由对应页面引入；组件样式就近写在
+  `<style scoped>` 里，不要再往 `common.css` 里塞单页专用类。
+
 ### 错误处理
 
 - 带 HTTP 状态的失败抛 `ApiRequestError`，携带 `status` 与 `serverMessage`

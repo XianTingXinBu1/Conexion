@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick, watch } from 'vue';
 import { Send, Plus, Sparkles, Square } from '@lucide/vue';
-import type { ChatRequestStatus } from '@/composables/useChatApi';
+import type { ChatRequestStatus } from '@/features/chat/presentation/useChatApi';
 
 interface Props {
   enterToSend: boolean;

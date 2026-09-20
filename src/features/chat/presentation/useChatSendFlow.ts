@@ -7,7 +7,7 @@ import type {
   RegexRule,
   UserCharacter,
 } from '@/types';
-import { getNotificationMessage } from '../modules/notification';
+import { getNotificationMessage } from '@/modules/notification';
 import type { MergeMode } from '@/modules/system-prompt';
 import type { Ref } from 'vue';
 import { SendMessageUseCase } from '@/features/chat/application/sendMessage.usecase';

@@ -15,8 +15,8 @@ Conexion 聊天耦合长期治理方案
 
 因此本文档不再描述旧的“ChatPage 巨型页面”状态，而是作为后续继续治理的路线图。
 
-文档同步状态：对应代码快照 fb3fd73。最后校对：2026-09-20（修正聊天提示词 /
-压缩域迁入 src/modules/ 后的路径，并标注各优先级任务的当前完成度）。
+文档同步状态：最后校对 2026-09-20（聊天专属 composable 已全部迁入
+features/chat/presentation，P1 完成度同步更新）。
 
 
 一、最终目标
@@ -73,7 +73,17 @@ Modules（相对独立的域模块）:
 
 Vue adapter:
 
-  src/composables/useChatSendFlow.ts
+  src/features/chat/presentation/useChatSendFlow.ts
+
+聊天页面使用的其余 7 个 composable 也已迁入同一目录：
+
+  src/features/chat/presentation/useChatApi.ts
+  src/features/chat/presentation/useChatScrollPolicy.ts
+  src/features/chat/presentation/useChatMessageActions.ts
+  src/features/chat/presentation/useChatViewport.ts
+  src/features/chat/presentation/useChatPageInit.ts
+  src/features/chat/presentation/useChatStats.ts
+  src/features/chat/presentation/useChatSessionMeta.ts
 
 Repositories:
 
@@ -235,17 +245,17 @@ src/api/*
 六、后续治理优先级
 ------------------
 
-P1. 迁移 useChatSendFlow
+P1. 迁移聊天专属 composable
 
 当前：
 
-  src/composables/useChatSendFlow.ts
-
-建议迁到：
-
   src/features/chat/presentation/useChatSendFlow.ts
+  以及 useChatApi / useChatScrollPolicy / useChatMessageActions /
+  useChatViewport / useChatPageInit / useChatStats / useChatSessionMeta
 
-完成度：未开始。
+（原先全部位于 src/composables/）
+
+完成度：已完成。
 
 要求：
 
@@ -253,6 +263,8 @@ P1. 迁移 useChatSendFlow
 - 不改发送行为。
 - 同步调整测试。
 - 验证：npm run test:run && npm run check:architecture
+
+回潮防护：架构脚本已新增规则，禁止聊天专属 composable 回到 src/composables/。
 
 
 P2. 防止 useChatPageViewModel 膨胀
@@ -371,4 +383,7 @@ P5. 横切 UI 统一
 九、一句话总结
 --------------
 
-聊天模块第一阶段瘦身已经完成。后续治理重点是保持边界不回潮，并把仍散落在全局 composables、页面和 services 中的聊天 / 会话专属逻辑按收益逐步收口。
+聊天模块第一阶段瘦身已经完成，聊天专属 composable 也已全部落入
+features/chat/presentation。后续治理重点是保持边界不回潮（架构脚本已
+新增防回潮规则），并把仍散落在页面和 services 中的会话专属逻辑按收益
+逐步收口。

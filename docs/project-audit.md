@@ -2,9 +2,9 @@
 
 本文档记录 Conexion 当前项目健康度、已完成的结构治理、仍需关注的风险点和建议优先级。
 
-> 文档同步状态：对应代码快照 `fb3fd73`。最后校对：2026-09-20。
-> 本次校对内容：修正聊天提示词 / 压缩域迁入 `src/modules/` 后的路径，
-> 标注 P3（确认弹窗统一）已完成，并同步“已完成的好变化”清单。
+> 文档同步状态：最后校对 2026-09-20。
+> 本次校对内容：聊天专属 composable 已全部迁入 `src/features/chat/presentation/`，
+> 同步移除「聊天逻辑留在全局 composables」这一风险项。
 
 ## 总体结论
 
@@ -19,10 +19,9 @@
 
 当前主要风险不再是“ChatPage 单文件过重”，而是：
 
-1. 聊天专属逻辑仍有一部分留在全局 `src/composables`。
-2. 非聊天页面仍有较厚页面组件。
-3. 部分模块文档和历史蓝图容易与当前状态混淆。
-4. 页面级联动测试仍偏少。
+1. 非聊天页面仍有较厚页面组件。
+2. 部分模块文档和历史蓝图容易与当前状态混淆。
+3. 页面级联动测试仍偏少。
 
 ## 测试现状
 
@@ -65,9 +64,13 @@ npm run test:coverage
 
 ### 仍未完全收口的地方
 
-- `src/composables/useChatSendFlow.ts` 是聊天专属适配器，但还位于全局 composables。
 - `useChatPageViewModel` 装配依赖较多，后续可继续分组。
 - conversation / regex / knowledge / character / prompt-preset 还未全部迁入 feature 目录。
+
+> 注：聊天专属 composable（useChatApi / useChatSendFlow / useChatScrollPolicy /
+> useChatMessageActions / useChatViewport / useChatPageInit / useChatStats /
+> useChatSessionMeta）已全部迁入 `src/features/chat/presentation/`，
+> 不再属于「未收口」范围。
 
 > 注：聊天提示词与压缩域已于 `335fdc6` / `61d7a9a` 迁入 `src/modules/`，不再属于“未收口”范围。
 
@@ -180,15 +183,14 @@ src/components/common/ConfirmDialog.vue
 - 保持只做组合，不写业务规则。
 - 如果继续增长，按 feature controller 分组输出。
 
-### 2. `src/composables/useChatSendFlow.ts`
+### 2. `src/features/chat/presentation/useChatSendFlow.ts`
 
 它是 Vue adapter，负责连接 `SendMessageUseCase` 与页面状态。
 
-风险：
+现状：
 
-- 聊天专属逻辑仍放在全局 composables。
-
-建议：
+- 已迁入 chat feature，全局 composables 不再承载聊天专属逻辑。
+- 定位不变：只做适配，不回流业务流程。
 
 - 后续可迁入 `src/features/chat/presentation/`。
 - 保持它只做适配，不回流业务流程。
@@ -270,8 +272,8 @@ npm run health-check
 
 ### P1：继续收口聊天适配层
 
-- 评估 `useChatSendFlow` 是否迁到 `features/chat/presentation`。
-- 避免 `useChatPageViewModel` 膨胀成新总控。
+- 聊天专属 composable 已全部迁入 `features/chat/presentation`，并有架构规则防回潮。
+- 下一步：避免 `useChatPageViewModel` 膨胀成新总控。
 
 ### P2：整理 API 预设页面
 

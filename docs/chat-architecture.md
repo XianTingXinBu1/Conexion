@@ -2,8 +2,8 @@
 
 本文档说明 Conexion 当前聊天模块的分层、职责和边界规则。
 
-> 文档同步状态：对应代码快照 `fb3fd73`（统一聊天上下文构建链并收敛压缩提示词路径）。
-> 最后校对：2026-09-20（聊天提示词与压缩域迁入 `src/modules/` 后的路径修正）。
+> 文档同步状态：随 2026-09-20 的聊天专属 composable 迁移一并更新（8 个 useChat* 已从 `src/composables/` 迁入 `src/features/chat/presentation/`）。
+> 最后校对：2026-09-20。
 
 ## 当前状态
 
@@ -91,7 +91,7 @@ src/modules/conversation-compression/presentation/useConversationCompression.ts
 ### Vue Adapter
 
 ```txt
-src/composables/useChatSendFlow.ts
+src/features/chat/presentation/useChatSendFlow.ts
 ```
 
 职责：
@@ -102,8 +102,10 @@ src/composables/useChatSendFlow.ts
 
 注意：
 
-- 它不应重新承载完整发送业务流程。
-- 后续可考虑迁入 `features/chat/presentation`，减少全局 composables 的聊天专属逻辑。
+- 它不应重新承载完整发送业务流程，只做 Vue ref 与 usecase 之间的适配。
+
+聊天专属的 composable 均位于 `src/features/chat/presentation/`，全局
+`src/composables/` 只保留跨页面通用能力；该约束由架构脚本固定（见边界规则）。
 
 ### Application UseCases
 

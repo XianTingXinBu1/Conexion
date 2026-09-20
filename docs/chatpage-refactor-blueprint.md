@@ -2,7 +2,7 @@
 
 这份文档记录 `src/components/ChatPage.vue` 当前状态和后续重构方向。
 
-> 文档同步状态：对应代码快照 `fb3fd73`。最后校对：2026-09-20（修正提示词/压缩域迁入 `src/modules/` 后的路径，并标注尚未完成的阶段一任务）。
+> 文档同步状态：随 2026-09-20 的聊天专属 composable 迁移一并更新。最后校对：2026-09-20。
 
 ## 当前状态
 
@@ -21,7 +21,7 @@ src/features/chat/presentation/useChatPageViewModel.ts
 src/features/chat/presentation/useChatSessionFacade.ts
 src/features/chat/presentation/useChatPromptController.ts
 src/features/chat/presentation/useChatLifecycleController.ts
-src/composables/useChatSendFlow.ts
+src/features/chat/presentation/useChatSendFlow.ts
 src/features/chat/application/sendMessage.usecase.ts
 src/features/chat/application/streamMessageAssembler.ts
 src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts
@@ -149,33 +149,25 @@ useChatPageUiState.ts
 
 但只有在真的变复杂时再拆，避免空中楼阁。
 
-### 2. `useChatSendFlow` 仍在全局 composables
+### 2. 聊天专属 composable 已全部落入 chat feature（已完成）
 
-文件：
-
-```txt
-src/composables/useChatSendFlow.ts
-```
-
-它现在是 Vue adapter，不是发送业务本体。
-
-后续可考虑迁到：
+聊天页面使用的 8 个 composable（useChatApi / useChatSendFlow /
+useChatScrollPolicy / useChatMessageActions / useChatViewport /
+useChatPageInit / useChatStats / useChatSessionMeta）已全部位于：
 
 ```txt
-src/features/chat/presentation/useChatSendFlow.ts
+src/features/chat/presentation/
 ```
 
-收益：
+全局 `src/composables/` 现在只保留跨页面通用能力（useTheme、useConfirmDialog、
+useDraggable、useListManager、useCharacters、useKnowledgeBases 等），
+聊天专属逻辑不再散落在全局目录。
 
-- 聊天专属逻辑更靠近 chat feature。
-- 全局 composables 更干净。
+它现在是 Vue adapter，不是发送业务本体，这个定位保持不变——只是从全局
+composables 迁到了 chat feature 内。
 
-风险：
-
-- 需要同步调整测试和 import。
-- 不应顺手改行为。
-
-建议作为独立小任务处理。
+收益已经拿到：聊天专属逻辑更靠近 chat feature，全局 composables 只剩通用能力。
+下一步不再是迁移，而是继续防止它重新承载业务流程。
 
 ### 3. stream 与 regex 的行为边界
 
@@ -211,7 +203,9 @@ src/features/chat/presentation/useChatSendFlow.ts
 2. 更新相关测试路径。
 3. 跑 `npm run test:run` 和 `npm run check:architecture`。
 
-当前状态：未完成。`useChatSendFlow` 仍位于 `src/composables/useChatSendFlow.ts`。
+当前状态：已完成。不仅 useChatSendFlow，聊天页面使用的 8 个 composable
+已一并迁入 `src/features/chat/presentation/`，并新增架构规则禁止它们回到
+全局 composables 目录。
 
 ### 第二阶段：继续瘦 ViewModel
 
@@ -282,4 +276,6 @@ npm run health-check
 
 ## 一句话总结
 
-`ChatPage.vue` 的核心瘦身已经完成。下一步重点不是继续追求页面行数，而是防止 `useChatPageViewModel` 和 `useChatSendFlow` 变成新的耦合中心。
+`ChatPage.vue` 的核心瘦身已经完成，聊天专属 composable 也已全部落入
+`src/features/chat/presentation/`。下一步重点不是继续追求页面行数，
+而是防止 `useChatPageViewModel` 变成新的耦合中心。

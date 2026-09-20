@@ -1,6 +1,6 @@
 import { computed, type Ref } from 'vue';
 import type { ChatMessage, Message, Preset } from '@/types';
-import { countMessagesTokens } from '../utils/tokenCounter';
+import { countMessagesTokens } from '@/utils/tokenCounter';
 import {
   getContextUsagePercent,
   isCompressionThresholdReached,

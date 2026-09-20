@@ -2,7 +2,7 @@ import { ref } from 'vue';
 import type { Ref } from 'vue';
 import type { AICharacter, Message, RegexRule } from '@/types';
 import { loadRegexRules as loadRegexRulesFromRepository } from '@/repositories/regexRuleRepository';
-import { useChatPageInit } from '@/composables/useChatPageInit';
+import { useChatPageInit } from './useChatPageInit';
 import type { ChatPageProps } from './chatPageTypes';
 
 interface UseChatLifecycleControllerOptions {

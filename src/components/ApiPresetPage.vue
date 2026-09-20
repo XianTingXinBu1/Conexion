@@ -27,7 +27,6 @@ const {
   confirmDialogProps,
   ConfirmDialog,
   loadPresets,
-  loadSelectedPreset,
   selectPreset,
   saveCurrentPreset,
   createNewPreset,
@@ -135,8 +134,8 @@ function initializePresetForm() {
 
 // 初始化
 onMounted(async () => {
+  // loadPresets 会一并同步后端记住的「选中预设」
   await loadPresets();
-  await loadSelectedPreset();
   loadModels();
   initializePresetForm();
 });

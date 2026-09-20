@@ -163,6 +163,11 @@ npm run health-check
 - **自动压缩时机**：由 `SendMessageUseCase` 在发送前后判断。压缩失败应中止发送
   并提示；压缩摘要参与 Prompt 构建；不要出现 UI controller 与 usecase 各判断
   一套规则的情况。
+- **预设状态的消费方**：`useApiPresets()` 每次调用都是独立实例，`currentPreset`
+  只有在 `loadPresets()`（会一并同步后端记住的选中项）之后才有意义。请求参数走
+  `repositories/apiPresetRepository.loadCurrentApiPreset()` 直接读设置，统计展示
+  走 composable 的 `currentPreset`，两条路径必须指向同一个预设，否则会出现
+  「改了预设但上下文上限/使用率不变」。
 
 ---
 

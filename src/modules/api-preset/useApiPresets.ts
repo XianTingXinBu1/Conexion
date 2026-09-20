@@ -67,6 +67,10 @@ export function useApiPresets() {
   // 加载预设
   async function loadPresets() {
     presets.value = await loadApiPresetsWithDefaults();
+    // 列表必须和后端记住的「选中项」一起同步：只加载列表时 selectedPreset
+    // 还停在初始值 'default'，消费 currentPreset 的页面（如聊天页的上下文统计）
+    // 会静默拿到内置「默认预设」的数值，而不是用户实际选中并编辑的预设。
+    await loadSelectedPreset();
   }
 
   // 保存预设

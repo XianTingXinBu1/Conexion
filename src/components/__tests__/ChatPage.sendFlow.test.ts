@@ -54,6 +54,22 @@ let streamPlan: StreamPlan = {};
 let chatCompletionBodies: Record<string, unknown>[] = [];
 let conversationMutations: string[] = [];
 
+/** 用于卡住 /api/api-presets 的闸门，测试「预设加载期间取消」这个窗口 */
+let presetGate: Promise<void> | null = null;
+let openPresetGate: (() => void) | null = null;
+
+const armPresetGate = () => {
+  presetGate = new Promise<void>(resolve => {
+    openPresetGate = resolve;
+  });
+};
+
+const releasePresetGate = () => {
+  openPresetGate?.();
+  presetGate = null;
+  openPresetGate = null;
+};
+
 const jsonResponse = (data: unknown, status = 200): Response =>
   new Response(JSON.stringify(data), {
     status,
@@ -112,6 +128,11 @@ const getUrl = (input: RequestInfo | URL): string => {
 const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
   const url = getUrl(input);
   const method = (init.method ?? 'GET').toUpperCase();
+
+  // 预设加载可以在测试里被挂住，用来制造「请求尚未发出但用户已看到停止按钮」的窗口
+  if (url.includes('/api/api-presets') && presetGate) {
+    await presetGate;
+  }
 
   if (url.includes('/api/chat/completions')) {
     chatCompletionBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
@@ -216,6 +237,8 @@ beforeEach(() => {
   streamPlan = {};
   chatCompletionBodies = [];
   conversationMutations = [];
+  presetGate = null;
+  openPresetGate = null;
   localStorage.clear();
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
@@ -290,6 +313,34 @@ describe('ChatPage 发送链路', () => {
     });
 
     // 取消不应被当成错误上报
+    expect(container.textContent).not.toContain('错误:');
+  });
+
+  it('取消路径：预设加载期间取消不应发出上游请求，也不应留下空白占位消息', async () => {
+    streamPlan = { chunks: ['不应到达前端'] };
+
+    const { container } = await renderChatPage();
+
+    // 挂住预设加载，制造真实的竞态窗口
+    armPresetGate();
+    await sendMessage(container, '测试内容');
+
+    // 此时 requestStatus 已是 sending，用户能看到停止按钮，但上游请求还没发出
+    await waitFor(() => {
+      expect(container.querySelector('.send-btn.stop-btn')).toBeTruthy();
+    });
+    expect(chatCompletionBodies).toHaveLength(0);
+
+    await fireEvent.click(getStopButton(container));
+    releasePresetGate();
+
+    // 取消必须生效：占位消息收尾为已停止生成
+    await waitFor(() => {
+      expect(container.textContent).toContain('已停止生成');
+    });
+
+    // 且上游请求一次都不该发出
+    expect(chatCompletionBodies).toHaveLength(0);
     expect(container.textContent).not.toContain('错误:');
   });
 

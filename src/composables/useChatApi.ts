@@ -230,6 +230,18 @@ export function useChatApi() {
     logApi('开始发送聊天请求（流式）', { messageCount: messages.length });
 
     const preset = await loadCurrentPreset();
+
+    // 预设加载可能包含多次网络往返，这期间 requestStatus 已经是 sending，
+    // 用户看得到「停止」按钮。若此时已经取消，必须在这里就停下来，
+    // 否则请求会照常发出，表现为「点了停止没有反应」。
+    // 这里走 onError('请求已取消') 是为了复用调用方已有的取消收尾逻辑
+    // （占位消息标记为已停止生成并落库）。
+    if (wasCancelled.value) {
+      logApi('预设加载期间已取消，跳过流式请求');
+      await onError('请求已取消');
+      return;
+    }
+
     if (!preset) {
       const errorMsg = '请先配置 API 预设（包括 URL 和模型名称）并保存';
       error.value = errorMsg;
@@ -348,14 +360,18 @@ export function useChatApi() {
    * 取消当前请求
    */
   function cancelRequest() {
-    if (!activeChatApi) {
+    // 注意：这里不能用 activeChatApi 当「有没有请求在跑」的判据。
+    // 它是在预设加载完成之后才被赋值的，用它判断会漏掉
+    // 「已进入 sending 但上游请求尚未发出」的窗口，使得这段时间内
+    // 点停止被静默忽略。requestStatus 才是这个窗口的真实信号。
+    if (!isRequestActive.value) {
       return;
     }
 
     wasCancelled.value = true;
     error.value = null;
     setRequestStatus('cancelled');
-    activeChatApi.cancelActiveStream();
+    activeChatApi?.cancelActiveStream();
     logApi('已取消当前流式请求');
   }
 

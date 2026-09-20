@@ -352,10 +352,9 @@ npm run check:architecture
 
 推荐优先阅读：
 
-- `docs/chat-architecture.md`：当前聊天模块架构与边界
-- `docs/project-audit.md`：当前项目健康度与风险点
-- `docs/chatpage-refactor-blueprint.md`：聊天页后续重构蓝图
-- `docs/chat-coupling-permanent-refactor-plan.txt`：聊天耦合长期治理路线图
+- `docs/chat-architecture.md`：聊天模块分层与边界规则
+- `docs/project-status.md`：项目现状、工程约定与后续路线
+- `docs/backend-api.txt`：后端 API 契约
 
 模块文档：
 
@@ -366,6 +365,7 @@ npm run check:architecture
 - `src/modules/markdown/README.md`
 - `src/modules/notification/README.md`
 - `src/modules/system-prompt/README.md`
+- `src/modules/system-prompt/USAGE.md`
 
 ## License
 

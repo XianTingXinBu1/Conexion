@@ -224,25 +224,21 @@ npm run check:architecture
 npm run health-check
 ```
 
-当前检查规则包括：
+规则由 `scripts/check-architecture-boundaries.js` 固化：
 
-1. `ChatPage.vue` 不允许直接 import：
-   - composables
-   - repositories
-   - services
-   - modules
-   - api
+1. `ChatPage.vue` 只依赖 chat presentation 入口、chat UI、压缩模块与共享样式。
+   不允许 import composables / repositories / services / api，
+   也不允许 import 除 `conversation-compression` 之外的 modules。
+2. chat presentation 不允许直接 import `@/utils/storage` / `@/constants`。
+3. chat application 不允许 import Vue / UI 组件 / storage / notification / composables。
+4. 压缩域与 chat-prompt 适配层不允许回到旧路径（`utils/`、`composables/`、
+   `features/chat/application/` 等）。
+5. 聊天专属 composable 不允许回到 `src/composables/`。
+6. `modules/system-prompt` 不允许依赖 features / composables / repositories / components。
 
-2. chat presentation 不允许直接 import：
-   - `@/utils/storage`
-   - `@/constants`
-
-3. chat application 不允许 import：
-   - Vue
-   - UI components
-   - storage
-   - notification
-   - composables
+> 路径类规则请用 `banned: true`（按文件位置判定）。此前用
+> `forbidden: [/.*/]` 表达时，因为 `forbidden` 匹配的是 import 说明符，
+> 一个不含任何 import 的文件可以绕过检查。
 
 ## 新增聊天能力时怎么放
 

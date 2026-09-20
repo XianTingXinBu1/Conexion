@@ -30,8 +30,7 @@ src/modules/markdown/
 ├── types.ts
 ├── markdown.test.ts
 ├── components/
-│   ├── MarkdownRenderer.vue
-│   └── CodeBlock.vue
+│   └── MarkdownRenderer.vue
 ├── styles/
 └── README.md
 ```

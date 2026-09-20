@@ -31,10 +31,10 @@ src/modules/system-prompt/
 │   ├── index.ts
 │   └── constants.ts
 ├── __tests__/
-│   └── builder.test.ts
+│   ├── builder.test.ts
+│   └── merger.test.ts
 ├── README.md
-├── USAGE.md
-└── SUMMARY.md
+└── USAGE.md
 ```
 
 ## 快速开始
@@ -162,7 +162,7 @@ mergeMessages(messages: ChatMessage[], mode: MergeMode): MergeResult
 ChatPage.vue
   -> useChatPageViewModel
     -> useChatPromptController / useChatSendFlow / useChatStats
-      -> buildSystemMessagesUseCase
+      -> buildChatSystemMessagesUseCase
         -> buildSystemPrompt
 ```
 
@@ -173,7 +173,7 @@ src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts
 src/modules/chat-prompt/presentation/useChatPromptBuilder.ts
 src/features/chat/presentation/useChatPromptController.ts
 src/features/chat/application/sendMessage.usecase.ts
-src/composables/useChatStats.ts
+src/features/chat/presentation/useChatStats.ts
 ```
 
 ## 设计原则

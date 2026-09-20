@@ -2,6 +2,9 @@
 
 本文档说明 Conexion 当前聊天模块的分层、职责和边界规则。
 
+> 文档同步状态：对应代码快照 `fb3fd73`（统一聊天上下文构建链并收敛压缩提示词路径）。
+> 最后校对：2026-09-20（聊天提示词与压缩域迁入 `src/modules/` 后的路径修正）。
+
 ## 当前状态
 
 聊天页已经从早期的“大页面总控”收敛为较薄的 View：
@@ -69,16 +72,18 @@ src/features/chat/presentation/useChatPageViewModel.ts
 
 ```txt
 src/features/chat/presentation/useChatSessionFacade.ts
-src/features/chat/presentation/useChatCompressionController.ts
 src/features/chat/presentation/useChatPromptController.ts
 src/features/chat/presentation/useChatLifecycleController.ts
 src/features/chat/presentation/chatPageTypes.ts
+
+src/modules/conversation-compression/presentation/useChatCompressionController.ts
+src/modules/conversation-compression/presentation/useConversationCompression.ts
 ```
 
 职责：
 
 - `useChatSessionFacade`：会话加载、创建、保存、编辑、删除、临时会话判断。
-- `useChatCompressionController`：压缩按钮行为、压缩通知、压缩状态适配。
+- `useChatCompressionController`：压缩按钮行为、压缩通知、压缩状态适配（属于压缩模块）。
 - `useChatPromptController`：prompt builder、prompt preview、token details 控制。
 - `useChatLifecycleController`：页面初始化、regex 加载、生命周期绑定。
 - `chatPageTypes`：页面 props 类型。
@@ -105,14 +110,15 @@ src/composables/useChatSendFlow.ts
 ```txt
 src/features/chat/application/sendMessage.usecase.ts
 src/features/chat/application/streamMessageAssembler.ts
-src/features/chat/application/buildSystemMessages.usecase.ts
+
+src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts
 ```
 
 职责：
 
 - `sendMessage.usecase`：发送消息主流程。
 - `streamMessageAssembler`：stream chunk buffer、flush、assistant regex 应用。
-- `buildSystemMessages.usecase`：统一真实发送和 prompt 预览的系统提示词构建入口。
+- `buildChatSystemMessages.usecase`：统一真实发送和 prompt 预览的系统提示词构建入口（属于 chat-prompt 模块）。
 
 禁止：
 
@@ -128,6 +134,7 @@ src/repositories/regexRuleRepository.ts
 src/repositories/knowledgeBaseRepository.ts
 src/repositories/promptPresetRepository.ts
 src/repositories/apiPresetRepository.ts
+src/repositories/settingsRepository.ts
 ```
 
 职责：
@@ -147,7 +154,7 @@ ChatPage.vue
         -> apply user regex
         -> auto compression if needed
         -> create/save conversation
-        -> buildSystemMessagesUseCase
+        -> buildChatSystemMessagesUseCase
         -> sendStreamChatRequest
         -> StreamMessageAssembler
         -> saveConversation
@@ -158,25 +165,25 @@ ChatPage.vue
 
 ```txt
 useChatPromptController
-  -> useChatPromptBuilder
-    -> buildSystemMessagesUseCase
-      -> buildSystemPrompt
+  -> useChatPromptBuilder（src/modules/chat-prompt/presentation/）
+    -> buildChatSystemMessagesUseCase（src/modules/chat-prompt/application/）
+      -> buildSystemPrompt（src/modules/system-prompt/core/builder.ts）
 ```
 
-真实发送和 prompt 预览都使用同一个 `buildSystemMessagesUseCase`，避免两套构建逻辑分叉。
+真实发送和 prompt 预览都使用同一个 `buildChatSystemMessagesUseCase`，避免两套构建逻辑分叉。
 
 ## 会话压缩调用链
 
 ```txt
 TokenDetailsPanel / compression warning
   -> handleCompressConversation
-    -> useChatCompressionController
+    -> useChatCompressionController（src/modules/conversation-compression/presentation/）
       -> useConversationCompression
         -> sendChatRequest
         -> saveConversation
 ```
 
-压缩通知只在 presentation controller 中处理，压缩核心逻辑仍在 composable / utility 层。
+压缩通知只在 presentation controller 中处理，压缩核心规则（阈值、切分、摘要格式、有效历史计算）位于 `src/modules/conversation-compression/core/conversationCompression.ts`，不依赖 Vue 与 UI。
 
 ## API 代理链路
 
@@ -185,8 +192,10 @@ TokenDetailsPanel / compression warning
 ```txt
 src/api/*
   -> /api/*
-    -> server/index.ts
-      -> upstream OpenAI-compatible API
+    -> server/index.ts（进程入口）
+      -> server/app.ts + server/routes/*.ts
+        -> server/upstream/client.ts
+          -> upstream OpenAI-compatible API
 ```
 
 后端当前支持：
@@ -266,6 +275,23 @@ src/features/chat/application/xxx.usecase.ts
 ```
 
 要求可单测，不能 import Vue / UI / storage。
+
+提示词构建、预设加载等聊天提示词相关业务不要放进 `features/chat/application`，而是放在：
+
+```txt
+src/modules/chat-prompt/
+  application/   # usecase
+  presentation/  # builder / panel controller
+```
+
+会话压缩相关业务放在：
+
+```txt
+src/modules/conversation-compression/
+  core/          # 纯函数规则（阈值 / 切分 / 摘要格式）
+  presentation/  # controller / composable
+  components/    # 摘要卡片等 UI
+```
 
 ### 新存储读写
 

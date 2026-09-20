@@ -2,6 +2,8 @@
 
 这份文档记录 `src/components/ChatPage.vue` 当前状态和后续重构方向。
 
+> 文档同步状态：对应代码快照 `fb3fd73`。最后校对：2026-09-20（修正提示词/压缩域迁入 `src/modules/` 后的路径，并标注尚未完成的阶段一任务）。
+
 ## 当前状态
 
 `ChatPage.vue` 已经不再是早期的大型业务页面。
@@ -17,13 +19,13 @@
 ```txt
 src/features/chat/presentation/useChatPageViewModel.ts
 src/features/chat/presentation/useChatSessionFacade.ts
-src/features/chat/presentation/useChatCompressionController.ts
 src/features/chat/presentation/useChatPromptController.ts
 src/features/chat/presentation/useChatLifecycleController.ts
 src/composables/useChatSendFlow.ts
 src/features/chat/application/sendMessage.usecase.ts
-src/features/chat/application/buildSystemMessages.usecase.ts
 src/features/chat/application/streamMessageAssembler.ts
+src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts
+src/modules/conversation-compression/presentation/useChatCompressionController.ts
 ```
 
 ## 已完成的重构
@@ -44,13 +46,19 @@ src/features/chat/application/streamMessageAssembler.ts
 真实发送和 Prompt 预览都经由：
 
 ```txt
-src/features/chat/application/buildSystemMessages.usecase.ts
+src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts
 ```
 
 底层使用：
 
 ```txt
 src/modules/system-prompt/core/builder.ts
+```
+
+聊天提示词适配层（builder / panel controller / 预设加载）也在同一模块内：
+
+```txt
+src/modules/chat-prompt/presentation/
 ```
 
 ### 3. 会话行为收口
@@ -109,6 +117,9 @@ npm run check:architecture
 - `ChatPage.vue` 不直接依赖业务 composable / repository / service / module / api。
 - chat presentation 不直接访问 raw storage / constants。
 - chat application 不依赖 Vue / UI / storage / notification / composables。
+- 压缩域不允许回到 `utils/`、`composables/`、`features/chat/presentation/` 旧路径。
+- 聊天提示词适配层不允许回到 `features/chat/application/`、`composables/` 旧路径。
+- `modules/system-prompt` 不依赖 features / composables / repositories / components。
 
 ## 当前仍值得关注的点
 
@@ -199,6 +210,8 @@ src/features/chat/presentation/useChatSendFlow.ts
 1. 将 `useChatSendFlow` 迁到 `features/chat/presentation`。
 2. 更新相关测试路径。
 3. 跑 `npm run test:run` 和 `npm run check:architecture`。
+
+当前状态：未完成。`useChatSendFlow` 仍位于 `src/composables/useChatSendFlow.ts`。
 
 ### 第二阶段：继续瘦 ViewModel
 

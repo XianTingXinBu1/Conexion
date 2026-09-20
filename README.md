@@ -203,10 +203,12 @@ npm run health-check:verbose
 后端入口：
 
 ```txt
-server/index.ts
+server/index.ts        # 进程入口：读取配置并启动 @hono/node-server
+server/app.ts          # Hono app 装配：CORS、路由注册、错误处理
+server/routes/*.ts     # 按领域拆分的路由（proxy / conversations / presets / ...）
 ```
 
-当前支持接口：
+上游代理接口：
 
 ```txt
 GET  /api/health
@@ -214,6 +216,26 @@ GET  /api/models
 POST /api/models
 POST /api/connection-test
 POST /api/chat/completions
+```
+
+数据读写接口（本地 JSON 数据源）：
+
+```txt
+/api/conversations
+/api/characters/users
+/api/characters/ai
+/api/knowledge-bases
+/api/api-presets
+/api/prompt-presets
+/api/regex-rules
+/api/settings
+DELETE /api/data
+```
+
+完整接口说明见：
+
+```txt
+docs/backend-api.txt
 ```
 
 代理行为：
@@ -275,12 +297,13 @@ View -> ViewModel -> Controller/Facade -> UseCase -> Repository/Gateway -> Stora
 src/components/ChatPage.vue
 src/features/chat/presentation/useChatPageViewModel.ts
 src/features/chat/presentation/useChatSessionFacade.ts
-src/features/chat/presentation/useChatCompressionController.ts
 src/features/chat/presentation/useChatPromptController.ts
 src/features/chat/presentation/useChatLifecycleController.ts
 src/features/chat/application/sendMessage.usecase.ts
-src/features/chat/application/buildSystemMessages.usecase.ts
 src/features/chat/application/streamMessageAssembler.ts
+src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts
+src/modules/conversation-compression/presentation/useChatCompressionController.ts
+src/modules/conversation-compression/core/conversationCompression.ts
 ```
 
 架构边界由脚本检查：
@@ -336,6 +359,8 @@ npm run check:architecture
 模块文档：
 
 - `src/modules/api-preset/README.md`
+- `src/modules/chat-prompt/`（暂无独立 README，见 `docs/chat-architecture.md`）
+- `src/modules/conversation-compression/`（暂无独立 README，见 `docs/chat-architecture.md`）
 - `src/modules/debug/README.md`
 - `src/modules/markdown/README.md`
 - `src/modules/notification/README.md`

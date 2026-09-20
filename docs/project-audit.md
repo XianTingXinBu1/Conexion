@@ -2,14 +2,19 @@
 
 本文档记录 Conexion 当前项目健康度、已完成的结构治理、仍需关注的风险点和建议优先级。
 
+> 文档同步状态：对应代码快照 `fb3fd73`。最后校对：2026-09-20。
+> 本次校对内容：修正聊天提示词 / 压缩域迁入 `src/modules/` 后的路径，
+> 标注 P3（确认弹窗统一）已完成，并同步“已完成的好变化”清单。
+
 ## 总体结论
 
 当前项目已经完成一轮重要的聊天页收敛：
 
 - `ChatPage.vue` 已经从早期的大型业务页面变成较薄的 View。
 - 聊天发送主流程已经进入 `SendMessageUseCase`。
-- Prompt 构建已有统一入口。
-- 聊天模块已经具备架构边界检查。
+- Prompt 构建已有统一入口（`src/modules/chat-prompt/`）。
+- 会话压缩已收敛为独立模块（`src/modules/conversation-compression/`）。
+- 聊天模块已经具备架构边界检查（含压缩域与 chat-prompt 的旧路径回流拦截）。
 - 后端代理已经加入项目，前端请求统一走本地 `/api`。
 
 当前主要风险不再是“ChatPage 单文件过重”，而是：
@@ -53,36 +58,35 @@ npm run test:coverage
 - `src/components/ChatPage.vue` 只负责渲染和事件绑定。
 - `src/features/chat/presentation/useChatPageViewModel.ts` 成为聊天页 composition root。
 - `src/features/chat/application/sendMessage.usecase.ts` 承载发送主流程。
-- `src/features/chat/application/buildSystemMessages.usecase.ts` 统一真实发送与预览的 Prompt 构建。
+- `src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts` 统一真实发送与预览的 Prompt 构建。
 - `src/features/chat/application/streamMessageAssembler.ts` 管理 stream buffer 与 flush。
+- `src/modules/conversation-compression/core/conversationCompression.ts` 承载压缩规则，`presentation/` 承载控制器与适配。
 - `scripts/check-architecture-boundaries.js` 固化聊天边界规则。
 
 ### 仍未完全收口的地方
 
 - `src/composables/useChatSendFlow.ts` 是聊天专属适配器，但还位于全局 composables。
 - `useChatPageViewModel` 装配依赖较多，后续可继续分组。
-- conversation / regex / prompt / knowledge / character 还未全部迁入 feature 目录。
+- conversation / regex / knowledge / character / prompt-preset 还未全部迁入 feature 目录。
+
+> 注：聊天提示词与压缩域已于 `335fdc6` / `61d7a9a` 迁入 `src/modules/`，不再属于“未收口”范围。
 
 ## 重复实现 / 责任重叠
 
-### 1. 确认弹窗系统
+### 1. 确认弹窗系统（已解决）
 
-涉及：
+原状态：同一类确认交互存在两套组件（`src/components/ConfirmDialog.vue` 与
+`src/components/common/ConfirmDialog.vue`）和一套 composable，调用方式不统一。
+
+现状（提交 `8830a5d`）：
 
 ```txt
-src/components/ConfirmDialog.vue
-src/components/common/ConfirmDialog.vue
-src/composables/useConfirmDialog.ts
+src/components/common/ConfirmDialog.vue   ← 唯一实现
+src/composables/useConfirmDialog.ts       ← 唯一调用入口
+src/components/ConfirmDialog.vue          ← 已删除
 ```
 
-问题：
-
-同一类确认交互存在两套组件和一套 composable，调用方式不统一。
-
-建议：
-
-- 明确一个组件作为唯一默认实现。
-- 旧组件逐步迁移或删除。
+结论：该问题已关闭，仅保留 `common/ConfirmDialog.vue` 作为唯一确认弹窗实现。
 
 ### 2. 会话管理
 
@@ -276,7 +280,8 @@ npm run health-check
 
 ### P3：统一确认弹窗 / Modal / PageHeader
 
-- 明确通用 UI 唯一入口。
+- 确认弹窗已完成统一（`8830a5d`）：`common/ConfirmDialog.vue` 为唯一实现。
+- 待办：Modal / PageHeader / EmptyState 的唯一入口。
 - 降低页面重复实现。
 
 ### P4：提升页面级测试

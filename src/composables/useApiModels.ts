@@ -96,8 +96,6 @@ export function useApiModels() {
       baseURL: url,
       apiKey,
       timeout: 30000,
-      maxRetries: 2,
-      retryDelay: 1000,
     };
 
     const modelsApi = new ModelsApi(config);

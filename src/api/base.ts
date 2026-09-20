@@ -11,8 +11,6 @@ export interface ApiClientConfig {
   baseURL: string;
   apiKey?: string;
   timeout?: number;
-  maxRetries?: number;
-  retryDelay?: number;
 }
 
 /**
@@ -55,16 +53,12 @@ export class ApiClient {
   public baseURL: string;
   public apiKey?: string;
   public timeout: number;
-  public maxRetries: number;
-  public retryDelay: number;
   public backendBaseURL: string;
 
   constructor(config: ApiClientConfig) {
     this.baseURL = config.baseURL.replace(/\/$/, '');
     this.apiKey = config.apiKey;
     this.timeout = config.timeout ?? 60000;
-    this.maxRetries = config.maxRetries ?? 3;
-    this.retryDelay = config.retryDelay ?? 1000;
     this.backendBaseURL = '/api';
   }
 
@@ -103,39 +97,6 @@ export class ApiClient {
   }
 
   /**
-   * 延迟函数
-   */
-  public delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * 判断是否应该重试
-   */
-  public shouldRetry(error: Error, attempt: number): boolean {
-    if (attempt >= this.maxRetries) {
-      return false;
-    }
-
-    // 网络错误可以重试
-    if (error.message.includes('Failed to fetch') || error.message.includes('network')) {
-      return true;
-    }
-
-    // 5xx 服务器错误可以重试
-    if (error instanceof ApiError && error.statusCode && error.statusCode >= 500) {
-      return true;
-    }
-
-    // 408 请求超时可以重试
-    if (error instanceof ApiError && error.statusCode === 408) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
    * 解析错误消息
    */
   public parseErrorMessage(errorText: string): string {
@@ -149,6 +110,10 @@ export class ApiClient {
 
   /**
    * 发送 HTTP 请求
+   *
+   * 不做重试。重试策略已下沉到后端代理（见 server/upstream/client.ts）：
+   * 前端无从判断上游请求是否幂等，而重发 POST 会造成重复计费与重复生成。
+   * 这里保留超时与取消能力。
    */
   async request<T>(
     path: string,
@@ -156,83 +121,58 @@ export class ApiClient {
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
     body?: any
   ): Promise<T> {
-    const maxAttempts = this.maxRetries + 1;
+    this.validateUrl(this.baseURL);
 
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        this.validateUrl(this.baseURL);
+    const { controller, cleanup } = this.createAbortController();
 
-        const { controller, cleanup } = this.createAbortController();
-        const headers = this.buildHeaders(options.headers);
-        const url = this.buildBackendUrl(path);
+    try {
+      const headers = this.buildHeaders(options.headers);
+      const url = this.buildBackendUrl(path);
 
-        logApi(`API 请求 [${method}] ${url}`, { attempt: attempt + 1, maxAttempts });
+      logApi(`API 请求 [${method}] ${url}`);
 
-        const response = await fetch(url, {
-          method,
-          headers,
-          body: body ? JSON.stringify(body) : undefined,
-          signal: options.signal ?? controller.signal,
-        });
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: options.signal ?? controller.signal,
+      });
 
-        cleanup();
+      if (!response.ok) {
+        const errorText = await response.text();
+        const errorMessage = this.parseErrorMessage(errorText);
 
-        // 检查响应状态
-        if (!response.ok) {
-          const errorText = await response.text();
-          const errorMessage = this.parseErrorMessage(errorText);
-          const error = new ApiError(
-            `API 请求失败 (${response.status}): ${errorMessage || response.statusText}`,
-            response.status,
-            { errorText }
-          );
+        logApiError('API 请求失败', { status: response.status, message: errorMessage });
 
-          // 判断是否应该重试
-          if (this.shouldRetry(error, attempt)) {
-            logApiWarn(`请求失败，准备重试 (${attempt + 1}/${this.maxRetries})`, {
-              status: response.status,
-              message: errorMessage,
-            });
-
-            await this.delay(this.retryDelay * (attempt + 1)); // 指数退避
-            continue;
-          }
-
-          logApiError('API 请求失败', { status: response.status, message: errorMessage });
-          throw error;
-        }
-
-        // 解析响应
-        const data = await response.json();
-        logApi('API 请求成功');
-        return data;
-
-      } catch (error) {
-        if (error instanceof Error) {
-          if (error.name === 'AbortError') {
-            logApiWarn('API 请求已取消或超时');
-            throw error;
-          }
-
-          // 判断是否应该重试
-          if (this.shouldRetry(error, attempt)) {
-            logApiWarn(`请求失败，准备重试 (${attempt + 1}/${this.maxRetries})`, {
-              message: error.message,
-            });
-
-            await this.delay(this.retryDelay * (attempt + 1));
-            continue;
-          }
-
-          logApiError('API 请求异常', { error: error.message });
-          throw error;
-        }
-
-        throw new Error('未知错误');
+        throw new ApiError(
+          `API 请求失败 (${response.status}): ${errorMessage || response.statusText}`,
+          response.status,
+          { errorText }
+        );
       }
-    }
 
-    throw new Error('请求失败，已达到最大重试次数');
+      const data = await response.json();
+      logApi('API 请求成功');
+      return data;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          logApiWarn('API 请求已取消或超时');
+          throw error;
+        }
+
+        logApiError('API 请求异常', { error: error.message });
+        throw error;
+      }
+
+      throw new Error('未知错误');
+    } finally {
+      cleanup();
+    }
   }
 
   /**

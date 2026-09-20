@@ -21,8 +21,6 @@ export function useApiConnection() {
       baseURL: url,
       apiKey,
       timeout: 15000,
-      maxRetries: 1,
-      retryDelay: 500,
     };
 
     const modelsApi = new ModelsApi(config);

@@ -78,8 +78,6 @@ export function useChatApi() {
       baseURL: preset.url,
       apiKey: preset.apiKey,
       timeout: preset.streamEnabled ? 120000 : 60000,
-      maxRetries: 3,
-      retryDelay: 1000,
     };
 
     return new ChatApi(config, preset.model);

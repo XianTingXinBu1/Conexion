@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { ChevronDown, Database } from 'lucide-vue-next';
+import { ChevronDown, Database } from '@lucide/vue';
 import type { Model } from '@/types';
 import { filterModels } from '../../../data/modelData';
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ChevronDown, Plus, Trash2, Edit2 } from 'lucide-vue-next';
+import { ChevronDown, Plus, Trash2, Edit2 } from '@lucide/vue';
 import type { Preset } from '@/types';
 
 interface Props {

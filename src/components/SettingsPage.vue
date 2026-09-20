@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, inject } from 'vue';
 import { useRouter } from 'vue-router';
-import { ArrowLeft } from 'lucide-vue-next';
+import { ArrowLeft } from '@lucide/vue';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import { clearBackendData, getAllSettings } from '@/repositories/settingsRepository';
 import { useAppSettings, APP_SETTINGS_DEFAULTS, writeAppSettingsDefaults } from '../composables/useAppSettings';

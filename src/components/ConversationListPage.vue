@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ArrowLeft, Plus, Clock, MessageSquare, Search, XCircle, SearchX } from 'lucide-vue-next';
+import { ArrowLeft, Plus, Clock, MessageSquare, Search, XCircle, SearchX } from '@lucide/vue';
 import type { AICharacter, Conversation } from '@/types';
 import { CharacterSelector, ConversationItem } from './conversation';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';

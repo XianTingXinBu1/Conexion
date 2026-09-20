@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { Server, Shield, AlertCircle, RefreshCw } from 'lucide-vue-next';
+import { Server, Shield, AlertCircle, RefreshCw } from '@lucide/vue';
 import { validateUrl } from '../../../utils';
 
 interface Props {

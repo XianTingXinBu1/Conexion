@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { RegexRule } from '@/types';
-import { Plus, Hash } from 'lucide-vue-next';
+import { Plus, Hash } from '@lucide/vue';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import { useRegexRules } from '../composables/useRegexRules';

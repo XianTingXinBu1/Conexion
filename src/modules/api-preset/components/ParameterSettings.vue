@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Sliders } from 'lucide-vue-next';
+import { Sliders } from '@lucide/vue';
 import FormToggle from '../../../components/form/FormToggle.vue';
 import FormSlider from '../../../components/form/FormSlider.vue';
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeft, Plus, Settings, X } from 'lucide-vue-next';
+import { ChevronLeft, Plus, Settings, X } from '@lucide/vue';
 
 interface Props {
   currentPresetName: string;

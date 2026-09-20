@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import type { Message, Theme } from '@/types';
 import { MarkdownRenderer } from '@/modules/markdown';
-import { Edit2, Trash2 } from 'lucide-vue-next';
+import { Edit2, Trash2 } from '@lucide/vue';
 
 interface Props {
   message: Message;

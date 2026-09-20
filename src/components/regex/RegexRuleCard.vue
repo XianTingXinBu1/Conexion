@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ToggleLeft, ToggleRight, Edit2, Trash2, User, Bot, Hash } from 'lucide-vue-next';
+import { ToggleLeft, ToggleRight, Edit2, Trash2, User, Bot, Hash } from '@lucide/vue';
 import type { RegexRule, RegexScope, RegexApplyTo } from '@/types';
 
 interface Props {

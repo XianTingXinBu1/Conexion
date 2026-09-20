@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import DOMPurify from 'dompurify';
-import { X, Copy, Check, ChevronDown, ChevronUp, Search, XCircle, RefreshCw, Zap, FileText, SearchX } from 'lucide-vue-next';
+import { X, Copy, Check, ChevronDown, ChevronUp, Search, XCircle, RefreshCw, Zap, FileText, SearchX } from '@lucide/vue';
 import type { ChatMessage } from '@/types';
 
 interface Props {

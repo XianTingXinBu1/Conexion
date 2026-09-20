@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue';
-import { Plus, X } from 'lucide-vue-next';
+import { Plus, X } from '@lucide/vue';
 import type { PromptItem } from '@/types';
 import Modal from '../common/Modal.vue';
 import FormInput from '../form/FormInput.vue';

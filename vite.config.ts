@@ -3,9 +3,9 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
 const VENDOR_CHUNKS: Array<[string, string[]]> = [
-  ['markdown-vendor', ['marked', 'markdown-it', 'highlight.js', 'dompurify']],
-  ['vue-vendor', ['@vue', 'vue-router', 'pinia']],
-  ['icons-vendor', ['lucide-vue-next']],
+  ['markdown-vendor', ['marked', 'dompurify']],
+  ['vue-vendor', ['@vue', 'vue-router']],
+  ['icons-vendor', ['@lucide/vue']],
   ['storage-vendor', ['idb-keyval']],
   ['tokenizer-vendor', ['gpt-tokenizer']],
 ]

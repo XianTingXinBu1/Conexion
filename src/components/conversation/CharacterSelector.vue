@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, ArrowLeft } from 'lucide-vue-next';
+import { Bot, ArrowLeft } from '@lucide/vue';
 import type { AICharacter } from '@/types';
 import Modal from '../common/Modal.vue';
 import EmptyState from '../common/EmptyState.vue';

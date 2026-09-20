@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Save, RefreshCw, Zap, AlertTriangle } from 'lucide-vue-next';
+import { Save, RefreshCw, Zap, AlertTriangle } from '@lucide/vue';
 import { DEFAULTS } from '../constants';
 import PageHeader from './common/PageHeader.vue';
 import Modal from './common/Modal.vue';

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue';
-import { ArrowLeft } from 'lucide-vue-next';
+import { ArrowLeft } from '@lucide/vue';
 import type { ChatPageProps } from '@/features/chat/presentation/chatPageTypes';
 import { ChatInput, MessageItem, ContextRing } from './chat';
 import { CompressionSummaryCard } from '@/modules/conversation-compression/components';

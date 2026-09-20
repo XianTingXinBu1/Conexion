@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { X, Trash2, AlertCircle, Info, CheckCircle } from 'lucide-vue-next';
+import { X, Trash2, AlertCircle, Info, CheckCircle } from '@lucide/vue';
 
 export interface ConfirmDialogProps {
   show: boolean;

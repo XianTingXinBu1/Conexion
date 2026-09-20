@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Plus, X, User, Bot } from 'lucide-vue-next';
+import { Plus, X, User, Bot } from '@lucide/vue';
 import type { UserCharacter, AICharacter, CharacterType } from '@/types';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';

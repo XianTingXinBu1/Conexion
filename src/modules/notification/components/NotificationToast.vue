@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { X, Info, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-vue-next';
+import { X, Info, AlertTriangle, AlertCircle, CheckCircle } from '@lucide/vue';
 import type { NotificationItem } from '../types';
 import { MarkdownRenderer } from '@/modules/markdown';
 import { useNotifications } from '../useNotifications';

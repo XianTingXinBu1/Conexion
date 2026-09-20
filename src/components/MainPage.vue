@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Sun, Moon, MessageSquare, Zap, Settings, FileText, User, BookOpen, Hash } from 'lucide-vue-next';
+import { Sun, Moon, MessageSquare, Zap, Settings, FileText, User, BookOpen, Hash } from '@lucide/vue';
 import { useRouter } from 'vue-router';
 import { inject } from 'vue';
 import { prefetchRouteComponent } from '@/router';

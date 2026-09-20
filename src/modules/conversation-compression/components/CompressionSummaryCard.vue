@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { ChevronDown, FileText } from 'lucide-vue-next';
+import { ChevronDown, FileText } from '@lucide/vue';
 import { MarkdownRenderer } from '@/modules/markdown';
 
 interface Props {

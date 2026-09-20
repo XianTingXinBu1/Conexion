@@ -5,7 +5,7 @@ import Modal from '../common/Modal.vue';
 import FormInput from '../form/FormInput.vue';
 import FormTextarea from '../form/FormTextarea.vue';
 import FormActions from '../form/FormActions.vue';
-import { X } from 'lucide-vue-next';
+import { X } from '@lucide/vue';
 
 interface Props {
   show: boolean;

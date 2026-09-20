@@ -163,6 +163,11 @@ npm run health-check
 - **自动压缩时机**：由 `SendMessageUseCase` 在发送前后判断。压缩失败应中止发送
   并提示；压缩摘要参与 Prompt 构建；不要出现 UI controller 与 usecase 各判断
   一套规则的情况。
+- **列表排序（`useDraggable`）**：列表必须是**可写**的 ref。传 props 派生的 computed
+  进去时 `items.value = newItems` 只会被 Vue 警告后忽略（computed 只读），表现为
+  “能拖、有动画、顺序不生效”；列表项高度不固定时必须传 `measureItemHeights`
+  按真实节距算落点，固定高度会让落点跳格；触摸路径要一并处理 `touchcancel`，
+  否则浏览器接管手势后 `isDragging` 与偏移量会停在拖拽态。
 - **预设状态的消费方**：`useApiPresets()` 每次调用都是独立实例，`currentPreset`
   只有在 `loadPresets()`（会一并同步后端记住的选中项）之后才有意义。请求参数走
   `repositories/apiPresetRepository.loadCurrentApiPreset()` 直接读设置，统计展示

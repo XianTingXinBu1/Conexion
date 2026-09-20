@@ -29,10 +29,29 @@ const emit = defineEmits<{
   touchStart: [index: number, event: TouchEvent];
   touchMove: [event: TouchEvent];
   touchEnd: [];
+  touchCancel: [];
 }>();
 
 // 内部 items ref，用于拖拽操作
 const itemsRef = ref<PromptItem[]>([]);
+
+const listRef = ref<HTMLElement | null>(null);
+
+/**
+ * 按真实布局测量每项节距（本项顶 → 下一项顶，含列表 gap）。
+ * 卡片高度随描述长短变化，写死高度会让拖拽落点跳格。
+ */
+const measureItemHeights = (): number[] => {
+  const cards = listRef.value?.querySelectorAll<HTMLElement>('.prompt-item');
+  if (!cards || cards.length === 0) return [];
+
+  const rects = [...cards].map((card) => card.getBoundingClientRect());
+
+  return rects.map((rect, index) => {
+    const next = rects[index + 1];
+    return next ? next.top - rect.top : rect.height;
+  });
+};
 
 // 同步 props.items 到内部 ref
 watch(
@@ -55,8 +74,10 @@ const {
   handleTouchStart,
   handleTouchMove,
   handleTouchEnd,
+  handleTouchCancel,
 } = useDraggable(itemsRef, {
   itemHeight: 74,
+  measureItemHeights,
   onDragEnd: () => {
     emit('reorder', itemsRef.value);
   },
@@ -87,10 +108,15 @@ const onTouchEnd = () => {
   emit('touchEnd');
   handleTouchEnd();
 };
+
+const onTouchCancel = () => {
+  emit('touchCancel');
+  handleTouchCancel();
+};
 </script>
 
 <template>
-  <div :class="['prompt-list', { 'dragging-active': isDragging }]">
+  <div ref="listRef" :class="['prompt-list', { 'dragging-active': isDragging }]">
     <template v-if="items.length > 0">
       <div
         v-for="(item, index) in items"
@@ -116,6 +142,7 @@ const onTouchEnd = () => {
           @touch-start="(idx: number, evt: TouchEvent) => onTouchStart(idx, evt)"
           @touch-move="(evt: TouchEvent) => onTouchMove(evt)"
           @touch-end="onTouchEnd"
+          @touch-cancel="onTouchCancel"
         />
       </div>
     </template>

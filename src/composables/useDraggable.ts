@@ -35,14 +35,20 @@ import { ref, computed, type Ref } from 'vue';
 export function useDraggable<T>(
   items: Ref<T[]>,
   options: {
-    /** 单个列表项的高度（像素），用于计算触摸拖拽 */
+    /** 单个列表项的高度（像素），仅在没有 measureItemHeights 时作为兑底 */
     itemHeight?: number;
+    /**
+     * 按真实布局测量每项的“节距”（本项顶到下一项顶的距离，含 gap）。
+     * 拖拽开始时调用一次；列表项高度不固定时必须提供，否则落点会按固定高度推算而错位。
+     */
+    measureItemHeights?: () => number[];
     /** 拖拽结束时的回调，传入新的列表顺序 */
     onDragEnd?: (newItems: T[]) => void;
   } = {}
 ) {
   const {
     itemHeight = 74,
+    measureItemHeights,
     onDragEnd,
   } = options;
 
@@ -54,6 +60,58 @@ export function useDraggable<T>(
   const touchStartY = ref<number>(0);
   const touchCurrentY = ref<number>(0);
   const itemOffsets = ref<Map<number, number>>(new Map());
+
+  // 本次手势开始时测量到的各槽位几何（节距 / 槽位中心），避免拖动中反复读布局
+  let slotPitches: number[] = [];
+
+  const resolvePitch = (index: number): number => {
+    const measured = slotPitches[index];
+    if (typeof measured === 'number' && Number.isFinite(measured) && measured > 0) {
+      return measured;
+    }
+    return itemHeight;
+  };
+
+  const measureSlots = () => {
+    const measured = measureItemHeights?.();
+    slotPitches = Array.isArray(measured) && measured.length === items.value.length ? measured : [];
+  };
+
+  const buildSlotCenters = (): number[] => {
+    const centers: number[] = [];
+    let offset = 0;
+
+    for (let index = 0; index < items.value.length; index += 1) {
+      const pitch = resolvePitch(index);
+      centers.push(offset + pitch / 2);
+      offset += pitch;
+    }
+
+    return centers;
+  };
+
+  /**
+   * 根据手指位移推算落点：取“拖动项中心移动到的新位置”最近的槽位。
+   * 按真实节距累加，所以列表项高度不一致时也不会跳格。
+   */
+  const resolveTargetIndex = (fromIndex: number, deltaY: number): number => {
+    const centers = buildSlotCenters();
+    if (centers.length === 0) return fromIndex;
+
+    const movedCenter = (centers[fromIndex] ?? 0) + deltaY;
+    let targetIndex = fromIndex;
+    let minDistance = Number.POSITIVE_INFINITY;
+
+    centers.forEach((center, index) => {
+      const distance = Math.abs(center - movedCenter);
+      if (distance < minDistance) {
+        minDistance = distance;
+        targetIndex = index;
+      }
+    });
+
+    return Math.max(0, Math.min(targetIndex, items.value.length - 1));
+  };
 
   /**
    * 处理鼠标拖拽开始
@@ -143,6 +201,7 @@ export function useDraggable<T>(
     const touch = event.touches[0];
     if (!touch) return;
 
+    measureSlots();
     isDragging.value = true;
     draggedIndex.value = index;
     touchStartY.value = touch.clientY;
@@ -170,23 +229,20 @@ export function useDraggable<T>(
 
     // 计算移动距离和目标位置
     const deltaY = touchCurrentY.value - touchStartY.value;
-    const moveCount = Math.round(deltaY / itemHeight);
-    let targetIndex = draggedIndex.value + moveCount;
-    targetIndex = Math.max(0, Math.min(targetIndex, items.value.length - 1));
+    const fromIndex = draggedIndex.value;
+    const targetIndex = resolveTargetIndex(fromIndex, deltaY);
 
-    // 计算每个项目的偏移量，用于视觉反馈
+    // 计算每个项目的偏移量，用于视觉反馈（按各自的真实节距让位）
     const newOffsets = new Map<number, number>();
     for (let i = 0; i < items.value.length; i++) {
-      if (i === draggedIndex.value) {
+      if (i === fromIndex) {
         newOffsets.set(i, deltaY);
-      } else if (draggedIndex.value !== null) {
-        if (i >= draggedIndex.value && i <= targetIndex) {
-          newOffsets.set(i, -itemHeight);
-        } else if (i >= targetIndex && i <= draggedIndex.value) {
-          newOffsets.set(i, itemHeight);
-        } else {
-          newOffsets.set(i, 0);
-        }
+      } else if (i > fromIndex && i <= targetIndex) {
+        newOffsets.set(i, -resolvePitch(i));
+      } else if (i >= targetIndex && i < fromIndex) {
+        newOffsets.set(i, resolvePitch(i));
+      } else {
+        newOffsets.set(i, 0);
       }
     }
 
@@ -210,14 +266,13 @@ export function useDraggable<T>(
 
     try {
       const deltaY = (touchCurrentY.value ?? 0) - (touchStartY.value ?? 0);
-      const moveCount = Math.round(deltaY / itemHeight);
-      let targetIndex = draggedIndex.value + moveCount;
-      targetIndex = Math.max(0, Math.min(targetIndex, items.value.length - 1));
+      const fromIndex = draggedIndex.value;
+      const targetIndex = resolveTargetIndex(fromIndex, deltaY);
 
       // 如果位置改变，更新列表
-      if (targetIndex !== draggedIndex.value) {
+      if (targetIndex !== fromIndex) {
         const newItems = [...items.value];
-        const [draggedItem] = newItems.splice(draggedIndex.value, 1);
+        const [draggedItem] = newItems.splice(fromIndex, 1);
 
         if (draggedItem) {
           newItems.splice(targetIndex, 0, draggedItem);
@@ -228,12 +283,24 @@ export function useDraggable<T>(
     } catch (error) {
       console.error('[useDraggable] Error during touch end operation:', error);
     } finally {
-      // 重置状态
-      isDragging.value = false;
-      draggedIndex.value = null;
-      itemOffsets.value.clear();
+      resetTouchState();
     }
   };
+
+  /**
+   * 触摸被系统中断（例如浏览器接管手势）时复位，不改变顺序。
+   * 不处理的话 isDragging / 偏移量会一直停在拖拽中的状态。
+   */
+  const handleTouchCancel = () => {
+    resetTouchState();
+  };
+
+  function resetTouchState() {
+    isDragging.value = false;
+    draggedIndex.value = null;
+    itemOffsets.value.clear();
+    slotPitches = [];
+  }
 
   /**
    * 获取列表项的样式
@@ -262,11 +329,8 @@ export function useDraggable<T>(
     }
 
     const deltaY = touchCurrentY.value - touchStartY.value;
-    const moveCount = Math.round(deltaY / itemHeight);
-    let targetIndex = draggedIndex.value + moveCount;
-    targetIndex = Math.max(0, Math.min(targetIndex, items.value.length - 1));
 
-    return targetIndex;
+    return resolveTargetIndex(draggedIndex.value, deltaY);
   });
 
   return {
@@ -286,6 +350,7 @@ export function useDraggable<T>(
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,
+    handleTouchCancel,
 
     // 样式和工具方法
     getItemStyle,

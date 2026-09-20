@@ -28,6 +28,7 @@ const emit = defineEmits<{
   touchStart: [index: number, event: TouchEvent];
   touchMove: [event: TouchEvent];
   touchEnd: [];
+  touchCancel: [];
 }>();
 
 const cardClasses = computed(() => [
@@ -139,6 +140,12 @@ const onTouchEnd = (event: TouchEvent) => {
   event.stopPropagation();
   emit('touchEnd');
 };
+
+// 浏览器接管手势会发 touchcancel，必须复位，否则列表会停在拖拽态
+const onTouchCancel = (event: TouchEvent) => {
+  event.stopPropagation();
+  emit('touchCancel');
+};
 </script>
 
 <template>
@@ -153,6 +160,7 @@ const onTouchEnd = (event: TouchEvent) => {
         @touchstart="onTouchStart"
         @touchmove="onTouchMove"
         @touchend="onTouchEnd"
+        @touchcancel="onTouchCancel"
       >
         <GripVertical :size="18" />
       </div>

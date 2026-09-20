@@ -5,12 +5,18 @@ import { relative, resolve } from 'node:path';
 import { globSync } from 'node:fs';
 
 const root = resolve(process.cwd(), 'src');
-const files = globSync('src/**/*.{ts,vue}', {
-  ignore: [
-    'src/**/*.test.ts',
-    'src/**/__tests__/**',
-  ],
-});
+
+// 测试文件不参与生产代码的边界检查。
+//
+// 注意：这里刻意不使用 globSync 的 ignore / exclude 选项。
+// 该处原本写成 `ignore`，但 Node 的 fs.globSync 只认 `exclude`，
+// 参数被静默忽略后导致 src/**/__tests__/** 与 *.test.ts 一直在被扫描。
+// 改为显式过滤，语义自证且不会因为选项名写错而失效。
+const TEST_FILE_PATTERN = /\.(test|spec)\.(ts|tsx)$|(^|\/)__tests__\//;
+
+const files = globSync('src/**/*.{ts,vue}').filter(
+  file => !TEST_FILE_PATTERN.test(file.replaceAll('\\', '/')),
+);
 
 const rules = [
   {

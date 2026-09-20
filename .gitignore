@@ -56,3 +56,6 @@ Thumbs.db
 # Documentation (keep in local only)
 AGENTS.md
 任务清单.txt
+
+# pi agent 本地数据（长期记忆 / 笔记，不入仓库）
+.pi/

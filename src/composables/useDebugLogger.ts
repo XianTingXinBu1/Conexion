@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue';
 import { useBackendSetting } from './useBackendSetting';
-import { STORAGE_KEYS } from '../constants';
+import { SETTING_KEYS } from '../constants';
 import {
   log as coreLog,
   logGroup,
@@ -29,7 +29,7 @@ export type DebugCategory = 'API' | 'PRESET' | 'PROMPT' | 'CONVERSATION' | 'SYST
  */
 export function useDebugLogger() {
   // 调试模式开关
-  const { value: debugMode } = useBackendSetting(STORAGE_KEYS.DEBUG_MODE, false);
+  const { value: debugMode } = useBackendSetting(SETTING_KEYS.DEBUG_MODE, false);
 
   // 日志历史（响应式，用于 UI 显示）
   const logHistory = ref<DebugLogItem[]>([]);

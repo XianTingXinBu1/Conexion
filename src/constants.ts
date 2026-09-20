@@ -1,10 +1,10 @@
 /**
- * 后端设置/数据键常量。
+ * 后端设置键常量。
  *
- * 这些 key 用作后端 settings.json 字段名，或用于清理旧浏览器本地数据。
- * 运行时业务数据的权威来源是后端 `.runtime/data/*.json`，不是 localStorage / IndexedDB。
+ * 这些 key 用作后端 settings.json 的字段名，通过 /api/settings/<key> 读写。
+ * 运行时业务数据的权威来源是后端 `.runtime/data/*.json`。
  */
-export const STORAGE_KEYS = {
+export const SETTING_KEYS = {
   // settings.json: UI/选择项/偏好
   ENTER_TO_SEND: 'conexion_enter_to_send',
   THEME: 'conexion_theme',
@@ -20,17 +20,9 @@ export const STORAGE_KEYS = {
   DEBUG_MODE: 'conexion_debug_mode', // 调试模式开关
   COMPRESSION_THRESHOLD_PERCENT: 'conexion_compression_threshold_percent', // 会话压缩阈值百分比
   COMPRESSION_MODE: 'conexion_compression_mode', // 会话压缩模式: 'manual' | 'auto'
-  STORAGE_SCHEMA_VERSION: 'conexion_storage_schema_version', // 存储 schema 版本
 
-  // 后端集合数据文件 / 旧浏览器本地数据清理键
-  REGEX_SCRIPTS: 'conexion_regex_scripts',
-  USER_CHARACTERS: 'conexion_user_characters',
-  AI_CHARACTERS: 'conexion_ai_characters',
-  API_PRESETS: 'conexion_api_presets',
+  // 模型列表缓存
   MODELS: 'conexion_models', // 模型列表（包含关联的预设 ID 和 URL）
-  CONVERSATIONS: 'conexion_conversations', // 会话列表
-  PROMPT_PRESETS: 'conexion_prompt_presets', // 提示词预设列表
-  KNOWLEDGE_BASES: 'conexion_knowledge_bases', // 知识库列表
 } as const;
 
 /**

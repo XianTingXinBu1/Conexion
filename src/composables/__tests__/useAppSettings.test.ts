@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { APP_SETTINGS_DEFAULTS, writeAppSettingsDefaults } from '../useAppSettings';
-import { STORAGE_KEYS } from '@/constants';
+import { SETTING_KEYS } from '@/constants';
 
 describe('useAppSettings helpers', () => {
   it('exposes shared defaults for settings pages and composables', () => {
@@ -24,16 +24,16 @@ describe('useAppSettings helpers', () => {
     await writeAppSettingsDefaults(write as never);
 
     expect(write.mock.calls).toEqual([
-      [STORAGE_KEYS.ENTER_TO_SEND, true],
-      [STORAGE_KEYS.SHOW_WORD_COUNT, false],
-      [STORAGE_KEYS.ENABLE_MARKDOWN, true],
-      [STORAGE_KEYS.SHOW_MESSAGE_INDEX, false],
-      [STORAGE_KEYS.CHAT_HISTORY_LIMIT, 20],
-      [STORAGE_KEYS.MERGE_PROMPT_PRESETS, true],
-      [STORAGE_KEYS.PROMPT_MERGE_MODE, 'adjacent'],
-      [STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT, 75],
-      [STORAGE_KEYS.COMPRESSION_MODE, 'manual'],
-      [STORAGE_KEYS.DEBUG_MODE, false],
+      [SETTING_KEYS.ENTER_TO_SEND, true],
+      [SETTING_KEYS.SHOW_WORD_COUNT, false],
+      [SETTING_KEYS.ENABLE_MARKDOWN, true],
+      [SETTING_KEYS.SHOW_MESSAGE_INDEX, false],
+      [SETTING_KEYS.CHAT_HISTORY_LIMIT, 20],
+      [SETTING_KEYS.MERGE_PROMPT_PRESETS, true],
+      [SETTING_KEYS.PROMPT_MERGE_MODE, 'adjacent'],
+      [SETTING_KEYS.COMPRESSION_THRESHOLD_PERCENT, 75],
+      [SETTING_KEYS.COMPRESSION_MODE, 'manual'],
+      [SETTING_KEYS.DEBUG_MODE, false],
     ]);
   });
 });

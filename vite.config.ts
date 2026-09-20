@@ -6,7 +6,6 @@ const VENDOR_CHUNKS: Array<[string, string[]]> = [
   ['markdown-vendor', ['marked', 'dompurify']],
   ['vue-vendor', ['@vue', 'vue-router']],
   ['icons-vendor', ['@lucide/vue']],
-  ['storage-vendor', ['idb-keyval']],
   ['tokenizer-vendor', ['gpt-tokenizer']],
 ]
 

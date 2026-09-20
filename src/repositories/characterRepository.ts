@@ -1,7 +1,7 @@
 import { requestJson } from '@/api/http';
 import { ApiRequestError } from '@/api/errors';
 import type { AICharacter, UserCharacter } from '@/types';
-import { DEFAULT_AI_CHARACTERS, DEFAULT_USER_CHARACTER, STORAGE_KEYS } from '@/constants';
+import { DEFAULT_AI_CHARACTERS, DEFAULT_USER_CHARACTER, SETTING_KEYS } from '@/constants';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
 
 const CHARACTER_API_BASE = '/api/characters';
@@ -47,11 +47,11 @@ export async function loadAICharacterById(id: string): Promise<AICharacter | und
 }
 
 export async function loadSelectedUserCharacterId(): Promise<string | null> {
-  return await getSetting<string | null>(STORAGE_KEYS.SELECTED_USER_CHARACTER, null);
+  return await getSetting<string | null>(SETTING_KEYS.SELECTED_USER_CHARACTER, null);
 }
 
 export async function saveSelectedUserCharacterId(id: string): Promise<void> {
-  await setSetting(STORAGE_KEYS.SELECTED_USER_CHARACTER, id);
+  await setSetting(SETTING_KEYS.SELECTED_USER_CHARACTER, id);
 }
 
 export async function clearKnowledgeBaseReferenceFromAICharacters(knowledgeBaseId: string): Promise<boolean> {

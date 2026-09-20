@@ -1,6 +1,6 @@
 import { requestJson } from '@/api/http';
 import type { PromptPreset } from '@/types';
-import { DEFAULT_PROMPT_PRESETS, STORAGE_KEYS } from '@/constants';
+import { DEFAULT_PROMPT_PRESETS, SETTING_KEYS } from '@/constants';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
 
 const PROMPT_PRESETS_ENDPOINT = '/api/prompt-presets';
@@ -29,9 +29,9 @@ export async function savePromptPresets(presets: PromptPreset[]): Promise<void> 
 }
 
 export async function loadSelectedPromptPresetId(): Promise<string> {
-  return await getSetting<string>(STORAGE_KEYS.SELECTED_PROMPT_PRESET, '');
+  return await getSetting<string>(SETTING_KEYS.SELECTED_PROMPT_PRESET, '');
 }
 
 export async function saveSelectedPromptPresetId(id: string): Promise<void> {
-  await setSetting(STORAGE_KEYS.SELECTED_PROMPT_PRESET, id);
+  await setSetting(SETTING_KEYS.SELECTED_PROMPT_PRESET, id);
 }

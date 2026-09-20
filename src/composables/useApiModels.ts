@@ -7,7 +7,7 @@
 import { ref } from 'vue';
 import type { Model } from '@/types';
 import { DEFAULT_MODELS, getModelById } from '../data/modelData';
-import { STORAGE_KEYS, DEFAULTS } from '../constants';
+import { SETTING_KEYS, DEFAULTS } from '../constants';
 import { ModelsApi, type ApiClientConfig } from '@/api';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
 
@@ -27,7 +27,7 @@ export function useApiModels() {
    */
   async function loadModels() {
     const saved = await getSetting<{ models: Model[]; presetId: string; url: string }>(
-      STORAGE_KEYS.MODELS,
+      SETTING_KEYS.MODELS,
       { models: [], presetId: '', url: '' }
     );
     if (saved && saved.models && Array.isArray(saved.models)) {
@@ -41,7 +41,7 @@ export function useApiModels() {
    * 保存模型列表
    */
   async function saveModels(presetId: string, url: string) {
-    await setSetting(STORAGE_KEYS.MODELS, {
+    await setSetting(SETTING_KEYS.MODELS, {
       models: models.value,
       presetId,
       url,

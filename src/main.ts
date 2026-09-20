@@ -1,7 +1,6 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
-import { ensureStorageSchema } from './utils/storageSchema';
 
 function renderBootstrapError(error: unknown) {
   console.error('[bootstrap] 应用启动失败:', error);
@@ -17,13 +16,15 @@ function renderBootstrapError(error: unknown) {
   `;
 }
 
-async function bootstrap() {
-  await ensureStorageSchema();
-
+function bootstrap() {
   const app = createApp(App);
 
   app.use(router);
   app.mount('#app');
 }
 
-void bootstrap().catch(renderBootstrapError);
+try {
+  bootstrap();
+} catch (error) {
+  renderBootstrapError(error);
+}

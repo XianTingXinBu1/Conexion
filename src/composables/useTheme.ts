@@ -1,6 +1,6 @@
 import { ref, watch, onMounted } from 'vue';
 import type { Theme } from '@/types';
-import { STORAGE_KEYS } from '../constants';
+import { SETTING_KEYS } from '../constants';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
 
 /**
@@ -11,7 +11,7 @@ export function useTheme() {
 
   // 从存储加载主题
   const loadTheme = async () => {
-    const savedTheme = await getSetting<string>(STORAGE_KEYS.THEME, 'light');
+    const savedTheme = await getSetting<string>(SETTING_KEYS.THEME, 'light');
     if (savedTheme === 'light' || savedTheme === 'dark') {
       theme.value = savedTheme;
     }
@@ -34,7 +34,7 @@ export function useTheme() {
   // 监听主题变化，应用到 DOM
   watch(theme, (newTheme) => {
     applyTheme(newTheme);
-    void setSetting(STORAGE_KEYS.THEME, newTheme);
+    void setSetting(SETTING_KEYS.THEME, newTheme);
   });
 
   // 组件挂载时加载主题

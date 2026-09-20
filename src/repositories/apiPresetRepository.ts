@@ -1,6 +1,6 @@
 import { requestJson } from '@/api/http';
 import type { Preset } from '@/types';
-import { DEFAULT_API_PRESETS, STORAGE_KEYS } from '@/constants';
+import { DEFAULT_API_PRESETS, SETTING_KEYS } from '@/constants';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
 
 const API_PRESETS_ENDPOINT = '/api/api-presets';
@@ -27,11 +27,11 @@ export async function saveApiPresets(presets: Preset[]): Promise<void> {
 }
 
 export async function loadSelectedApiPresetId(): Promise<string> {
-  return await getSetting<string>(STORAGE_KEYS.SELECTED_PRESET, '');
+  return await getSetting<string>(SETTING_KEYS.SELECTED_PRESET, '');
 }
 
 export async function saveSelectedApiPresetId(id: string): Promise<void> {
-  await setSetting(STORAGE_KEYS.SELECTED_PRESET, id);
+  await setSetting(SETTING_KEYS.SELECTED_PRESET, id);
 }
 
 export async function loadCurrentApiPreset(): Promise<Preset | null> {

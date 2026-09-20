@@ -6,7 +6,7 @@
 
 import { ref } from 'vue';
 import { useBackendSetting } from './useBackendSetting';
-import { STORAGE_KEYS, DEFAULTS } from '@/constants';
+import { SETTING_KEYS, DEFAULTS } from '@/constants';
 import type { MergeMode } from '@/modules/system-prompt';
 import type { ConversationCompressionMode } from '@/types';
 import { setSetting } from '@/repositories/settingsRepository';
@@ -64,16 +64,16 @@ type SettingsWriter = <T>(key: string, value: T) => Promise<unknown>;
 export async function writeAppSettingsDefaults(
   write: SettingsWriter = setSetting,
 ) {
-  await write(STORAGE_KEYS.ENTER_TO_SEND, APP_SETTINGS_DEFAULTS.enterToSend);
-  await write(STORAGE_KEYS.SHOW_WORD_COUNT, APP_SETTINGS_DEFAULTS.showWordCount);
-  await write(STORAGE_KEYS.ENABLE_MARKDOWN, APP_SETTINGS_DEFAULTS.enableMarkdown);
-  await write(STORAGE_KEYS.SHOW_MESSAGE_INDEX, APP_SETTINGS_DEFAULTS.showMessageIndex);
-  await write(STORAGE_KEYS.CHAT_HISTORY_LIMIT, APP_SETTINGS_DEFAULTS.chatHistoryLimit);
-  await write(STORAGE_KEYS.MERGE_PROMPT_PRESETS, APP_SETTINGS_DEFAULTS.mergePromptPresets);
-  await write(STORAGE_KEYS.PROMPT_MERGE_MODE, APP_SETTINGS_DEFAULTS.promptMergeMode);
-  await write(STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT, APP_SETTINGS_DEFAULTS.compressionThresholdPercent);
-  await write(STORAGE_KEYS.COMPRESSION_MODE, APP_SETTINGS_DEFAULTS.compressionMode);
-  await write(STORAGE_KEYS.DEBUG_MODE, APP_SETTINGS_DEFAULTS.debugMode);
+  await write(SETTING_KEYS.ENTER_TO_SEND, APP_SETTINGS_DEFAULTS.enterToSend);
+  await write(SETTING_KEYS.SHOW_WORD_COUNT, APP_SETTINGS_DEFAULTS.showWordCount);
+  await write(SETTING_KEYS.ENABLE_MARKDOWN, APP_SETTINGS_DEFAULTS.enableMarkdown);
+  await write(SETTING_KEYS.SHOW_MESSAGE_INDEX, APP_SETTINGS_DEFAULTS.showMessageIndex);
+  await write(SETTING_KEYS.CHAT_HISTORY_LIMIT, APP_SETTINGS_DEFAULTS.chatHistoryLimit);
+  await write(SETTING_KEYS.MERGE_PROMPT_PRESETS, APP_SETTINGS_DEFAULTS.mergePromptPresets);
+  await write(SETTING_KEYS.PROMPT_MERGE_MODE, APP_SETTINGS_DEFAULTS.promptMergeMode);
+  await write(SETTING_KEYS.COMPRESSION_THRESHOLD_PERCENT, APP_SETTINGS_DEFAULTS.compressionThresholdPercent);
+  await write(SETTING_KEYS.COMPRESSION_MODE, APP_SETTINGS_DEFAULTS.compressionMode);
+  await write(SETTING_KEYS.DEBUG_MODE, APP_SETTINGS_DEFAULTS.debugMode);
 }
 
 /**
@@ -81,25 +81,25 @@ export async function writeAppSettingsDefaults(
  */
 export function useAppSettings() {
   // 聊天设置
-  const { value: enterToSend } = useBackendSetting(STORAGE_KEYS.ENTER_TO_SEND, APP_SETTINGS_DEFAULTS.enterToSend);
-  const { value: showWordCount } = useBackendSetting(STORAGE_KEYS.SHOW_WORD_COUNT, APP_SETTINGS_DEFAULTS.showWordCount);
-  const { value: enableMarkdown } = useBackendSetting(STORAGE_KEYS.ENABLE_MARKDOWN, APP_SETTINGS_DEFAULTS.enableMarkdown);
-  const { value: showMessageIndex } = useBackendSetting(STORAGE_KEYS.SHOW_MESSAGE_INDEX, APP_SETTINGS_DEFAULTS.showMessageIndex);
-  const { value: chatHistoryLimit } = useBackendSetting(STORAGE_KEYS.CHAT_HISTORY_LIMIT, APP_SETTINGS_DEFAULTS.chatHistoryLimit);
+  const { value: enterToSend } = useBackendSetting(SETTING_KEYS.ENTER_TO_SEND, APP_SETTINGS_DEFAULTS.enterToSend);
+  const { value: showWordCount } = useBackendSetting(SETTING_KEYS.SHOW_WORD_COUNT, APP_SETTINGS_DEFAULTS.showWordCount);
+  const { value: enableMarkdown } = useBackendSetting(SETTING_KEYS.ENABLE_MARKDOWN, APP_SETTINGS_DEFAULTS.enableMarkdown);
+  const { value: showMessageIndex } = useBackendSetting(SETTING_KEYS.SHOW_MESSAGE_INDEX, APP_SETTINGS_DEFAULTS.showMessageIndex);
+  const { value: chatHistoryLimit } = useBackendSetting(SETTING_KEYS.CHAT_HISTORY_LIMIT, APP_SETTINGS_DEFAULTS.chatHistoryLimit);
 
   // 提示词设置
   const { value: promptMergeMode } = useBackendSetting<MergeMode>(
-    STORAGE_KEYS.PROMPT_MERGE_MODE,
+    SETTING_KEYS.PROMPT_MERGE_MODE,
     APP_SETTINGS_DEFAULTS.promptMergeMode
   );
 
   // 会话压缩设置
   const { value: compressionThresholdPercent } = useBackendSetting(
-    STORAGE_KEYS.COMPRESSION_THRESHOLD_PERCENT,
+    SETTING_KEYS.COMPRESSION_THRESHOLD_PERCENT,
     APP_SETTINGS_DEFAULTS.compressionThresholdPercent
   );
   const { value: compressionMode } = useBackendSetting<ConversationCompressionMode>(
-    STORAGE_KEYS.COMPRESSION_MODE,
+    SETTING_KEYS.COMPRESSION_MODE,
     APP_SETTINGS_DEFAULTS.compressionMode
   );
 

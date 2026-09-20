@@ -91,7 +91,7 @@ Conexion 是一个移动端优先的 AI 聊天应用，支持 OpenAI 兼容接�
 CONEXION_DATA_DIR=/path/to/data npm run dev:server
 ```
 
-旧版浏览器 localStorage / IndexedDB 数据不会迁移，启动时只做清理。
+旧版浏览器 localStorage / IndexedDB 数据不会迁移，也不再做清理：新版应用完全不读写浏览器本地存储，遗留数据留在原处不影响使用，需要时可在浏览器控制台手动清除。
 
 ## 本地开发
 

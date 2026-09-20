@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, watch } from 'vue';
 import { ChevronLeft, Plus, X, Database, Trash2, MoreVertical, Edit2 } from '@lucide/vue';
 import type { KnowledgeBase, KnowledgeEntry } from '@/types';
 import { useConfirmDialog } from '../../composables/useConfirmDialog';
@@ -28,7 +28,7 @@ const emit = defineEmits<{
   reorderEntries: [entries: KnowledgeEntry[]];
 }>();
 
-const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete } = useConfirmDialog();
+const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete, ConfirmDialog } = useConfirmDialog();
 const { showSuccess, showInfo } = useNotifications();
 
 // 知识库菜单
@@ -46,7 +46,34 @@ const editingEntryData = ref<Partial<KnowledgeEntry>>({});
 const editingId = ref<string | null>(null);
 
 // 当前知识库的条目列表
-const currentEntries = computed(() => props.currentKnowledgeBase?.entries || []);
+// 用本地可写副本：useDraggable 会重新赋值整个数组，而 props 派生的 computed 是只读的
+const currentEntries = ref<KnowledgeEntry[]>([]);
+
+watch(
+  () => props.currentKnowledgeBase?.entries,
+  (entries) => {
+    currentEntries.value = [...(entries ?? [])];
+  },
+  { immediate: true, deep: true },
+);
+
+const entryListRef = ref<HTMLElement | null>(null);
+
+/**
+ * 按真实布局测量每项节距（本项顶 → 下一项顶，含列表 gap）。
+ * 条目卡片高度随内容长短变化，写死高度会让拖拽落点跳格。
+ */
+const measureItemHeights = (): number[] => {
+  const cards = entryListRef.value?.querySelectorAll<HTMLElement>('.entry-card');
+  if (!cards || cards.length === 0) return [];
+
+  const rects = [...cards].map((card) => card.getBoundingClientRect());
+
+  return rects.map((rect, index) => {
+    const next = rects[index + 1];
+    return next ? next.top - rect.top : rect.height;
+  });
+};
 
 // 使用拖拽 composable
 const {
@@ -58,15 +85,24 @@ const {
   handleDrop,
   handleDragEnd,
   getItemStyle: getDragItemStyle,
+  handleTouchStart,
+  handleTouchMove,
+  handleTouchEnd,
+  handleTouchCancel,
 } = useDraggable(currentEntries, {
   itemHeight: 74,
+  measureItemHeights,
   onDragEnd: () => {
-    // 拖拽结束后通知父组件更新条目顺序
-    if (props.currentKnowledgeBase) {
-      emit('reorderEntries', [...props.currentKnowledgeBase.entries]);
-    }
+    // 拖拽结束后通知父组件更新条目顺序（用本地顺序，props 里的还是旧的）
+    emit('reorderEntries', [...currentEntries.value]);
   },
 });
+
+// 触摸拖拽转发（卡片上的拖拽手柄发出来）
+const onEntryTouchStart = (index: number, event: TouchEvent) => handleTouchStart(index, event);
+const onEntryTouchMove = (event: TouchEvent) => handleTouchMove(event);
+const onEntryTouchEnd = () => handleTouchEnd();
+const onEntryTouchCancel = () => handleTouchCancel();
 
 // 切换条目启用状态
 const handleToggleEntry = (entryId: string) => {
@@ -214,7 +250,7 @@ const handleConfirmDelete = () => {
     </header>
 
     <div :class="['page-content', { 'dragging-active': isDragging }]">
-      <div v-if="currentEntries.length > 0" :class="['entry-list', { 'dragging-active': isDragging }]">
+      <div v-if="currentEntries.length > 0" ref="entryListRef" :class="['entry-list', { 'dragging-active': isDragging }]">
         <div
           v-for="(entry, index) in currentEntries"
           :key="entry.id"
@@ -237,6 +273,10 @@ const handleConfirmDelete = () => {
             @delete="handleDeleteEntry"
             @drag-start="handleDragStart"
             @drag-end="handleDragEnd"
+            @touch-start="onEntryTouchStart"
+            @touch-move="onEntryTouchMove"
+            @touch-end="onEntryTouchEnd"
+            @touch-cancel="onEntryTouchCancel"
           />
         </div>
       </div>

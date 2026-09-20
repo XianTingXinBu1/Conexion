@@ -28,6 +28,7 @@ const emit = defineEmits<{
   touchStart: [index: number, event: TouchEvent];
   touchMove: [event: TouchEvent];
   touchEnd: [];
+  touchCancel: [];
 }>();
 
 const cardClasses = computed(() => [
@@ -97,6 +98,7 @@ const canSave = computed(() => {
         @touchstart="emit('touchStart', index, $event)"
         @touchmove="emit('touchMove', $event)"
         @touchend="emit('touchEnd')"
+        @touchcancel="emit('touchCancel')"
       >
         <GripVertical :size="18" />
       </div>

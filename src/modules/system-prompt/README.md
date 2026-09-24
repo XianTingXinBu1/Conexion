@@ -12,7 +12,7 @@
 - 支持 `insertPosition` 排序。
 - 支持 `system` / `user` / `assistant` 三种角色类型。
 - 支持消息合并：`none` / `adjacent` / `all`。
-- 提供粗略 token 估算。
+- token 计数复用聊天侧同一个 gpt-tokenizer（`@/utils/tokenCounter`），与上下文用量同口径。
 - 返回构建元数据，方便 Prompt 预览和调试。
 - 对缺少 `compression-summary` 条目的旧预设保留兼容行为。
 
@@ -211,7 +211,7 @@ src/features/chat/presentation/useChatStats.ts
 
 ## 注意事项
 
-- token 估算是粗略估算，不等于真实模型 tokenizer 结果。
+- token 估算基于 gpt-tokenizer（cl100k），与上游真实分词器可能有细微差异，但不再按字符数线性折算（旧算法对中文会低估 3~4 倍）。
 - 知识库只收集全局启用知识库中的已启用条目。
 - 聊天历史条目会拆为多个 message，并保留 user / assistant 角色。
 - 用户指令条目会把当前输入放到预设指定的位置。

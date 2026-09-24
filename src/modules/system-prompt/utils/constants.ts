@@ -86,11 +86,6 @@ export const DEFAULT_MERGE_MODE: MergeMode = 'adjacent';
 export const MESSAGE_SEPARATOR = '\n\n';
 
 /**
- * Token 估算系数（粗略估算：1 token ≈ 4 字符）
- */
-export const TOKEN_ESTIMATION_RATIO = 0.25;
-
-/**
  * 最大条目位置值（用于插入位置计算）
  */
 export const MAX_INSERT_POSITION = 10000;

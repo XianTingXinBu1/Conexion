@@ -2,25 +2,25 @@
  * 系统提示词构建模块 - 工具函数
  */
 
-import { TOKEN_ESTIMATION_RATIO } from './constants';
+import { countMessagesTokens, countTokens } from '@/utils/tokenCounter';
 import type { ChatMessage } from '@/types';
 
 /**
  * 估算文本的 token 数量
- * 使用粗略估算：1 token ≈ 4 字符
+ *
+ * 复用聊天侧同一个 gpt-tokenizer（cl100k）计数器，避免与上下文用量出现两套口径。
+ * 与上游真实分词器可能有细微差异，但远优于旧版「字符数 × 0.25 折算」——
+ * 后者是英文经验值，对中文会低估 3~4 倍。
  */
 export function estimateTokens(text: string): number {
-  if (!text) return 0;
-  return Math.ceil(text.length * TOKEN_ESTIMATION_RATIO);
+  return countTokens(text);
 }
 
 /**
- * 估算 messages 数组的总 token 数量
+ * 估算 messages 数组的总 token 数量（含每条消息的固定开销）
  */
 export function estimateMessagesTokens(messages: ChatMessage[]): number {
-  return messages.reduce((total, msg) => {
-    return total + estimateTokens(msg.content);
-  }, 0);
+  return countMessagesTokens(messages);
 }
 
 /**

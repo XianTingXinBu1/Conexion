@@ -1,4 +1,5 @@
 import type { AICharacter, ChatMessage, KnowledgeBase, Message, PromptPreset, UserCharacter } from '@/types';
+import { countMessagesTokens } from '@/utils/tokenCounter';
 import type { MergeMode, SystemPromptResult } from '@/modules/system-prompt';
 import { buildSystemPrompt } from '@/modules/system-prompt';
 
@@ -94,7 +95,7 @@ export function buildSystemMessagesUseCase(context: BuildSystemMessagesContext):
     return {
       messages,
       promptResult: {
-        estimatedTokens: messages.reduce((sum, message) => sum + message.content.length, 0),
+        estimatedTokens: countMessagesTokens(messages),
       },
       usedFallback: true,
     };

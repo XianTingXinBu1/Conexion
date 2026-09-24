@@ -121,7 +121,7 @@ const tokenCount = estimateTokens('这是一段文本')
 const totalTokens = estimateMessagesTokens(messages)
 ```
 
-注意：token 估算是粗略值，主要用于 UI 提示和相对比较。
+注意：token 计数走 gpt-tokenizer（cl100k），与上下文用量、压缩阈值同一口径。
 
 ## 消息合并
 

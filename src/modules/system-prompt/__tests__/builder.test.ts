@@ -128,9 +128,10 @@ describe('system-prompt utils', () => {
     expect(isContentEmpty(' x ')).toBe(false);
   });
 
-  it('estimates tokens and validates role types', () => {
-    expect(estimateTokens('1234')).toBe(1);
-    expect(estimateTokens('12345')).toBe(2);
+  it('counts tokens with the shared tokenizer and validates role types', () => {
+    expect(estimateTokens('')).toBe(0);
+    // 中文不再按 1/4 折算：旧实现会把「你好，世界」算成 2
+    expect(estimateTokens('你好，世界')).toBeGreaterThan(2);
     expect(isValidRoleType('system')).toBe(true);
     expect(isValidRoleType('tool')).toBe(false);
   });

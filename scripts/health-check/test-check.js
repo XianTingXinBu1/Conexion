@@ -17,11 +17,22 @@ export async function runTestCheck(options = {}) {
 
   try {
     const { execSync } = await import('child_process');
+    const { existsSync } = await import('node:fs');
+    const { resolve, dirname } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
 
-    // 运行测试
-    execSync('npx vitest run', {
+    const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+    const vitestCli = resolve(projectRoot, 'node_modules/vitest/vitest.mjs');
+
+    // Termux 友好：直接用 node 跑 vitest 入口，避开 .bin shebang
+    const command = existsSync(vitestCli)
+      ? `node "${vitestCli}" run`
+      : 'npx vitest run';
+
+    execSync(command, {
       stdio: 'pipe',
       encoding: 'utf-8',
+      cwd: projectRoot,
     });
 
     return {

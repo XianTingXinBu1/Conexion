@@ -10,6 +10,7 @@ import { runBuildCheck } from './build-check.js';
 import { runTestCheck } from './test-check.js';
 import { runDepsCheck } from './deps-check.js';
 import { runArchitectureCheck } from './architecture-check.js';
+import { runE2ECheck } from './e2e-check.js';
 
 // 定义所有检查项
 const CHECKS = [
@@ -36,6 +37,12 @@ const CHECKS = [
     description: '架构边界检查',
     critical: true,
     run: () => runArchitectureCheck(),
+  },
+  {
+    name: 'e2e-check',
+    description: 'E2E 浏览器测试',
+    critical: false,
+    run: (opts) => runE2ECheck(opts),
   },
   {
     name: 'build-check',
@@ -166,6 +173,7 @@ async function main() {
   const options = {
     skipTests: args.includes('--skip-tests'),
     skipBuild: args.includes('--skip-build'),
+    skipE2E: args.includes('--skip-e2e'),
     verbose: args.includes('--verbose') || args.includes('-v'),
   };
 

@@ -50,6 +50,9 @@ coverage/
 .server/
 .runtime/
 
+# E2E runtime
+.e2e-run/
+
 # OS files
 Thumbs.db
 

@@ -5,6 +5,7 @@ import type { PromptItem } from '@/types';
 import FormInput from '../form/FormInput.vue';
 import FormTextarea from '../form/FormTextarea.vue';
 import FormActions from '../form/FormActions.vue';
+import { PROMPT_MACRO_HINTS } from './macroHints';
 
 interface Props {
   index: number;
@@ -66,6 +67,12 @@ const updateDescription = (value: string | undefined) => {
 const updatePrompt = (value: string | undefined) => {
   if (props.editingData) {
     props.editingData.prompt = value ?? '';
+  }
+};
+
+const insertMacro = (token: string) => {
+  if (props.editingData) {
+    props.editingData.prompt = (props.editingData.prompt ?? '') + token;
   }
 };
 
@@ -226,6 +233,19 @@ const onTouchCancel = (event: TouchEvent) => {
             :rows="4"
             @update:model-value="updatePrompt"
           />
+          <div class="macro-hint" data-testid="macro-hints">
+            <span class="macro-hint-label">可用变量：</span>
+            <button
+              v-for="macro in PROMPT_MACRO_HINTS"
+              :key="macro.token"
+              type="button"
+              class="macro-chip"
+              :title="macro.label"
+              @click="insertMacro(macro.token)"
+            >
+              {{ macro.token }}
+            </button>
+          </div>
         </div>
         <FormActions
           :buttons="[
@@ -453,5 +473,34 @@ const onTouchCancel = (event: TouchEvent) => {
   background: var(--accent-purple);
   border-color: var(--accent-purple);
   color: white;
+}
+
+.macro-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.macro-hint-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.macro-chip {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--accent-purple);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.macro-chip:hover {
+  border-color: var(--accent-purple);
 }
 </style>

@@ -77,6 +77,30 @@ console.log(result.metadata)
 - 如果预设里已经包含 `compression-summary` 条目，则压缩摘要会在该条目的插入位置进入结果。
 - 如果旧预设里没有该条目，但调用方传了 `compressionSummary`，模块会保留旧行为，默认把它前置注入为一条 `system` message。
 
+## 宏（变量）替换
+
+自定义提示词内容（例如“角色设定”以外的普通条目、或给特殊条目手写的内容）会执行 `{{...}}` 宏替换。
+宏替换同样作用于特殊条目的内置模板结果。
+
+| 变量 | 含义 |
+|------|------|
+| `{{char}}` / `{{charname}}` | AI 角色名 |
+| `{{user}}` / `{{username}}` | 用户角色名 |
+| `{{description}}` | AI 角色描述 |
+| `{{personality}}` | AI 角色性格 |
+| `{{user_description}}` | 用户描述 |
+| `{{time}}` | 实时日期时间 `YYYY-MM-DD HH:mm:ss` |
+| `{{date}}` | 实时日期 `YYYY-MM-DD` |
+| `{{weekday}}` | 实时星期（中文，如 `星期三`） |
+| `{{hour}}` | 实时小时 `00-23` |
+
+规则：
+
+- 变量名不区分大小写，允许 `{{ name }}` 带空格。
+- 未识别的变量保持原样，不会报错。
+- 角色为空时对应变量替换为空字符串。
+- 时间变量基于构建时刻，可通过 `buildSystemPrompt({ now })` 注入固定时间便于测试。
+
 ## API 参考
 
 ### buildSystemPrompt(config)

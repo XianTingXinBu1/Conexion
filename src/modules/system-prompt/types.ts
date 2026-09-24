@@ -42,6 +42,8 @@ export interface SystemPromptConfig {
   mergeMode?: MergeMode;
   /** 是否在构建时过滤掉空的 prompt（默认: true） */
   filterEmptyPrompts?: boolean;
+  /** 当前时间（用于 {{time}} 等宏，默认取构建时刻，便于测试注入） */
+  now?: Date;
 }
 
 /**
@@ -87,11 +89,35 @@ export interface BuildMetadata {
 }
 
 /**
- * 内容填充器上下文
+ * 支持的宏（变量）名称
  */
-export interface ContentFillerContext {
+export type MacroVariableName =
+  | 'char'
+  | 'charname'
+  | 'user'
+  | 'username'
+  | 'description'
+  | 'personality'
+  | 'user_description'
+  | 'time'
+  | 'date'
+  | 'weekday'
+  | 'hour';
+
+/**
+ * 宏替换上下文
+ */
+export interface MacroContext {
   aiCharacter?: AICharacter;
   userCharacter?: UserCharacter;
+  /** 当前时间（默认取构建时刻，便于测试注入） */
+  now?: Date;
+}
+
+/**
+ * 内容填充器上下文
+ */
+export interface ContentFillerContext extends MacroContext {
   knowledgeBases?: KnowledgeBase[];
   chatHistory?: Message[];
   userInstruction?: string;

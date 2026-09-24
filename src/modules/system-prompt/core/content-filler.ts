@@ -6,6 +6,7 @@
 
 import { SPECIAL_ITEM_NAMES, DEFAULT_PROMPT_TEMPLATES, KNOWLEDGE_ENTRY_TEMPLATE } from '../utils/constants';
 import { normalizeContent } from '../utils';
+import { applyMacros, buildMacroValues } from './macro';
 import type { PromptItem } from '@/types';
 import type { ContentPlaceholder, ContentFillerContext } from '../types';
 
@@ -90,18 +91,34 @@ function getPlaceholderType(item: PromptItem): ContentPlaceholder | null {
 
 /**
  * 填充条目内容
+ *
+ * 规则：
+ * - 特殊条目（角色设定 / 用户设定 / 知识库 / 压缩摘要）走内置模板插槽；
+ * - 自定义 prompt 内容优先，但会执行宏（{{...}}）替换；
+ * - 特殊条目本身没有自定义内容时，也会对模板结果做宏替换，保证一致性。
  */
 export function fillItemContent(
   item: PromptItem,
   context: ContentFillerContext
 ): { content: string; placeholder: ContentPlaceholder | null } {
+  const macroValues = buildMacroValues(context);
+
+  // 自定义内容优先：无论是普通条目还是特殊条目，只要写了 prompt，
+  // 就以自定义内容为准，并执行宏（{{...}}）替换。
+  if (item.prompt?.trim()) {
+    return {
+      content: normalizeContent(applyMacros(item.prompt, macroValues)),
+      placeholder: null,
+    };
+  }
+
   const placeholder = getPlaceholderType(item);
   if (!placeholder) {
-    return { content: normalizeContent(item.prompt), placeholder: null };
+    return { content: '', placeholder: null };
   }
 
   const content = FILLER_STRATEGIES[placeholder](context);
-  return { content: normalizeContent(content), placeholder };
+  return { content: normalizeContent(applyMacros(content, macroValues)), placeholder };
 }
 
 /**

@@ -5,6 +5,7 @@ import type { PromptItem } from '@/types';
 import Modal from '../common/Modal.vue';
 import FormInput from '../form/FormInput.vue';
 import FormTextarea from '../form/FormTextarea.vue';
+import { PROMPT_MACRO_HINTS } from './macroHints';
 
 interface Props {
   show: boolean;
@@ -29,6 +30,15 @@ const formData = ref<Partial<PromptItem> & { name: string; description: string; 
   prompt: '',
   roleType: 'system',
 });
+
+// 提示词中可用的宏（变量）
+const MACRO_HINTS = PROMPT_MACRO_HINTS;
+
+// 将变量追加到提示词末尾
+const insertMacro = (token: string) => {
+  const current = formData.value.prompt ?? '';
+  formData.value.prompt = current + token;
+};
 
 // 表单错误状态
 const formError = ref('');
@@ -197,6 +207,19 @@ const handleNameKeydown = (event: KeyboardEvent) => {
         placeholder="输入提示词内容（可选）"
         :rows="4"
       />
+      <div class="macro-hint">
+        <span class="macro-hint-label">可用变量：</span>
+        <button
+          v-for="macro in MACRO_HINTS"
+          :key="macro.token"
+          type="button"
+          class="macro-chip"
+          :title="macro.label"
+          @click="insertMacro(macro.token)"
+        >
+          {{ macro.token }}
+        </button>
+      </div>
     </div>
     <div v-if="formError" class="form-error">
       {{ formError }}
@@ -281,6 +304,35 @@ const handleNameKeydown = (event: KeyboardEvent) => {
   border: 1px solid rgba(239, 68, 68, 0.15);
   line-height: 1.5;
   font-weight: 500;
+}
+
+.macro-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.macro-hint-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.macro-chip {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--accent-purple);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.macro-chip:hover {
+  border-color: var(--accent-purple);
 }
 
 .modal-footer-actions {

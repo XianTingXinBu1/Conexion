@@ -43,6 +43,8 @@ export type {
   MergeMode,
   BuildMetadata,
   ContentFillerContext,
+  MacroContext,
+  MacroVariableName,
   MergeResult,
 } from './types';
 
@@ -50,6 +52,10 @@ export type {
 export {
   buildSystemPrompt,
   mergeMessages,
+  applyMacros,
+  renderMacros,
+  buildMacroValues,
+  SUPPORTED_MACROS,
 } from './core';
 
 // 工具函数

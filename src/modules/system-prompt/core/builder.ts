@@ -55,6 +55,7 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
     compressionSummary = '',
     mergeMode = DEFAULT_MERGE_MODE,
     filterEmptyPrompts = true,
+    now = new Date(),
   } = config;
 
   const context = {
@@ -64,6 +65,7 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
     chatHistory,
     userInstruction,
     compressionSummary,
+    now,
   };
 
   const messages: ChatMessage[] = [];

@@ -95,6 +95,7 @@ const {
 } = useDraggable(currentEntries, {
   itemHeight: 74,
   measureItemHeights,
+  getListElement: () => entryListRef.value,
   onDragEnd: () => {
     // 拖拽结束后通知父组件更新条目顺序（用本地顺序，props 里的还是旧的）
     emit('reorderEntries', [...currentEntries.value]);

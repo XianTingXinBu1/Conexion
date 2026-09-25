@@ -82,6 +82,7 @@ const {
 } = useDraggable(itemsRef, {
   itemHeight: 74,
   measureItemHeights,
+  getListElement: () => listRef.value,
   onDragEnd: () => {
     emit('reorder', itemsRef.value);
   },

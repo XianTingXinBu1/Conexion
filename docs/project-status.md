@@ -203,6 +203,10 @@ E2E 在健康检查中标记为**非关键项**（`critical: false`），失败�
   `drop` 的落点以插入指示为准而不是“落在哪个元素上”；拖动中的插入位置要存成 ref
   （手势坐标是普通变量，computed 读不到它的变化）。插入指示只改 `border-color` /
   `box-shadow`，改 `border-width` 会改变卡片高度并把下方内容挤动。
+  长列表的**边缘自动滚动**：指针进滚动容器上下 72px 内就每帧滚，滚动量要补偿进
+  手势位移（否则卡片不跟手）；滚动范围必须钳制在手势开始时的 `maxScroll`——
+  拖动项的 translate 会把内容掸出容器、掸大 `scrollHeight`，不钳制就是“掸出→又能滚”
+  的正反馈无限滚；自动滚动帧里不能再调 `syncAutoScroll`（会排第二个循环指数级跑飞）。
 - **预设状态的消费方**：`useApiPresets()` 每次调用都是独立实例，`currentPreset`
   只有在 `loadPresets()`（会一并同步后端记住的选中项）之后才有意义。请求参数走
   `repositories/apiPresetRepository.loadCurrentApiPreset()` 直接读设置，统计展示

@@ -41,6 +41,11 @@ import { ref, computed, type Ref } from 'vue';
 
 type DragMode = 'touch' | 'mouse';
 
+/** 指针进入滚动容器上下边缘多少像素内开始自动滚动 */
+const AUTO_SCROLL_EDGE = 72;
+/** 贴边时每帧最大滚动量（px） */
+const AUTO_SCROLL_MAX_STEP = 16;
+
 /**
  * 下一帧执行回调。
  * 单测（node 环境）没有 requestAnimationFrame，退化成 setTimeout。
@@ -68,6 +73,11 @@ export function useDraggable<T>(
      * 拖拽开始时调用一次；列表项高度不固定时必须提供，否则落点会按固定高度推算而错位。
      */
     measureItemHeights?: () => number[];
+    /**
+     * 列表容器元素。用于拖动到上下边缘时自动滚动（沿祖先链找可滚动的那个容器）。
+     * 不提供则不做自动滚动。
+     */
+    getListElement?: () => HTMLElement | null;
     /** 拖拽结束时的回调，传入新的列表顺序 */
     onDragEnd?: (newItems: T[]) => void;
   } = {}
@@ -75,6 +85,7 @@ export function useDraggable<T>(
   const {
     itemHeight = 74,
     measureItemHeights,
+    getListElement,
     onDragEnd,
   } = options;
 
@@ -97,6 +108,16 @@ export function useDraggable<T>(
   // 吸附动画的释放句柄
   let releaseHandle = 0;
 
+  // 拖到上下边缘时的自动滚动
+  let scrollContainer: HTMLElement | null = null;
+  let scrollTopEdge = 0;
+  let scrollBottomEdge = 0;
+  // 手势开始时容器的可滚范围：拖动项自身会被 translate 拖出容器（撑大 scrollHeight），
+  // 不钳制的话“溢出→又能滚→溢出更多”会正反馈无限滚下去
+  let scrollMaxTop = 0;
+  let scrollDelta = 0;
+  let autoScrollHandle = 0;
+
   const resolvePitch = (index: number): number => {
     const measured = slotPitches[index];
     if (typeof measured === 'number' && Number.isFinite(measured) && measured > 0) {
@@ -117,6 +138,90 @@ export function useDraggable<T>(
       total += resolvePitch(index);
     }
     return total;
+  };
+
+  /**
+   * 从列表容器沿祖先链找可滚动的容器（页面内容区），供边缘自动滚动使用。
+   * 拖拽开始时解析一次；容器不可滚（内容不够长）时返回 null，自动滚动自然关闭。
+   */
+  const resolveScrollContainer = (): HTMLElement | null => {
+    const listElement = getListElement?.();
+    let node = listElement?.parentElement ?? null;
+
+    while (node) {
+      const overflowY = typeof getComputedStyle === 'function' ? getComputedStyle(node).overflowY : '';
+      // overflow: hidden 也算（拖拽期间页面会临时设成 hidden 防误滚，但内容仍可编程滚动）
+      const scrollable = overflowY === 'auto' || overflowY === 'scroll'
+        || overflowY === 'overlay' || overflowY === 'hidden';
+      if (scrollable && node.scrollHeight > node.clientHeight) return node;
+      node = node.parentElement;
+    }
+
+    return null;
+  };
+
+  /** 手势位移 + 自动滚动补偿：容器滚下去多少，卡片就要多往前走多少 */
+  const resolveDeltaY = (): number => gestureCurrentY - gestureStartY + scrollDelta;
+
+  const stopAutoScroll = () => {
+    if (autoScrollHandle) {
+      cancelFrame(autoScrollHandle);
+      autoScrollHandle = 0;
+    }
+  };
+
+  /** 指针是否停在滚动容器的上/下边缘带内 */
+  const isPointerNearEdge = (): boolean => {
+    if (!scrollContainer) return false;
+    return (
+      gestureCurrentY < scrollTopEdge + AUTO_SCROLL_EDGE
+      || gestureCurrentY > scrollBottomEdge - AUTO_SCROLL_EDGE
+    );
+  };
+
+  const runAutoScrollFrame = () => {
+    autoScrollHandle = 0;
+
+    const container = scrollContainer;
+    if (!container || !isDragging.value) return;
+
+    const distanceToTop = gestureCurrentY - scrollTopEdge;
+    const distanceToBottom = scrollBottomEdge - gestureCurrentY;
+
+    // 越贴边越快（指针移到容器外时按满速）
+    const ratio = (distance: number) =>
+      Math.min(1, Math.max(0, (AUTO_SCROLL_EDGE - distance) / AUTO_SCROLL_EDGE));
+
+    let step = 0;
+    if (distanceToTop < AUTO_SCROLL_EDGE) {
+      step = -Math.ceil(AUTO_SCROLL_MAX_STEP * ratio(distanceToTop));
+    } else if (distanceToBottom < AUTO_SCROLL_EDGE) {
+      step = Math.ceil(AUTO_SCROLL_MAX_STEP * ratio(distanceToBottom));
+    }
+
+    if (step === 0) return;
+
+    const before = container.scrollTop;
+    const target = Math.max(0, Math.min(before + step, scrollMaxTop));
+    container.scrollTop = target;
+    const applied = container.scrollTop - before;
+
+    if (applied !== 0) {
+      scrollDelta += applied;
+      // 这一帧已经在自动滚动循环里，不能再让 syncAutoScroll 排第二个循环（会指数级爆炸）
+      updateProgress(false);
+      autoScrollHandle = scheduleFrame(runAutoScrollFrame);
+    }
+    // 已经拖到两端（applied === 0）时停下，等下一次指针移动再重启
+  };
+
+  /** 每帧同步：在边缘带内就保持自动滚动，离开就停 */
+  const syncAutoScroll = () => {
+    if (isPointerNearEdge()) {
+      if (!autoScrollHandle) autoScrollHandle = scheduleFrame(runAutoScrollFrame);
+    } else {
+      stopAutoScroll();
+    }
   };
 
   const buildSlotCenters = (): number[] => {
@@ -185,17 +290,19 @@ export function useDraggable<T>(
     return offsets;
   };
 
-  /** 按当前指针位置刷新让位与插入点 */
-  const updateProgress = () => {
+  /** 按当前指针位置刷新让位与插入点（自动滚动帧里不要再触发 syncAutoScroll）*/
+  const updateProgress = (syncScroll = true) => {
     const fromIndex = draggedIndex.value;
     if (fromIndex === null || items.value.length === 0) return;
 
-    const deltaY = gestureCurrentY - gestureStartY;
+    const deltaY = resolveDeltaY();
     const targetIndex = resolveTargetIndex(fromIndex, deltaY);
     const draggedOffset = dragMode === 'touch' ? deltaY : 0;
 
     itemOffsets.value = computeOffsets(fromIndex, targetIndex, draggedOffset);
     insertIndex.value = targetIndex;
+
+    if (syncScroll) syncAutoScroll();
   };
 
   const clearReleaseFrame = () => {
@@ -207,11 +314,14 @@ export function useDraggable<T>(
 
   const resetState = () => {
     clearReleaseFrame();
+    stopAutoScroll();
     draggedIndex.value = null;
     isDragging.value = false;
     itemOffsets.value = new Map();
     insertIndex.value = -1;
     slotPitches = [];
+    scrollContainer = null;
+    scrollDelta = 0;
   };
 
   /** 手势开始：测量几何、记录起点、复位偏移 */
@@ -222,7 +332,18 @@ export function useDraggable<T>(
     }
 
     clearReleaseFrame();
+    stopAutoScroll();
     measureSlots();
+
+    // 自动滚动用的滚动容器与它的视口边界（拖拽期间容器位置不会变）
+    scrollContainer = resolveScrollContainer();
+    scrollDelta = 0;
+    if (scrollContainer) {
+      const rect = scrollContainer.getBoundingClientRect();
+      scrollTopEdge = rect.top;
+      scrollBottomEdge = rect.bottom;
+      scrollMaxTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+    }
 
     dragMode = mode;
     draggedIndex.value = index;
@@ -259,6 +380,7 @@ export function useDraggable<T>(
     itemOffsets.value = new Map([[fromIndex, restingOffset]]);
 
     clearReleaseFrame();
+    stopAutoScroll();
     releaseHandle = scheduleFrame(() => {
       releaseHandle = 0;
       draggedIndex.value = null;
@@ -266,6 +388,8 @@ export function useDraggable<T>(
       itemOffsets.value = new Map();
       insertIndex.value = -1;
       slotPitches = [];
+      scrollContainer = null;
+      scrollDelta = 0;
     });
   };
 
@@ -326,7 +450,7 @@ export function useDraggable<T>(
     const fromIndex = draggedIndex.value;
     if (fromIndex === null) return;
 
-    const deltaY = gestureCurrentY - gestureStartY;
+    const deltaY = resolveDeltaY();
     const resolvedTarget = insertIndex.value >= 0 ? insertIndex.value : targetIndex;
 
     commitReorder(fromIndex, resolvedTarget);
@@ -398,7 +522,7 @@ export function useDraggable<T>(
       return;
     }
 
-    const deltaY = gestureCurrentY - gestureStartY;
+    const deltaY = resolveDeltaY();
     const targetIndex = resolveTargetIndex(fromIndex, deltaY);
 
     commitReorder(fromIndex, targetIndex);
@@ -417,7 +541,7 @@ export function useDraggable<T>(
       return;
     }
 
-    settleAfterReorder(fromIndex, fromIndex, gestureCurrentY - gestureStartY);
+    settleAfterReorder(fromIndex, fromIndex, resolveDeltaY());
   };
 
   /**

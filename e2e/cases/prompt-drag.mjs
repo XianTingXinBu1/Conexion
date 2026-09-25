@@ -113,6 +113,82 @@ export default {
     }
   },
 
+  '长列表拖到边缘时自动滚动，松手不改顺序': async () => {
+    const driver = buildDriver();
+    try {
+      const before = await openList(driver);
+
+      // 撑高卡片让列表超出一屏（只影响本次会话，用例结束会移除）
+      await driver.executeScript(`
+        const style = document.createElement('style');
+        style.id = 'e2e-drag-tall';
+        style.textContent = '.prompt-item { min-height: 180px !important; }';
+        document.head.appendChild(style);
+        return true;
+      `);
+      await driver.sleep(400);
+
+      const scrollable = await driver.executeScript(`
+        const scroller = document.querySelector('.page-content');
+        return { scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight };
+      `);
+      if (scrollable.scrollHeight <= scrollable.clientHeight) {
+        throw new Error(`列表未超出一屏，无法验证自动滚动：${scrollable.scrollHeight}/${scrollable.clientHeight}`);
+      }
+
+      await driver.executeScript(INSTALL_TOUCH);
+      await driver.executeScript(`window.__fireTouch('touchstart', window.__startY); return true;`);
+      // 指针停在容器底部边缘带内，不再移动
+      await driver.executeScript(`
+        window.__endY = window.innerHeight - 30;
+        window.__fireTouch('touchmove', window.__endY);
+        return true;
+      `);
+
+      await driver.sleep(700);
+      const scrolled = await driver.executeScript(`
+        const scroller = document.querySelector('.page-content');
+        const drag = document.querySelector('.prompt-item--dragging');
+        return {
+          scrollTop: Math.round(scroller.scrollTop),
+          maxScroll: Math.round(scroller.scrollHeight - scroller.clientHeight),
+          dragTop: drag ? Math.round(drag.getBoundingClientRect().top) : null,
+        };
+      `);
+      if (scrolled.scrollTop <= 0) {
+        throw new Error('指针停在底部边缘时列表未自动滚动');
+      }
+
+      // 再等一会儿：滚动到两端后应停下（不能因拖动项溢出而无限滚）
+      await driver.sleep(900);
+      const settled = await driver.executeScript(`
+        const scroller = document.querySelector('.page-content');
+        const drag = document.querySelector('.prompt-item--dragging');
+        return {
+          scrollTop: Math.round(scroller.scrollTop),
+          dragTop: drag ? Math.round(drag.getBoundingClientRect().top) : null,
+        };
+      `);
+      if (settled.scrollTop <= scrolled.scrollTop) {
+        throw new Error(`自动滚动未到两端就停了：${scrolled.scrollTop} → ${settled.scrollTop}`);
+      }
+      // 卡片跟手：容器滚动后它在屏幕上的位置应基本不变
+      if (Math.abs((settled.dragTop ?? 0) - (scrolled.dragTop ?? 0)) > 4) {
+        throw new Error(`滚动补偿不对，卡片在屏幕上漂移：${scrolled.dragTop} → ${settled.dragTop}`);
+      }
+
+      // touchcancel 收尾：复位且不写数据
+      await driver.executeScript(`window.__fireTouch('touchcancel', window.__endY); return true;`);
+      await driver.sleep(400);
+      await driver.executeScript(`document.getElementById('e2e-drag-tall')?.remove(); return true;`);
+
+      const after = await driver.executeScript(READ_GEOMETRY);
+      assertEqual(after.names.join(','), before.names.join(','), '自动滚动后顺序不应变化');
+    } finally {
+      await driver.quit();
+    }
+  },
+
   '鼠标拖拽：dragover 驱动让位与插入指示，拖动项不跟手': async () => {
     const driver = buildDriver();
     try {

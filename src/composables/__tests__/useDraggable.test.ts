@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import { useDraggable } from '../useDraggable';
 
@@ -172,6 +172,94 @@ describe('useDraggable 松手吸附', () => {
     expect(draggable.isDragging.value).toBe(false);
     expect(draggable.draggedIndex.value).toBeNull();
     expect(draggable.itemOffsets.value.size).toBe(0);
+  });
+});
+
+describe('useDraggable 边缘自动滚动', () => {
+  const VIEW = { top: 0, bottom: 300, left: 0, right: 100, height: 300, width: 100 };
+
+  const makeContainer = () => ({
+    scrollTop: 0,
+    clientHeight: 300,
+    scrollHeight: 2000,
+    parentElement: null as unknown as HTMLElement,
+    getBoundingClientRect: () => ({ ...VIEW, x: 0, y: 0, toJSON: () => ({}) }),
+  }) as unknown as HTMLElement;
+
+  /** 容器可视区：0 ~ 300，边缘带 72px */
+  const setupWithContainer = (pitches: number[], container: HTMLElement | null) => {
+    const items = ref(Array.from({ length: pitches.length }, (_, i) => `item-${i}`));
+    const draggable = useDraggable(items, {
+      itemHeight: 74,
+      measureItemHeights: () => [...pitches],
+      getListElement: container ? () => ({ parentElement: container } as unknown as HTMLElement) : undefined,
+    });
+    return { items, draggable };
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('getComputedStyle', () => ({ overflowY: 'auto' }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('指针贴住容器下边缘时持续滚动，并把滚动量补偿进位移', async () => {
+    const container = makeContainer();
+    const { draggable } = setupWithContainer([84, 84, 84, 84, 84, 84], container);
+
+    draggable.handleTouchStart(0, touchEvent(100));
+    draggable.handleTouchMove(touchEvent(280)); // 距底边 20px，在边缘带内
+
+    await nextFrame();
+    await nextFrame();
+
+    const scrolled = container.scrollTop;
+    if (scrolled <= 0) throw new Error(`容器未自动滚动：scrollTop=${scrolled}`);
+    // 手指没动，位移应等于“手指位移 + 滚动补偿”
+    expect(draggable.itemOffsets.value.get(0)).toBe(280 - 100 + scrolled);
+
+    // 指针离开边缘带后停止
+    draggable.handleTouchMove(touchEvent(150));
+    const settled = container.scrollTop;
+    await nextFrame();
+    await nextFrame();
+    expect(container.scrollTop).toBe(settled);
+
+    draggable.handleTouchEnd();
+  });
+
+  it('指针贴住容器上边缘时反向滚动', async () => {
+    const container = makeContainer();
+    container.scrollTop = 400;
+    const { draggable } = setupWithContainer([84, 84, 84, 84, 84, 84], container);
+
+    draggable.handleTouchStart(0, touchEvent(200));
+    draggable.handleTouchMove(touchEvent(30)); // 距顶边 30px
+
+    await nextFrame();
+    await nextFrame();
+
+    if (container.scrollTop >= 400) {
+      throw new Error(`容器未向上滚动：scrollTop=${container.scrollTop}`);
+    }
+
+    draggable.handleTouchCancel();
+  });
+
+  it('没有滚动容器时不滚动', async () => {
+    const { items, draggable } = setupWithContainer([84, 84, 84], null);
+
+    draggable.handleTouchStart(0, touchEvent(100));
+    draggable.handleTouchMove(touchEvent(280));
+    await nextFrame();
+    await nextFrame();
+
+    expect(draggable.itemOffsets.value.get(0)).toBe(180);
+    expect([...items.value]).toHaveLength(3);
+
+    draggable.handleTouchEnd();
   });
 });
 

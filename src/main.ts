@@ -1,6 +1,8 @@
 // 全局共享样式：所有页面组件（含懒加载页面）都依赖其中的公共类，
 // 必须由入口引入，不能挂在某个懒加载页面上。
 import './styles/common.css';
+// KaTeX 官方样式（数学公式），同样是全局第三方样式
+import 'katex/dist/katex.min.css';
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';

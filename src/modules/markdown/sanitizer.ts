@@ -46,6 +46,15 @@ function setupHooks(): void {
         node.removeAttribute(attr.name);
       }
     }
+
+    // 3. 任务列表复选框：只保留不可交互的 disabled checkbox，
+    //    否则用户 HTML 可以注入文本框 / 文件上传这类可交互控件。
+    if (tag === 'input') {
+      const type = node.getAttribute('type')?.toLowerCase();
+      if (type !== 'checkbox' || !node.hasAttribute('disabled')) {
+        node.remove();
+      }
+    }
   });
 }
 

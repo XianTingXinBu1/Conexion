@@ -8,6 +8,8 @@ import { marked } from 'marked';
 import type { MarkdownConfig, UseMarkdownReturn, ResolvedMarkdownConfig } from './types';
 import { DEFAULT_MARKDOWN_CONFIG, CSS_CLASSES } from './config';
 import { sanitize, updateSanitizerConfig, resetSanitizerConfig } from './sanitizer';
+import { extractMath, restoreMath } from './math';
+import { transformFootnotes } from './footnote';
 
 // 全局配置
 let globalConfig: ResolvedMarkdownConfig = { ...DEFAULT_MARKDOWN_CONFIG };
@@ -38,17 +40,28 @@ function createRenderer() {
   };
 
   // 自定义链接渲染
-  renderer.link = ({ href, title, text }) => {
+  // 注意：marked 的 renderer 回调统一接收 token 对象（不是字符串），且 token.text
+  // 是「未解析的原始文本」——链接内部的 **加粗** / `代码` / 图片必须交给
+  // parseInline 渲染子 token，否则会以字面量形式原样输出。
+  // 这里用 function 而非箭头函数，才能拿到 marked 注入的 this.parser。
+  renderer.link = function ({ href, title, text, tokens }) {
     const safeHref = escapeHtmlAttribute(href || '');
     const titleAttr = title ? ` title="${escapeHtmlAttribute(title)}"` : '';
-    return `<a href="${safeHref}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    const content = tokens?.length
+      ? this.parser.parseInline(tokens)
+      : escapeHtml(text || '');
+    return `<a href="${safeHref}"${titleAttr} target="_blank" rel="noopener noreferrer">${content}</a>`;
   };
 
   // 自定义图片渲染
-  renderer.image = ({ href, title, text }) => {
+  // alt 只能是纯文本，用 textRenderer 把子 token 摊平（与 marked 默认行为一致）。
+  renderer.image = function ({ href, title, text, tokens }) {
     const safeSrc = escapeHtmlAttribute(href || '');
     const titleAttr = title ? ` title="${escapeHtmlAttribute(title)}"` : '';
-    const altAttr = text ? ` alt="${escapeHtmlAttribute(text)}"` : '';
+    const altText = tokens?.length
+      ? this.parser.parseInline(tokens, this.parser.textRenderer)
+      : (text || '');
+    const altAttr = altText ? ` alt="${escapeHtmlAttribute(altText)}"` : '';
     return `<img src="${safeSrc}"${altAttr}${titleAttr} loading="lazy" />`;
   };
 
@@ -146,9 +159,12 @@ export function useMarkdown(config?: Partial<MarkdownConfig>): UseMarkdownReturn
   }
 
   /**
-   * 渲染 Markdown 为 HTML（不含 sanitize）
+   * 渲染核心：钩子 → 提取公式 → marked → afterRender →（可选）sanitize → 回填公式
+   *
+   * 公式回填必须在 sanitize 之后：KaTeX 输出依赖大量 inline style，
+   * 直接走 sanitizer 会被 per-tag 属性白名单删干净（详见 math.ts 顶部说明）。
    */
-  function render(content: string): string {
+  function renderInternal(content: string, sanitizeHtml?: (html: string) => string): string {
     if (!content) return '';
 
     // 应用 beforeRender 钩子
@@ -157,23 +173,40 @@ export function useMarkdown(config?: Partial<MarkdownConfig>): UseMarkdownReturn
       processedContent = mergedConfig.hooks.beforeRender(processedContent);
     }
 
+    // 脚注：先抽走 `[^1]: ...` 定义行并替换引用，
+    // 否则 marked 会把定义当成引用式链接，渲染出 href="脚注内容" 这种错误链接
+    const withFootnotes = transformFootnotes(processedContent);
+
+    // 抽出数学公式，先换成占位符（纯文本，能安全穿过 marked 与清洗）
+    const { content: withPlaceholders, items } = extractMath(withFootnotes);
+
     // 渲染
-    let html = marked.parse(processedContent) as string;
+    let html = marked.parse(withPlaceholders) as string;
 
     // 应用 afterRender 钩子
     if (mergedConfig.hooks?.afterRender) {
       html = mergedConfig.hooks.afterRender(html);
     }
 
-    return html;
+    if (sanitizeHtml) {
+      html = sanitizeHtml(html);
+    }
+
+    return restoreMath(html, items);
+  }
+
+  /**
+   * 渲染 Markdown 为 HTML（不含 sanitize）
+   */
+  function render(content: string): string {
+    return renderInternal(content);
   }
 
   /**
    * 渲染并 sanitize（推荐使用）
    */
   function renderSafe(content: string): string {
-    const html = render(content);
-    return sanitize(html, mergedConfig.sanitizer);
+    return renderInternal(content, (html) => sanitize(html, mergedConfig.sanitizer));
   }
 
   /**

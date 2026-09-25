@@ -103,6 +103,14 @@
   margin-bottom: 0.5em;
 }
 
+/* GFM 任务列表复选框（不可交互，仅作标记） */
+.markdown-renderer li > input[type='checkbox'] {
+  margin-right: 0.4em;
+  vertical-align: middle;
+  accent-color: var(--accent-purple);
+  pointer-events: none;
+}
+
 /* 引用块 */
 .markdown-renderer blockquote {
   margin: 1em 0;
@@ -121,6 +129,87 @@
   margin: 2em 0;
   border: none;
   border-top: 1px solid var(--border-color);
+}
+
+/* 折叠块（<details>/<summary>） */
+.markdown-renderer details {
+  margin: 1em 0;
+  padding: 0.6em 0.9em;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+
+.markdown-renderer summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-main);
+  /* 去掉浏览器默认三角，改用自绘箭头（便于跟随主题色与旋转动画） */
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.markdown-renderer summary::-webkit-details-marker {
+  display: none;
+}
+
+.markdown-renderer summary::before {
+  content: '▸';
+  color: var(--accent-purple);
+  transition: transform 0.2s ease;
+}
+
+.markdown-renderer details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.markdown-renderer details[open] > summary {
+  margin-bottom: 0.5em;
+}
+
+.markdown-renderer details > :last-child {
+  margin-bottom: 0;
+}
+
+/* 脚注 */
+.markdown-renderer .footnote-ref {
+  color: var(--accent-purple);
+  font-size: 0.75em;
+  padding: 0 0.15em;
+}
+
+.markdown-renderer .footnotes {
+  margin-top: 1.5em;
+  padding-top: 0.75em;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.markdown-renderer .footnotes ol {
+  margin-bottom: 0;
+  padding-left: 1.5em;
+}
+
+/* 数学公式（KaTeX） */
+.markdown-renderer .katex-block {
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* KaTeX 自带 1em 上下边距，容器已提供，避免双倍间距 */
+.markdown-renderer .katex-block .katex-display {
+  margin: 0;
+}
+
+.markdown-renderer .katex-error {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
 }
 
 /* 表格 */

@@ -26,6 +26,7 @@
     "dompurify": "^3.3.1",
     "gpt-tokenizer": "^3.4.0",
     "hono": "^4.12.28",
+    "katex": "^0.18.9",
     "marked": "^17.0.2",
     "vue": "^3.5.25",
     "vue-router": "^4.6.4"

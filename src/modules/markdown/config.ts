@@ -11,15 +11,21 @@ export const DEFAULT_ALLOWED_TAGS = [
   // 标题
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   // 文本
-  'p', 'br', 'hr', 'strong', 'em', 'del', 'code', 'pre',
+  'p', 'br', 'hr', 'strong', 'em', 'del', 'ins', 'code', 'pre',
+  // 内联语义标签
+  'kbd', 'mark', 'sub', 'sup', 'abbr',
   // 列表
   'ul', 'ol', 'li',
   // 引用
   'blockquote',
+  // 折叠块（模型输出长内容时常用）
+  'details', 'summary',
   // 表格
   'table', 'thead', 'tbody', 'tr', 'th', 'td',
   // 链接和图片
   'a', 'img',
+  // 任务列表复选框（由 sanitizer 收紧为不可交互的 disabled checkbox）
+  'input',
   // 其他
   'span', 'div',
 ];
@@ -36,6 +42,14 @@ export const DEFAULT_ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   'code': ['class'],
   'pre': ['class'],
   'span': ['class'],
+  // 代码块的 code-wrapper 靠 class 获得横向滚动，缺失会导致长代码行溢出
+  'div': ['class'],
+  'input': ['type', 'checked', 'disabled'],
+  // <details open> 控制默认展开；abbr 的 title 是悬浮释义
+  'details': ['open'],
+  'abbr': ['title'],
+  // 脚注标记需要自己的 class（.footnote-ref），否则无法与普通上标区分
+  'sup': ['class'],
   'td': ['align'],
   'th': ['align'],
   'table': ['class'],

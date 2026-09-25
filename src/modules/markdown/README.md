@@ -11,8 +11,8 @@ Markdown 模块提供安全的 Markdown 渲染能力，用于聊天消息、通�
 
 - GFM 支持。
 - 换行转 `<br>`。
-- XSS 防护。
-- 自定义代码块渲染。
+- XSS 防护：标签白名单 + 按标签维度的属性白名单（per-tag）。
+- 自定义代码块 / 行内代码渲染（内容转义，不会当作 HTML 解析）。
 - 链接自动加 `target="_blank"` 和 `rel="noopener noreferrer"`。
 - 图片 lazy loading。
 - 渲染前 / 渲染后 hooks。
@@ -176,6 +176,10 @@ const { renderSafe } = useMarkdown()
 
 ## 注意事项
 
+- 覆盖 marked 的 renderer 回调时注意：新版统一接收 token 对象（如 `codespan({ text })`），
+  且必须自行转义文本——否则行内代码会渲染成 `[object Object]` 或被当作 HTML。
+- `DEFAULT_ALLOWED_ATTRIBUTES` 是 per-tag 结构，由 sanitizer 钩子在过滤后收紧；
+  DOMPurify 的 `ALLOWED_ATTR` 是全局列表，只作为粗过滤。
 - 默认不依赖 highlight.js。
 - 渲染出来的 HTML 应使用模块提供的 sanitizer。
 - 需要直接 `v-html` 时优先使用 `renderSafe`。
@@ -186,6 +190,9 @@ const { renderSafe } = useMarkdown()
 修改 Markdown 模块后运行：
 
 ```bash
-npm run test:run
-npm run build
+node scripts/health-check/health-check.js
 ```
+
+DOM 级行为（如属性白名单、危险协议拦截）在 happy-dom 下不可信
+（DOMPurify 在该环境无法正确解析标签），已由 `e2e/cases/markdown-render.mjs`
+在真实 Chromium 中覆盖。

@@ -31,8 +31,10 @@ function createRenderer() {
   };
 
   // 自定义行内代码渲染
-  renderer.codespan = (text) => {
-    return `<code class="${CSS_CLASSES.inlineCode}">${text}</code>`;
+  // 注意：marked 的 renderer 回调统一接收 token 对象（不是字符串），
+  // 且覆盖默认实现后必须自行转义，否则行内代码会被当作 HTML 解析。
+  renderer.codespan = ({ text }) => {
+    return `<code class="${CSS_CLASSES.inlineCode}">${escapeHtml(text)}</code>`;
   };
 
   // 自定义链接渲染

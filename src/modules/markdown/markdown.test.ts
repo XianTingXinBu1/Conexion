@@ -37,4 +37,26 @@ describe('markdown security boundaries', () => {
     expect(html).toContain('src="https://example.com/test.png"');
     expect(html).toContain('title="title &amp;quot;quoted&amp;quot;"');
   });
+
+  it('renders inline code as escaped literal text', () => {
+    const { render } = useMarkdown();
+
+    const html = render('`<b>bold</b>`');
+
+    expect(html).toContain('<code class="inline-code">');
+    expect(html).toContain('&lt;b&gt;bold&lt;/b&gt;');
+    // 回归：marked 新版 renderer 回调改为 token 对象，曾导致插值出 [object Object]
+    expect(html).not.toContain('[object Object]');
+  });
+
+  it('renders plain inline code without mangling', () => {
+    const { render } = useMarkdown();
+
+    expect(render('`useMarkdown()`')).toContain(
+      '<code class="inline-code">useMarkdown()</code>',
+    );
+    expect(render('`src/modules/markdown/sanitizer.ts`')).toContain(
+      'src/modules/markdown/sanitizer.ts',
+    );
+  });
 });

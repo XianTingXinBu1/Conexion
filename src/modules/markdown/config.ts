@@ -25,11 +25,14 @@ export const DEFAULT_ALLOWED_TAGS = [
 ];
 
 /**
- * 默认允许的属性
+ * 默认允许的属性（按标签维度）
+ *
+ * 注意：DOMPurify 的 ALLOWED_ATTR 是全局列表，这里的 per-tag 结构会被
+ * sanitizer.ts 摊平后作为粗过滤，再由 afterSanitizeAttributes 钩子按标签收紧。
  */
 export const DEFAULT_ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   'a': ['href', 'title', 'target', 'rel'],
-  'img': ['src', 'alt', 'title'],
+  'img': ['src', 'alt', 'title', 'loading'],
   'code': ['class'],
   'pre': ['class'],
   'span': ['class'],

@@ -87,3 +87,4 @@ export default {
 - `smoke.mjs` — 应用能加载
 - `macro.mjs` — 提示词界面的变量 chips 存在且可插入
 - `macro-replacement.mjs` — 浏览器运行时下 `{{...}}` 变量被正确替换
+- `markdown-render.mjs` — 行内代码渲染、per-tag 属性白名单、危险协议拦截、链接硬化

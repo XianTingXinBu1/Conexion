@@ -6,8 +6,18 @@
  * 因此优先直接调用 node 入口执行类型检查 + 构建。
  */
 
-export async function runBuildCheck() {
+export async function runBuildCheck(options = {}) {
   const startTime = Date.now();
+
+  // 如果跳过构建，返回 skip 状态
+  if (options.skipBuild) {
+    return {
+      name: '项目构建检查',
+      status: 'skip',
+      duration: 0,
+      message: '已跳过构建',
+    };
+  }
 
   try {
     const { execSync } = await import('child_process');

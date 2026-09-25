@@ -48,7 +48,7 @@ const CHECKS = [
     name: 'build-check',
     description: '项目构建检查',
     critical: true,
-    run: () => runBuildCheck(),
+    run: (opts) => runBuildCheck(opts),
   },
 ];
 

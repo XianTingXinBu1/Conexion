@@ -88,3 +88,5 @@ export default {
 - `macro.mjs` — 提示词界面的变量 chips 存在且可插入
 - `macro-replacement.mjs` — 浏览器运行时下 `{{...}}` 变量被正确替换
 - `markdown-render.mjs` — 行内代码渲染、per-tag 属性白名单、危险协议拦截、链接硬化
+- `prompt-drag.mjs` — 提示词列表拖拽的让位几何与插入指示（触摸 / 鼠标两条路径）。
+  刻意不落位（触摸用 `touchcancel`、鼠标只发 `dragend`），不给用户预设留下数据副作用

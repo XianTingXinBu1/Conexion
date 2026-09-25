@@ -24,7 +24,7 @@ const emit = defineEmits<{
   cancelEdit: [];
   delete: [id: string];
   reorder: [newOrder: PromptItem[]];
-  dragStart: [index: number];
+  dragStart: [index: number, event: DragEvent];
   dragEnd: [];
   touchStart: [index: number, event: TouchEvent];
   touchMove: [event: TouchEvent];
@@ -40,16 +40,19 @@ const listRef = ref<HTMLElement | null>(null);
 /**
  * 按真实布局测量每项节距（本项顶 → 下一项顶，含列表 gap）。
  * 卡片高度随描述长短变化，写死高度会让拖拽落点跳格。
+ * 最后一项没有“下一项”，单独加上列表 gap，否则末尾的让位 / 落点会少一个间距。
  */
 const measureItemHeights = (): number[] => {
-  const cards = listRef.value?.querySelectorAll<HTMLElement>('.prompt-item');
-  if (!cards || cards.length === 0) return [];
+  const listEl = listRef.value;
+  const cards = listEl?.querySelectorAll<HTMLElement>('.prompt-item');
+  if (!listEl || !cards || cards.length === 0) return [];
 
   const rects = [...cards].map((card) => card.getBoundingClientRect());
+  const rowGap = Number.parseFloat(getComputedStyle(listEl).rowGap) || 0;
 
   return rects.map((rect, index) => {
     const next = rects[index + 1];
-    return next ? next.top - rect.top : rect.height;
+    return next ? next.top - rect.top : rect.height + rowGap;
   });
 };
 
@@ -65,6 +68,7 @@ watch(
 // 使用拖拽 composable
 const {
   draggedIndex,
+  isDragging: isDraggingState,
   insertBeforeIndex,
   getItemStyle,
   handleDragStart,
@@ -84,9 +88,9 @@ const {
 });
 
 // 转发拖拽相关的事件
-const onDragStart = (index: number) => {
-  emit('dragStart', index);
-  handleDragStart(index);
+const onDragStart = (index: number, event: DragEvent) => {
+  emit('dragStart', index, event);
+  handleDragStart(index, event);
 };
 
 const onDragEnd = () => {
@@ -116,7 +120,7 @@ const onTouchCancel = () => {
 </script>
 
 <template>
-  <div ref="listRef" :class="['prompt-list', { 'dragging-active': isDragging }]">
+  <div ref="listRef" :class="['prompt-list', { 'dragging-active': isDragging || isDraggingState }]">
     <template v-if="items.length > 0">
       <div
         v-for="(item, index) in items"
@@ -137,7 +141,7 @@ const onTouchCancel = () => {
           @save-edit="emit('saveEdit')"
           @cancel-edit="emit('cancelEdit')"
           @delete="emit('delete', $event)"
-          @drag-start="(idx: number) => onDragStart(idx)"
+          @drag-start="(idx: number, evt: DragEvent) => onDragStart(idx, evt)"
           @drag-end="onDragEnd"
           @touch-start="(idx: number, evt: TouchEvent) => onTouchStart(idx, evt)"
           @touch-move="(evt: TouchEvent) => onTouchMove(evt)"

@@ -24,7 +24,7 @@ const emit = defineEmits<{
   saveEdit: [];
   cancelEdit: [];
   delete: [id: string];
-  dragStart: [index: number];
+  dragStart: [index: number, event: DragEvent];
   dragEnd: [];
   touchStart: [index: number, event: TouchEvent];
   touchMove: [event: TouchEvent];
@@ -121,7 +121,7 @@ const shouldShowPrompt = computed(() => {
 // 处理拖拽开始事件，防止事件冒泡
 const onDragStart = (event: DragEvent) => {
   event.stopPropagation();
-  emit('dragStart', props.index);
+  emit('dragStart', props.index, event);
 };
 
 // 处理拖拽结束事件，防止事件冒泡
@@ -287,9 +287,9 @@ const onTouchCancel = (event: TouchEvent) => {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
+/* 只改颜色与光晕：改 border-width 会改变卡片高度、把下方内容挤动 */
 .prompt-item--insert-before {
   border-color: var(--accent-purple);
-  border-width: 2px;
   box-shadow: 0 0 0 2px rgba(157, 141, 241, 0.2);
 }
 

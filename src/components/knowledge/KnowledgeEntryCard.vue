@@ -23,7 +23,7 @@ const emit = defineEmits<{
   saveEdit: [];
   cancelEdit: [];
   delete: [id: string];
-  dragStart: [index: number];
+  dragStart: [index: number, event: DragEvent];
   dragEnd: [];
   touchStart: [index: number, event: TouchEvent];
   touchMove: [event: TouchEvent];
@@ -93,7 +93,7 @@ const canSave = computed(() => {
       <div
         class="drag-handle"
         draggable="true"
-        @dragstart="emit('dragStart', index)"
+        @dragstart="emit('dragStart', index, $event)"
         @dragend="emit('dragEnd')"
         @touchstart="emit('touchStart', index, $event)"
         @touchmove="emit('touchMove', $event)"
@@ -211,9 +211,9 @@ const canSave = computed(() => {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
+/* 只改颜色与光晕：改 border-width 会改变卡片高度、把下方内容挤动 */
 .entry-card--insert-before {
   border-color: var(--accent-purple);
-  border-width: 2px;
   box-shadow: 0 0 0 2px rgba(157, 141, 241, 0.2);
 }
 

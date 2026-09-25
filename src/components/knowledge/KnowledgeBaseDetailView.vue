@@ -62,16 +62,19 @@ const entryListRef = ref<HTMLElement | null>(null);
 /**
  * 按真实布局测量每项节距（本项顶 → 下一项顶，含列表 gap）。
  * 条目卡片高度随内容长短变化，写死高度会让拖拽落点跳格。
+ * 最后一项没有“下一项”，单独加上列表 gap，否则末尾的让位 / 落点会少一个间距。
  */
 const measureItemHeights = (): number[] => {
-  const cards = entryListRef.value?.querySelectorAll<HTMLElement>('.entry-card');
-  if (!cards || cards.length === 0) return [];
+  const listEl = entryListRef.value;
+  const cards = listEl?.querySelectorAll<HTMLElement>('.entry-card');
+  if (!listEl || !cards || cards.length === 0) return [];
 
   const rects = [...cards].map((card) => card.getBoundingClientRect());
+  const rowGap = Number.parseFloat(getComputedStyle(listEl).rowGap) || 0;
 
   return rects.map((rect, index) => {
     const next = rects[index + 1];
-    return next ? next.top - rect.top : rect.height;
+    return next ? next.top - rect.top : rect.height + rowGap;
   });
 };
 

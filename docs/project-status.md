@@ -191,8 +191,18 @@ E2E 在健康检查中标记为**非关键项**（`critical: false`），失败�
 - **列表排序（`useDraggable`）**：列表必须是**可写**的 ref。传 props 派生的 computed
   进去时 `items.value = newItems` 只会被 Vue 警告后忽略（computed 只读），表现为
   “能拖、有动画、顺序不生效”；列表项高度不固定时必须传 `measureItemHeights`
-  按真实节距算落点，固定高度会让落点跳格；触摸路径要一并处理 `touchcancel`，
+  按真实节距算落点，固定高度会让落点跳格（测量函数要给**最后一项**补上列表 gap，
+  否则末尾落点少一个间距）；触摸路径要一并处理 `touchcancel`，
   否则浏览器接管手势后 `isDragging` 与偏移量会停在拖拽态。
+  让位位移要取**被拖项**的节距（`resolvePitch(fromIndex)`）：各让各的节距会让
+  高度不一的列表错位（高卡片的邻居被挤飞）；`getItemStyle` 的 `transition` 必须
+  **常驻**（只有被拖项是 `none`），偏移归零时摘掉整条 inline style 会让让位复位与
+  松手吸附瞬跳；松手吸附依赖“顺序变化与初始位移同帧、下一帧再放开过渡”，
+  不要在放开前清偏移。鼠标（HTML5 DnD）与触摸共用同一套几何：`dragover` 的
+  `clientY` 驱动让位与插入指示（鼠标路径拖动项**不跟手**，由浏览器拖影负责），
+  `drop` 的落点以插入指示为准而不是“落在哪个元素上”；拖动中的插入位置要存成 ref
+  （手势坐标是普通变量，computed 读不到它的变化）。插入指示只改 `border-color` /
+  `box-shadow`，改 `border-width` 会改变卡片高度并把下方内容挤动。
 - **预设状态的消费方**：`useApiPresets()` 每次调用都是独立实例，`currentPreset`
   只有在 `loadPresets()`（会一并同步后端记住的选中项）之后才有意义。请求参数走
   `repositories/apiPresetRepository.loadCurrentApiPreset()` 直接读设置，统计展示

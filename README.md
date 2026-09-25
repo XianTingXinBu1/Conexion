@@ -7,7 +7,7 @@ Conexion 是一个移动端优先的 AI 聊天应用，支持 OpenAI 兼容接�
 - Vue 3 + TypeScript + Vite 前端
 - 内建 Node.js 后端代理
 - OpenAI 兼容 `/chat/completions` 与 `/models` 转发
-- Vitest 测试、聊天架构边界检查和健康检查脚本
+- Vitest 测试、Selenium E2E、聊天架构边界检查和健康检查脚本
 
 ## 功能特性
 
@@ -46,6 +46,8 @@ Conexion 是一个移动端优先的 AI 聊天应用，支持 OpenAI 兼容接�
   - `marked`
   - `DOMPurify`
   - 代码块复制
+  - KaTeX 数学公式（`$...$` / `$$...$$`）
+  - `<details>` 折叠块与脚注（`[^1]`）
 - 上下文统计与会话压缩
   - token 估算
   - 上下文使用率
@@ -181,6 +183,7 @@ npm run test
 npm run test:run
 npm run test:coverage
 npm run check:architecture
+npm run e2e
 npm run health-check
 npm run health-check:quick
 npm run health-check:verbose
@@ -194,8 +197,9 @@ npm run health-check:verbose
 - `test:run`：运行 Vitest
 - `test:coverage`：运行测试并生成覆盖率
 - `check:architecture`：检查聊天模块架构边界
+- `e2e`：运行 Selenium 端到端测试（需前后端服务在线，见 `e2e/README.md`）
 - `health-check`：执行项目健康检查
-- `health-check:quick`：跳过测试和构建的快速健康检查
+- `health-check:quick`：跳过测试、构建与 E2E 的快速健康检查（只跑类型、依赖、架构）
 - `health-check:verbose`：输出更详细的健康检查日志
 
 ## 内建后端代理
@@ -261,6 +265,7 @@ docs/backend-api.txt
 │   ├── index.ts
 │   └── index.test.ts
 ├── scripts/                 # 架构检查和健康检查脚本
+├── e2e/                     # Selenium 端到端测试（用例 / 运行器 / 驱动封装）
 ├── docs/                    # 项目文档
 ├── src/
 │   ├── api/                 # 前端 API client 与 stream 解析
@@ -341,6 +346,13 @@ npm run build
 npm run health-check
 ```
 
+涉及渲染 / 浏览器行为（Markdown、宏变量、路由）时，额外跑一遍 E2E：
+
+```bash
+sh scripts/dev/manage.sh start
+npm run e2e
+```
+
 聊天相关代码改动后，至少运行：
 
 ```bash
@@ -355,6 +367,7 @@ npm run check:architecture
 - `docs/chat-architecture.md`：聊天模块分层与边界规则
 - `docs/project-status.md`：项目现状、工程约定与后续路线
 - `docs/backend-api.txt`：后端 API 契约
+- `e2e/README.md`：端到端测试的编写与运行方式
 
 模块文档：
 

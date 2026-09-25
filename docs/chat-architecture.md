@@ -3,7 +3,7 @@
 本文档说明 Conexion 当前聊天模块的分层、职责和边界规则。
 
 > 文档同步状态：随 2026-09-20 的聊天专属 composable 迁移一并更新（8 个 useChat* 已从 `src/composables/` 迁入 `src/features/chat/presentation/`）。
-> 最后校对：2026-09-20。
+> 最后校对：2026-09-25（本次仅补记 token 计数口径，分层与调用链未变）。
 
 ## 当前状态
 
@@ -173,6 +173,10 @@ useChatPromptController
 ```
 
 真实发送和 prompt 预览都使用同一个 `buildChatSystemMessagesUseCase`，避免两套构建逻辑分叉。
+
+长度与 token 统计统一走 `@/utils/tokenCounter`（gpt-tokenizer cl100k）：prompt 预览的
+用量、上下文上限判断、压缩阈值必须同一口径。`system-prompt` 早期按「字符数 × 0.25」
+估算，那是英文经验值，对中文低估 3~4 倍，不要再恢复类似的独立估算。
 
 ## 会话压缩调用链
 

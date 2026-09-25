@@ -6,8 +6,8 @@
 「已完成清单 / 边界规则 / 待办优先级 / 验证命令」上互相重复，且各有一套
 冲突的优先级编号。
 
-> 文档同步状态：最后校对 2026-09-20（聊天专属 composable 迁入 chat feature、
-> API 层错误与超时收敛之后）。
+> 文档同步状态：最后校对 2026-09-25（提示词宏变量、token 计数口径统一、
+> Markdown 属性白名单与 KaTeX 公式、Selenium E2E 落地之后）。
 
 相关文档：
 
@@ -15,6 +15,8 @@
 README.md                       项目入口与运行方式
 docs/chat-architecture.md       聊天模块分层与边界规则（聊天相关细节看它）
 docs/backend-api.txt            后端 API 契约
+e2e/README.md                   E2E 用例编写方式与运行命令
+src/modules/<name>/README.md    各 module 的独立说明（缺 chat-prompt、conversation-compression）
 ```
 
 ---
@@ -27,11 +29,12 @@ docs/backend-api.txt            后端 API 契约
 质量基线：
 
 ```bash
-npx vitest run                 # 25 文件 / 114 测试
-npm run check:architecture     # 165 文件扫描
+npx vitest run                 # 31 文件 / 153 测试
+npm run check:architecture     # 167 文件扫描
 npx vue-tsc -b                 # 类型检查
 npm run build                  # 构建
-npm run health-check           # 提交前的完整检查
+npm run e2e                    # E2E（需服务在线）
+npm run health-check           # 提交前的完整检查（6 项，约 65s）
 ```
 
 已完成的结构治理（细节见 git log，此处仅作索引）：
@@ -47,6 +50,13 @@ npm run health-check           # 提交前的完整检查
 - 上游重试策略收拢到后端代理，按请求是否幂等决定
 - 支持取消进行中的非流式请求（会话压缩）
 - 移除前端遗留的浏览器存储清理机制与相关依赖
+- 提示词宏变量替换（`src/modules/system-prompt/core/macro.ts`，表单侧带变量 chips）
+- token 计数统一走 `@/utils/tokenCounter`（gpt-tokenizer cl100k），废除按字符折算的估算
+- Markdown 清理改为按标签维度的属性白名单，修复行内代码被当作 HTML 解析
+- Markdown 支持 `<details>/<summary>` 折叠块与 `kbd` / `mark` / `sub` / `sup` / `abbr` 等语义标签
+- Markdown 脚注（`[^1]` + `[^1]: 内容`）改为上标标记 + 文末列表，不再生成指向相对路径的错误链接
+- 支持 KaTeX 数学公式（`$...$` / `$$...$$`，用占位符在 sanitize 后回填，不放宽白名单）
+- 引入 Selenium E2E（Termux 无可用 Playwright 二进制，复用系统 Chromium + chromedriver）
 
 ---
 
@@ -114,11 +124,21 @@ npm run check:architecture
 npm run build
 ```
 
+涉及渲染 / 浏览器行为：
+
+```bash
+sh scripts/dev/manage.sh start   # E2E 需要服务在线
+npm run e2e                      # 全部用例；npm run e2e macro 按名字过滤
+```
+
 提交前：
 
 ```bash
 npm run health-check
 ```
+
+E2E 在健康检查中标记为**非关键项**（`critical: false`），失败只告警不阻断；
+但改动 Markdown 清理、宏变量、路由时仍应手动确认 E2E 通过。
 
 无法跑完整验证时，至少说明：跑了什么、没跑什么、剩余风险。
 
@@ -145,15 +165,20 @@ npm run health-check
 2. **会话领域 owner 未完全收口**。能力仍分布在 `useConversations`、
    `useConversationManager`、`services/conversationRepository`、
    `useChatSessionFacade`、`ConversationListPage` 之间。
-3. **非聊天页面仍偏厚**：`ApiPresetPage.vue` 约 520 行，`PromptPresetPage.vue`、
-   `RoleManagementPage.vue`、`ConversationListPage.vue`、`MainPage.vue` 均在
-   400 行上下。
-4. **页面级测试仍然偏少**。目前只有 ChatPage 发送链路一条（成功 / 取消 / 失败 /
-   预设加载期取消），其余页面无页面级测试。
-5. **横切 UI 未统一**。ConfirmDialog 已统一，`Modal` / `PageHeader` /
-   `EmptyState` 仍是各页面自行组合。
+3. **页面与大组件仍偏厚**：`PromptPreviewModal.vue` 724 行、`TokenDetailsPanel.vue`
+   699 行、`ApiPresetPage.vue` 521 行；`MainPage.vue` 490、`KnowledgeBaseDetailView.vue`
+   467、`ConversationListPage.vue` 433、`PromptPresetPage.vue` 398。
+   聊天页主体已经瘦下来（`ChatPage.vue` 219 行），厚度转移到了聊天侧的大组件上。
+4. **页面级测试仍然偏少**。单测里只有 `ChatPage.sendFlow.test.ts` 一条页面级链路
+   （成功 / 取消 / 失败 / 预设加载期取消），其余页面无页面级测试；E2E 目前 4 个
+   用例（smoke / macro / macro-replacement / markdown-render），只覆盖冒烟与两处
+   特定渲染，还没形成页面回归网。
+5. **横切 UI 尚未完全收口**。`ConfirmDialog`（10 处）与 `Modal`（8 处）已是事实上的
+   唯一入口；`PromptPreviewModal.vue` 仍自带一套遮罩实现，`PageHeader` /
+   `EmptyState` 的用法在各页面间也不一致。
 6. `src/modules/chat-prompt` 与 `src/modules/conversation-compression` 尚无独立
-   README（其余 module 都有）。
+   README（`api-preset` / `debug` / `markdown` / `notification` / `system-prompt`
+   都已经有）。
 
 ### 需要注意的行为边界
 
@@ -173,6 +198,19 @@ npm run health-check
   `repositories/apiPresetRepository.loadCurrentApiPreset()` 直接读设置，统计展示
   走 composable 的 `currentPreset`，两条路径必须指向同一个预设，否则会出现
   「改了预设但上下文上限/使用率不变」。
+- **token 计数口径**：长度与 token 一律走 `@/utils/tokenCounter`（gpt-tokenizer
+  cl100k）。`system-prompt` 曾用「字符数 × 0.25」估算，这是英文经验值，对中文
+  低估 3~4 倍（已删除 `TOKEN_ESTIMATION_RATIO`）。预览用量、上下文上限、压缩
+  阈值必须同一口径，不要引入第三套估算。
+- **Markdown 安全断言的位置**：sanitizer 用的是按标签维度的属性白名单。
+  DOMPurify 在 happy-dom 下无法真正清理（原生 `sanitize('<p>x</p>')` 只返回
+  `x`，显式传 `ALLOWED_TAGS` 也一样），所以 **DOM 级断言在单测里是假阳性，
+  必须放到 E2E**（`e2e/cases/markdown-render.mjs`）；纯字符串层面的
+  `marked.render()` 输出在单测里测仍然可靠。
+- **数学公式的回填顺序**：KaTeX 输出依赖大量 inline style，必须在 sanitize
+  **之后**回填（`src/modules/markdown/math.ts` 的占位符方案）。若把回填放进
+  `afterRender` 这类清洗前的钩子，公式样式会被属性白名单删干净导致排版崩；
+  也不要为了公式放宽 sanitizer 白名单。
 
 ---
 
@@ -182,10 +220,13 @@ npm run health-check
 
 ### P1：补页面级测试
 
-理由：当前只有一条发送链路用例，任何页面重构都缺乏安全网。工具链
-（`@testing-library/vue` + happy-dom）已就绪。
+理由：单测层面仍只有一条发送链路用例，任何页面重构都缺乏安全网。工具链
+（`@testing-library/vue` + happy-dom）与 E2E 骨架（Selenium）均已就绪，可直接复用。
 
 优先补：API 预设保存 / 切换 / 测试连接，Prompt 预设编辑，知识库条目启用与排序。
+
+注意：涉及 DOM 清理 / XSS 的断言不要写在 happy-dom 单测里，理由见「需要注意的
+行为边界」。
 
 ### P2：会话领域收口
 
@@ -238,5 +279,6 @@ src/
 ## 一句话总结
 
 Conexion 已经走完「聊天页重、业务散」阶段：聊天核心分层清晰、边界由脚本固化、
-API 传输层与错误语义统一。当前重点转向**页面级测试覆盖**与**横切 UI / 会话领域
+API 传输层与错误语义统一，验证侧也补齐了 Selenium E2E 骨架（但页面级单测仍是空白）。
+当前重点转向**页面级测试覆盖**与**横切 UI / 会话领域
 的收口**，并继续保持小步治理、每步可验证的节奏。

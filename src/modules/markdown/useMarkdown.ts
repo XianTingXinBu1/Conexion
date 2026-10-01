@@ -65,6 +65,17 @@ function createRenderer() {
     return `<img src="${safeSrc}"${altAttr}${titleAttr} loading="lazy" />`;
   };
 
+  // 自定义表格渲染：默认实现外层再包一层横向滚动容器
+  //
+  // <table> 自身不是滚动容器（display: table + overflow: visible），宽表格会直接
+  // 撑破聊天消息气泡；overflow-x 只有挂在块级外层上才生效。这里只包一层、不改
+  // 默认表格结构，避免改成 display:block 破坏列宽计算。
+  const defaultTableRenderer = marked.Renderer.prototype.table;
+  renderer.table = function (token) {
+    const table = defaultTableRenderer.call(this, token);
+    return `<div class="${CSS_CLASSES.tableWrapper}">${table}</div>`;
+  };
+
   return renderer;
 }
 

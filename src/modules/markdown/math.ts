@@ -21,8 +21,16 @@ import { mapNonCode } from './segments';
 export interface MathItem {
   /** 占位符（在清洗后的 HTML 中被替换掉） */
   placeholder: string;
-  /** KaTeX 生成的 HTML */
+  /** 默认形态：块级公式为 <div class="katex-block">…</div>，行内公式直接是 KaTeX 输出 */
   html: string;
+  /**
+   * 内联上下文下的回填形态
+   *
+   * 块级公式写在文字中间时，占位符会被 marked 裹进 <p>，此时不能再回填 <div>
+   * —— <div> 不能出现在 <p> 内，浏览器会强制闭合段落，后续文字会脱离段落样式。
+   * 这种情况改用 <span class="katex-block katex-block--inline">，保留块级排版能力。
+   */
+  inlineHtml: string;
   /** 是否为块级公式（回填时整体替换 <p> 包裹） */
   display: boolean;
 }
@@ -50,8 +58,10 @@ function escapeHtml(text: string): string {
 
 /**
  * 单个公式 → HTML
+ *
+ * 同时给出默认形态与内联形态，由 restoreMath 根据占位符所处上下文选择。
  */
-function renderMathHtml(tex: string, display: boolean): string {
+function renderMathHtml(tex: string, display: boolean): { html: string; inlineHtml: string } {
   let body: string;
 
   try {
@@ -66,7 +76,14 @@ function renderMathHtml(tex: string, display: boolean): string {
     body = `<code class="katex-error">${escapeHtml(tex)}</code>`;
   }
 
-  return display ? `<div class="katex-block">${body}</div>` : body;
+  if (!display) {
+    return { html: body, inlineHtml: body };
+  }
+
+  return {
+    html: `<div class="katex-block">${body}</div>`,
+    inlineHtml: `<span class="katex-block katex-block--inline">${body}</span>`,
+  };
 }
 
 /**
@@ -78,7 +95,8 @@ function replaceMath(text: string, items: MathItem[], nonce: string): string {
   const push = (tex: string, display: boolean): string => {
     const trimmed = tex.trim();
     const placeholder = `@@MATH-${nonce}-${items.length}@@`;
-    items.push({ placeholder, html: renderMathHtml(trimmed, display), display });
+    const { html, inlineHtml } = renderMathHtml(trimmed, display);
+    items.push({ placeholder, html, inlineHtml, display });
     return placeholder;
   };
 
@@ -120,11 +138,16 @@ export function restoreMath(html: string, items: MathItem[]): string {
   let out = html;
   for (const item of items) {
     if (item.display) {
+      // 公式独占整段：连 <p> 一起替换，不留下空段落
       const wrapped = `<p>${item.placeholder}</p>`;
       if (out.includes(wrapped)) {
         out = out.split(wrapped).join(item.html);
         continue;
       }
+      // 与文字同行：占位符此刻在 <p> 内部，只能回填内联形态，
+      // 否则 <div> 会被塞进 <p> 触发浏览器的强制段落闭合
+      out = out.split(item.placeholder).join(item.inlineHtml);
+      continue;
     }
     out = out.split(item.placeholder).join(item.html);
   }

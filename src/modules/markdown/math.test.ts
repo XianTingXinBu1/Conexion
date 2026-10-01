@@ -15,6 +15,9 @@ describe('math extraction', () => {
     expect(block).toBeDefined();
     expect(inline?.html).toContain('class="katex"');
     expect(block?.html).toContain('class="katex-block"');
+    expect(block?.inlineHtml).toContain('class="katex-block katex-block--inline"');
+    // 行内公式没有块级容器，两种形态一致
+    expect(inline?.html).toEqual(inline?.inlineHtml);
     // 占位符是纯文本，公式本身不该留在文本里
     expect(content).not.toContain('$');
     expect(content).toContain(inline?.placeholder ?? '');
@@ -52,8 +55,20 @@ describe('math extraction', () => {
     const { content, items } = extractMath('$$\na+b\n$$');
     const html = restoreMath(`<p>${content}</p>`, items);
 
-    expect(html).toContain('class="katex-block"');
+    expect(html).toContain('<div class="katex-block">');
+    expect(html).not.toContain('katex-block--inline');
     expect(html).not.toContain('<p>');
+  });
+
+  it('falls back to an inline container when a block formula sits inside a paragraph', () => {
+    const { content, items } = extractMath('前文 $$x^2$$ 后文');
+    const html = restoreMath(`<p>${content}</p>`, items);
+
+    // 回归：块级回填曾无条件插入 <div>，而 <div> 不能出现在 <p> 内，
+    // 浏览器会强制闭合段落，使后续文字脱离段落样式
+    expect(html).toContain('katex-block--inline');
+    expect(html).not.toMatch(/<p>[^]*?<div/);
+    expect(html).not.toContain('@@MATH');
   });
 
   it('degrades gracefully when the formula is invalid', () => {

@@ -84,5 +84,7 @@ export const CSS_CLASSES = {
   container: 'markdown-renderer',
   codeBlock: 'code-block',
   inlineCode: 'inline-code',
+  /** 表格横向滚动容器：<table> 自身不是滚动容器，溢出必须由外层 div 承担 */
+  tableWrapper: 'table-wrapper',
   highlightPrefix: 'language-',
 } as const;

@@ -200,6 +200,13 @@
   overflow-y: hidden;
 }
 
+/* 块级公式被写在文字中间时的内联形态（详见 math.ts 的 MathItem.inlineHtml） */
+.markdown-renderer .katex-block--inline {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0.35em 0.25em;
+}
+
 /* KaTeX 自带 1em 上下边距，容器已提供，避免双倍间距 */
 .markdown-renderer .katex-block .katex-display {
   margin: 0;
@@ -212,9 +219,18 @@
   border-radius: 4px;
 }
 
-/* 表格 */
-.markdown-renderer table {
+/* 表格：外层滚动容器 + 表格本体
+   <table> 自身不是滚动容器（display: table + overflow: visible），宽表格会直接撑破
+   消息气泡，横向滚动必须交给外层块级元素。 */
+.markdown-renderer .table-wrapper {
   margin: 1em 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.markdown-renderer table {
+  margin: 0;
   border-collapse: collapse;
   width: 100%;
   table-layout: auto;
@@ -254,39 +270,46 @@
 
 /* 滚动条 - 紫色主题 */
 .markdown-renderer .code-wrapper::-webkit-scrollbar,
-.markdown-renderer table::-webkit-scrollbar {
+.markdown-renderer .table-wrapper::-webkit-scrollbar {
   height: 8px;
   width: 8px;
 }
 
 .markdown-renderer .code-wrapper::-webkit-scrollbar-track,
-.markdown-renderer table::-webkit-scrollbar-track {
+.markdown-renderer .table-wrapper::-webkit-scrollbar-track {
   background: rgba(157, 141, 241, 0.1);
   border-radius: 4px;
 }
 
 .markdown-renderer .code-wrapper::-webkit-scrollbar-thumb,
-.markdown-renderer table::-webkit-scrollbar-thumb {
+.markdown-renderer .table-wrapper::-webkit-scrollbar-thumb {
   background: rgba(157, 141, 241, 0.4);
   border-radius: 4px;
   border: 2px solid transparent;
 }
 
 .markdown-renderer .code-wrapper::-webkit-scrollbar-thumb:hover,
-.markdown-renderer table::-webkit-scrollbar-thumb:hover {
+.markdown-renderer .table-wrapper::-webkit-scrollbar-thumb:hover {
   background: rgba(157, 141, 241, 0.6);
 }
 
-/* 行内代码 */
+/* 行内代码 - 基础 */
 .markdown-renderer code {
   font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.9em;
   color: var(--text-main);
-  padding: 0;
-  border-radius: 0;
-  border: none;
-  background: none;
   word-wrap: break-word;
+}
+
+/* 行内代码 - 视觉样式（与正文区分）
+   marked 的 codespan 渲染器会给行内代码加 .inline-code 类，代码块里的 <code>
+   不带这个类，因此以下样式不会污染代码块。 */
+.markdown-renderer .inline-code {
+  padding: 0.15em 0.4em;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--accent-soft);
+  font-size: 0.88em;
 }
 
 /* 代码块 - 紫色主题 */

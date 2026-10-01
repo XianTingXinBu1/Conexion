@@ -38,6 +38,40 @@ const PROBE_SCRIPT = [
   "      codeWrapper: renderSafe('```js\\nconst a = 1\\n```'),",
   "      taskList: renderSafe('- [x] done\\n- [ ] todo'),",
   "      evilInput: renderSafe('<input type=\"text\" name=\"x\">'),",
+  "      tableWrapper: renderSafe('| a | b |\\n| --- | --- |\\n| 1 | 2 |'),",
+  "      blockMathInParagraph: renderSafe('前文 $$x^2$$ 后文'),",
+  '      tableScroll: (() => {',
+  "        const host = document.createElement('div');",
+  "        host.className = 'markdown-renderer';",
+  "        host.style.cssText = 'position:absolute;left:-9999px;width:200px;';",
+  "        host.innerHTML = renderSafe('| 参数名 | 说明 |\\n| --- | --- |\\n| `aVeryLongIdentifierNameThatCannotWrapAtAllAnywhere` | `anotherVeryLongTokenThatAlsoCannotWrap` |');",
+  '        document.body.appendChild(host);',
+  "        const wrapper = host.querySelector('.table-wrapper');",
+  '        const result = {',
+  '          exists: !!wrapper,',
+  "          overflowX: wrapper ? getComputedStyle(wrapper).overflowX : null,",
+  '          wrapperWidth: wrapper ? wrapper.clientWidth : null,',
+  "          tableWidth: wrapper ? Math.round(wrapper.querySelector('table').getBoundingClientRect().width) : null,",
+  '          scrollable: wrapper ? wrapper.scrollWidth > wrapper.clientWidth : false,',
+  "          escapedPage: wrapper ? wrapper.getBoundingClientRect().right > document.documentElement.clientWidth : null,",
+  '        };',
+  '        host.remove();',
+  '        return result;',
+  '      })(),',
+  '      inlineCodeStyle: (() => {',
+  "        const host = document.createElement('div');",
+  "        host.className = 'markdown-renderer';",
+  "        host.style.cssText = 'position:absolute;left:-9999px;';",
+  "        host.innerHTML = render('`code`');",
+  '        document.body.appendChild(host);',
+  "        const el = host.querySelector('code.inline-code');",
+  '        const cs = el ? getComputedStyle(el) : null;',
+  '        const result = cs',
+  '          ? { padding: cs.paddingLeft, background: cs.backgroundColor, borderWidth: cs.borderTopWidth, radius: cs.borderRadius }',
+  '          : null;',
+  '        host.remove();',
+  '        return result;',
+  '      })(),',
   "      mathInline: renderSafe('$E=mc^2$'),",
   "      mathBlock: renderSafe('$$\\n\\\\int_0^1 x\\\\,dx\\n$$'),",
   "      mathMoney: renderSafe('价格是 $5 和 $10'),",
@@ -136,6 +170,45 @@ export default {
       }
       if (r.evilInput.includes('input')) {
         fail('可交互 input 未被移除');
+      }
+
+      // 2e. 表格必须包在横向滚动容器里，且 class 要穿过 sanitizer
+      // （<table> 自身不是滚动容器，宽表格会直接撑破消息气泡）
+      if (!r.tableWrapper.includes('<div class="table-wrapper">')) {
+        fail('表格未包在 .table-wrapper 中（或 class 被 sanitizer 删掉）');
+      }
+      if (!r.tableScroll.exists) {
+        fail('表格滚动容器不存在');
+      }
+      if (r.tableScroll.overflowX !== 'auto') {
+        fail(`表格滚动容器的 overflow-x 应为 auto，实际 ${r.tableScroll.overflowX}`);
+      }
+      if (!r.tableScroll.scrollable) {
+        fail(
+          `宽表格无法横向滚动：wrapper=${r.tableScroll.wrapperWidth}px，table=${r.tableScroll.tableWidth}px`,
+        );
+      }
+      if (r.tableScroll.escapedPage) {
+        fail('表格滚动容器超出视口右边界，未约束在容器内');
+      }
+
+      // 2f. 块级公式写在文字中间时不能用 <div>（<div> 不能出现在 <p> 内）
+      if (!r.blockMathInParagraph.includes('katex-block--inline')) {
+        fail('块级公式夹在文字中未降级为内联容器');
+      }
+      if (/<p>[^]*?<div class="katex-block"/.test(r.blockMathInParagraph)) {
+        fail('<div class="katex-block"> 被塞进 <p>，浏览器会强制闭合段落');
+      }
+
+      // 2g. 行内代码必须有可辨识的视觉样式（背景 + 内边距）
+      if (!r.inlineCodeStyle) {
+        fail('行内代码元素不存在');
+      }
+      if (r.inlineCodeStyle.background === 'rgba(0, 0, 0, 0)' || r.inlineCodeStyle.background === 'transparent') {
+        fail(`行内代码无背景色，与正文无法区分：${JSON.stringify(r.inlineCodeStyle)}`);
+      }
+      if (parseFloat(r.inlineCodeStyle.padding) <= 0) {
+        fail(`行内代码无内边距：${JSON.stringify(r.inlineCodeStyle)}`);
       }
 
       // 3b. 数学公式：KaTeX 输出必须完整存活（回填发生在 sanitize 之后）

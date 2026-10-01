@@ -117,4 +117,27 @@ describe('markdown security boundaries', () => {
       'src/modules/markdown/sanitizer.ts',
     );
   });
+
+  it('wraps tables in a horizontal scroll container', () => {
+    const { render } = useMarkdown();
+
+    const html = render('| 列一 | 列二 |\n| --- | --- |\n| a | b |');
+
+    // 回归：<table> 自身不是滚动容器（display: table + overflow: visible），
+    // 宽表格会直接撑破消息气泡，横向滚动必须由外层块级元素承担。
+    // 注：sanitize 后的 class 保留由 E2E 验证（happy-dom 下 DOMPurify 不可信）。
+    expect(html).toContain('<div class="table-wrapper">');
+    expect(html).toContain('<table>');
+    expect(html).toMatch(/<\/table>\s*<\/div>/);
+  });
+
+  it('keeps a block formula inline-safe inside a paragraph', () => {
+    const { render } = useMarkdown();
+
+    const html = render('前文 $$x^2$$ 后文');
+
+    // 回归：<div class="katex-block"> 曾直接被塞进 <p>，属非法嵌套
+    expect(html).toContain('katex-block--inline');
+    expect(html).not.toMatch(/<p>[^]*?<div/);
+  });
 });

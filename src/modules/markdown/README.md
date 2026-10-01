@@ -14,6 +14,10 @@ Markdown 模块提供安全的 Markdown 渲染能力，用于聊天消息、通�
 - XSS 防护：标签白名单 + 按标签维度的属性白名单（per-tag）；任务列表复选框只保留
   不可交互的 `disabled` checkbox，其余 `input`（text / file / submit …）整节点移除。
 - 自定义代码块 / 行内代码渲染（内容转义，不会当作 HTML 解析）。
+- 行内代码带独立视觉样式（`.inline-code` 类，背景 + 内边距），与正文可区分。
+- 表格外层包裹 `.table-wrapper` 滚动容器：`<table>` 自身不是滚动容器（`display: table`
+  + `overflow: visible`），单元格含无法逐字换行的长内容（长英文标识符 / 长 URL）时
+  表格会超出容器宽度，横向滚动必须由外层块级元素承担。
 - 链接文本内的行内 markdown（加粗 / 行内代码 / 图片）会被正常渲染。
 - 链接自动加 `target="_blank"` 和 `rel="noopener noreferrer"`。
 - 图片 lazy loading。
@@ -194,12 +198,17 @@ const { renderSafe } = useMarkdown()
   `function`，箭头函数拿不到 marked 注入的 `this.parser`。
 - `DEFAULT_ALLOWED_ATTRIBUTES` 是 per-tag 结构，由 sanitizer 钩子在过滤后收紧；
   DOMPurify 的 `ALLOWED_ATTR` 是全局列表，只作为粗过滤。新标签默认不带任何属性，
-  靠 class 定位的样式（如代码块的 `.code-wrapper`）需要在映射里显式声明。
+  靠 class 定位的样式（如代码块的 `.code-wrapper`、表格的 `.table-wrapper`）需要在
+  映射里显式声明。
+- 覆盖 `table` 渲染器时不要改写默认表格结构（例如改成 `display: block` 来拿滚动条，
+  会破坏列宽计算）；正确做法是保留默认输出、在 **外层** 包一层滚动容器。
 - **数学公式不走 sanitizer**：KaTeX 输出依赖大量 inline style 做竖排定位，
   进白名单会被删干净导致排版崩。实现是「占位符 + 回填」（`math.ts`）：
   渲染前抽成纯文本占位符 → marked → sanitize → 再换回 KaTeX HTML。
   因此 KaTeX 的 CSS 需要在入口（`src/main.ts`）引入，且 KaTeX 以 `trust: false`
   运行（`\href` / `\htmlClass` 等命令不生成 HTML），公式文本均经过转义。
+- 块级公式写在文字中间时回填为 `<span class="katex-block--inline">`：`<div>` 不能出现在
+  `<p>` 内，否则浏览器会强制闭合段落，后续文字会脱离段落样式（见 `MathItem.inlineHtml`）。
 - 代码块与行内代码内的 `$` 不会被当作公式；`$5 和 $10` 这类货币写法也不会误判。
 - **脚注**由 `footnote.ts` 预处理：marked 不支持 GFM 脚注，会把 `[^1]: 内容`
   当成引用式链接定义，渲染出 `href="内容"` 的错误链接（点进去 404）。实现是移

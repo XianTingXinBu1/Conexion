@@ -239,7 +239,6 @@ beforeEach(() => {
   conversationMutations = [];
   presetGate = null;
   openPresetGate = null;
-  localStorage.clear();
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
 });

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { X, Trash2, AlertCircle, Info, CheckCircle } from '@lucide/vue';
+import { useBackGuard } from '@/composables/useBackGuard';
 
 export interface ConfirmDialogProps {
   show: boolean;
@@ -64,6 +65,12 @@ const getConfirmBtnBg = () => {
 
 const handleConfirm = () => emit('confirm');
 const handleCancel = () => emit('cancel');
+
+// 系统返回键先关确认框
+useBackGuard({
+  isOpen: () => props.show,
+  onBack: handleCancel,
+});
 </script>
 
 <template>

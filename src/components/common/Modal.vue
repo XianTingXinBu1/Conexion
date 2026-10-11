@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue';
 import { X } from '@lucide/vue';
+import { useBackGuard } from '@/composables/useBackGuard';
 
 interface Props {
   show: boolean;
@@ -31,6 +32,12 @@ const handleClose = () => {
   emit('update:show', false);
   emit('close');
 };
+
+// 系统返回键先关弹窗（含嵌套弹窗的最上层），而不是离开页面
+useBackGuard({
+  isOpen: () => props.show,
+  onBack: handleClose,
+});
 
 const handleBackdropClick = () => {
   if (props.closeOnClickOutside) {

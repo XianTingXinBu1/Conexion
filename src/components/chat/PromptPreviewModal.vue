@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue';
 import DOMPurify from 'dompurify';
 import { X, Copy, Check, ChevronDown, ChevronUp, Search, XCircle, RefreshCw, Zap, FileText, SearchX } from '@lucide/vue';
 import type { ChatMessage } from '@/types';
+import { useBackGuard } from '@/composables/useBackGuard';
 
 interface Props {
   show: boolean;
@@ -82,6 +83,12 @@ const closeModal = () => {
   emit('update:show', false);
   copied.value = false;
 };
+
+// 系统返回键先关预览，而不是离开会话页
+useBackGuard({
+  isOpen: () => props.show,
+  onBack: closeModal,
+});
 
 const copyPrompt = async () => {
   if (!props.systemMessages || props.systemMessages.length === 0) return;

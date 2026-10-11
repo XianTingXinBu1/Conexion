@@ -98,26 +98,11 @@ export class ConversationRepository {
   }
 
   async update(id: string, updates: Partial<Conversation>): Promise<Conversation | undefined> {
-    if (isTemporaryConversationId(id)) {
-      return undefined;
-    }
-
-    const conversations = await this.list();
-    const index = conversations.findIndex(conversation => conversation.id === id);
-
-    if (index === -1) {
-      return undefined;
-    }
-
-    const updated: Conversation = {
-      ...conversations[index]!,
+    return this.mutate(id, conversation => ({
+      ...conversation,
       ...updates,
       updatedAt: Date.now(),
-    };
-
-    conversations[index] = updated;
-    await this.storage.conversations.write(conversations);
-    return cloneConversation(updated);
+    }));
   }
 
   async delete(id: string): Promise<boolean> {
@@ -153,53 +138,43 @@ export class ConversationRepository {
     messageId: string,
     newContent: string,
   ): Promise<Conversation | undefined> {
-    if (isTemporaryConversationId(conversationId)) {
-      return undefined;
-    }
+    return this.mutate(conversationId, conversation => {
+      const messageIndex = conversation.messages.findIndex(message => message.id === messageId);
+      if (messageIndex === -1) {
+        return undefined;
+      }
 
-    const conversation = await this.get(conversationId);
-    if (!conversation) {
-      return undefined;
-    }
+      const originalMessage = conversation.messages[messageIndex]!;
+      const nextMessages = [...conversation.messages];
+      nextMessages[messageIndex] = {
+        id: originalMessage.id,
+        type: originalMessage.type,
+        content: newContent,
+        timestamp: originalMessage.timestamp,
+      };
 
-    const messageIndex = conversation.messages.findIndex(message => message.id === messageId);
-    if (messageIndex === -1) {
-      return undefined;
-    }
-
-    const originalMessage = conversation.messages[messageIndex]!;
-    const nextMessages = [...conversation.messages];
-    nextMessages[messageIndex] = {
-      id: originalMessage.id,
-      type: originalMessage.type,
-      content: newContent,
-      timestamp: originalMessage.timestamp,
-    };
-
-    return this.update(conversationId, {
-      ...clearCompressionIfSourceChanged(conversation, [messageId]),
-      messages: nextMessages,
+      return {
+        ...conversation,
+        ...clearCompressionIfSourceChanged(conversation, [messageId]),
+        messages: nextMessages,
+        updatedAt: Date.now(),
+      };
     });
   }
 
   async deleteMessage(conversationId: string, messageId: string): Promise<Conversation | undefined> {
-    if (isTemporaryConversationId(conversationId)) {
-      return undefined;
-    }
+    return this.mutate(conversationId, conversation => {
+      const nextMessages = conversation.messages.filter(message => message.id !== messageId);
+      if (nextMessages.length === conversation.messages.length) {
+        return undefined;
+      }
 
-    const conversation = await this.get(conversationId);
-    if (!conversation) {
-      return undefined;
-    }
-
-    const nextMessages = conversation.messages.filter(message => message.id !== messageId);
-    if (nextMessages.length === conversation.messages.length) {
-      return undefined;
-    }
-
-    return this.update(conversationId, {
-      ...clearCompressionIfSourceChanged(conversation, [messageId]),
-      messages: nextMessages,
+      return {
+        ...conversation,
+        ...clearCompressionIfSourceChanged(conversation, [messageId]),
+        messages: nextMessages,
+        updatedAt: Date.now(),
+      };
     });
   }
 
@@ -209,5 +184,37 @@ export class ConversationRepository {
     }
 
     return conversation;
+  }
+
+  /**
+   * 会话变更的单一入口：读一次、找一次、写一次。
+   *
+   * 此前的 editMessage / deleteMessage 先 get() 再 update()，会对同一个
+   * conversations.json 读两次；这里收敛成单读单写，避免重复 IO。
+   * transform 返回 undefined 表示“没有变化/目标不存在”，此时不落盘。
+   */
+  private async mutate(
+    id: string,
+    transform: (conversation: Conversation) => Conversation | undefined,
+  ): Promise<Conversation | undefined> {
+    if (isTemporaryConversationId(id)) {
+      return undefined;
+    }
+
+    const conversations = await this.list();
+    const index = conversations.findIndex(conversation => conversation.id === id);
+
+    if (index === -1) {
+      return undefined;
+    }
+
+    const updated = transform(conversations[index]!);
+    if (!updated) {
+      return undefined;
+    }
+
+    conversations[index] = updated;
+    await this.storage.conversations.write(conversations);
+    return cloneConversation(updated);
   }
 }

@@ -1,7 +1,8 @@
 /**
- * E2E 驱动封装（Selenium + Termux 系统 Chromium）
+ * E2E 驱动封装（Selenium + 系统 Chromium）
  *
- * Termux 上 Playwright 的浏览器二进制不可用，因此复用系统 chromedriver。
+ * Playwright 自带的浏览器二进制在 Termux (Android/aarch64) 上无法运行，
+ * 因此复用系统 chromium + chromedriver（路径解析见 chromedriver-path.mjs）。
  * 注意：
  * - 必须 --no-sandbox（Android 上无法用 setuid sandbox）
  * - dbus / inotify 报错是无害噪音
@@ -10,9 +11,9 @@
 
 import { Builder, By, until } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome.js';
+import { chromedriverMissingMessage, findChromedriverPath } from './chromedriver-path.mjs';
 
-const CHROMEDRIVER_PATH = process.env.CHROMEDRIVER_PATH
-  || '/data/data/com.termux/files/usr/bin/chromedriver';
+export { findChromedriverPath };
 
 export const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
 
@@ -22,6 +23,11 @@ const MOBILE_VIEWPORT = { width: 390, height: 844 };
 export { By, until };
 
 export function buildDriver() {
+  const chromedriverPath = findChromedriverPath();
+  if (!chromedriverPath) {
+    throw new Error(chromedriverMissingMessage());
+  }
+
   const options = new chrome.Options();
   options.addArguments(
     '--headless=new',
@@ -31,7 +37,7 @@ export function buildDriver() {
     `--window-size=${MOBILE_VIEWPORT.width},${MOBILE_VIEWPORT.height}`,
   );
 
-  const service = new chrome.ServiceBuilder(CHROMEDRIVER_PATH);
+  const service = new chrome.ServiceBuilder(chromedriverPath);
 
   return new Builder()
     .forBrowser('chrome')

@@ -61,16 +61,14 @@ export async function runE2ECheck(options = {}) {
     };
   }
 
-  // 检查浏览器驱动是否可用
-  const { existsSync } = await import('node:fs');
-  const chromedriverPath = process.env.CHROMEDRIVER_PATH
-    || '/data/data/com.termux/files/usr/bin/chromedriver';
-  if (!existsSync(chromedriverPath)) {
+  // 检查浏览器驱动是否可用（驱动解析不依赖 selenium，见 chromedriver-path.mjs）
+  const { chromedriverMissingMessage, findChromedriverPath } = await import('../../e2e/helpers/chromedriver-path.mjs');
+  if (!findChromedriverPath()) {
     return {
       name: 'E2E 浏览器测试',
       status: 'skip',
       duration: Date.now() - startTime,
-      message: `未找到 chromedriver: ${chromedriverPath}`,
+      message: chromedriverMissingMessage(),
     };
   }
 

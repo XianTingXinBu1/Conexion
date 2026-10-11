@@ -5,12 +5,22 @@
 ## 为什么不用 Playwright / Cypress
 
 Termux (Android/aarch64) 上 Playwright 自带的浏览器二进制无法运行。
-本项目复用系统已安装的 `chromium-browser` + `chromedriver`，通过 Selenium 驱动。
+本项目复用系统已安装的 Chromium + ChromeDriver，通过 Selenium 驱动。
 
 ## 前置条件
 
-- Termux 已安装：`pkg install chromium`（含 chromedriver）
-- 应用服务已启动：前端 `:3100`、后端 `:3900`
+**Termux**：`pkg install chromium`（含 chromedriver）
+
+**Debian / Ubuntu**：`apt-get install chromium chromium-driver`（提供 `/usr/bin/chromium`）
+
+驱动路径按 `chromedriver-path.mjs` 里的候选列表自动探测（Termux `$PREFIX/bin` →
+`/usr/bin` → `/usr/local/bin`），也可用环境变量指定：
+
+```bash
+CHROMEDRIVER_PATH=/usr/bin/chromedriver npm run e2e
+```
+
+应用服务需已启动：前端 `:3100`、后端 `:3900`
 
 ## 运行
 

@@ -1,11 +1,11 @@
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useChatApi } from './useChatApi';
 import { useConfirmDialog } from '@/composables/useConfirmDialog';
 import { useCharacters } from '@/composables/useCharacters';
 import { useKnowledgeBases } from '@/composables/useKnowledgeBases';
 import { useApiPresets } from '@/modules/api-preset';
-import { useNotifications } from '@/modules/notification';
+import { useNotifications, getNotificationMessage } from '@/modules/notification';
 import { useAppSettings } from '@/composables/useAppSettings';
 import { useTheme } from '@/composables/useTheme';
 import { useChatStats } from './useChatStats';
@@ -18,6 +18,7 @@ import { useChatSessionFacade } from './useChatSessionFacade';
 import { useChatCompressionController } from '@/modules/conversation-compression/presentation';
 import { useChatPromptController } from './useChatPromptController';
 import { useChatLifecycleController } from './useChatLifecycleController';
+import { buildGreetingMessage } from '../application/buildGreetingMessage.usecase';
 import type { ChatPageProps } from './chatPageTypes';
 
 export function useChatPageViewModel(props: ChatPageProps) {
@@ -72,7 +73,7 @@ export function useChatPageViewModel(props: ChatPageProps) {
     requestStatus,
     isRequestActive,
   } = useChatApi();
-  const { showSuccess, showError, showInfo } = useNotifications();
+  const { showSuccess, showError, showInfo, showWarning } = useNotifications();
   const { selectedUser, init: initCharacters } = useCharacters();
   const { knowledgeBases, init: initKnowledgeBases } = useKnowledgeBases();
   const { currentPreset: currentApiPreset, loadPresets: loadApiPresets } = useApiPresets();
@@ -152,6 +153,29 @@ export function useChatPageViewModel(props: ChatPageProps) {
     isCompressionThresholdReached,
   } = useChatStats(effectiveMessages, currentContextMessages, currentApiPreset, compressionThresholdPercent);
 
+  /**
+   * 跨过上下文阈值时用全局通知提醒一次。
+   *
+   * 以前是页面里常驻一条「可压缩历史上下文」提示条，不带阈值要求、
+   * 只要有消息就显示，太吵；改成只在跨过阈值的那一刻提醒，
+   * 压缩入口保留在上下文详情面板里（那里有常驻的手动压缩按钮）。
+   */
+  watch(isCompressionThresholdReached, (reached) => {
+    if (!reached) return;
+    // 自动模式会自行压缩，压缩完成后另有成功通知
+    if (compressionMode.value !== 'manual') return;
+    // 临时会话不支持压缩
+    if (!canUseConversationCompression.value) return;
+    // 没有可压缩的历史（例如刚压缩完）
+    if (!canCompress.value) return;
+
+    const msg = getNotificationMessage('CHAT_COMPRESSION_THRESHOLD_REACHED', {
+      usage: usagePercent.value,
+      threshold: compressionThresholdPercent.value,
+    });
+    showWarning(msg.title, msg.message);
+  });
+
   const { regexRules, loadRegexRules } = useChatLifecycleController({
     props,
     effectiveMessages,
@@ -166,6 +190,21 @@ export function useChatPageViewModel(props: ChatPageProps) {
     initCharacters,
     initKnowledgeBases,
     loadMessages,
+    seedGreeting: async (character, rules) => {
+      // 只在全新角色会话里灌；已有消息（历史会话、临时会话）不动
+      if (messages.value.length > 0) return;
+
+      const greeting = buildGreetingMessage({
+        character,
+        userCharacter: selectedUser.value,
+        rules,
+        now: new Date(),
+      });
+
+      if (greeting) {
+        messages.value.push(greeting);
+      }
+    },
   });
 
   const {

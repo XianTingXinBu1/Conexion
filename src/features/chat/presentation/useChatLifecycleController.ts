@@ -16,9 +16,14 @@ interface UseChatLifecycleControllerOptions {
   syncVisibleMessages: () => void;
   loadPromptPresets: () => Promise<void>;
   loadApiPresets: () => Promise<void>;
-  initCharacters: () => Promise<boolean>;
-  initKnowledgeBases: () => Promise<boolean>;
+  initCharacters: () => Promise<boolean> | void;
+  initKnowledgeBases: () => Promise<boolean> | void;
   loadMessages: () => void;
+  /**
+   * 灌入角色开场白。回调同时拿到已加载的正则规则，
+   * 因为开场白要跟 AI 输出走同一条管线。
+   */
+  seedGreeting?: (character: AICharacter, rules: RegexRule[]) => void | Promise<void>;
 }
 
 export function useChatLifecycleController(options: UseChatLifecycleControllerOptions) {
@@ -44,6 +49,9 @@ export function useChatLifecycleController(options: UseChatLifecycleControllerOp
     initKnowledgeBases: options.initKnowledgeBases,
     loadMessages: options.loadMessages,
     refreshVisibleMessages: options.syncVisibleMessages,
+    seedGreeting: options.seedGreeting
+      ? (character: AICharacter) => options.seedGreeting!(character, regexRules.value)
+      : undefined,
   });
 
   return {

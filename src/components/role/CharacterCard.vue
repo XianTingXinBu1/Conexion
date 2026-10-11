@@ -1,242 +1,165 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
-import { User, Bot, Check, Edit2, Trash2, X } from '@lucide/vue';
-import type { UserCharacter, AICharacter, CharacterType, KnowledgeBase } from '@/types';
-import { loadKnowledgeBases as loadKnowledgeBasesFromRepository } from '@/repositories/knowledgeBaseRepository';
-import FormInput from '../form/FormInput.vue';
-import FormTextarea from '../form/FormTextarea.vue';
-import FormActions from '../form/FormActions.vue';
+/**
+ * 角色卡片（只读展示）
+ *
+ * 编辑统一走 CharacterEditor（全屏编辑页），这里不再内联表单，
+ * 因此卡片只负责「信息展示 + 操作入口」。
+ */
+import { computed } from 'vue';
+import { Check, Edit2, Trash2, Download, User, Bot } from '@lucide/vue';
+import type { UserCharacter, AICharacter, CharacterType } from '@/types';
 
 interface Props {
   character: UserCharacter | AICharacter;
   type: CharacterType;
   isSelected?: boolean;
-  isEditing: boolean;
-  editingData?: Partial<UserCharacter | AICharacter>;
   canDelete?: boolean;
+  /** 是否显示单卡导出（AI 角色卡） */
+  canExport?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isSelected: false,
-  isEditing: false,
   canDelete: true,
-});
-
-const knowledgeBases = ref<KnowledgeBase[]>([]);
-
-// 加载知识库列表
-const loadKnowledgeBases = async () => {
-  knowledgeBases.value = await loadKnowledgeBasesFromRepository();
-};
-
-onMounted(async () => {
-  await loadKnowledgeBases();
+  canExport: false,
 });
 
 const emit = defineEmits<{
   select: [id: string];
-  startEdit: [id: string, type: CharacterType];
-  saveEdit: [];
-  cancelEdit: [];
-  delete: [id: string, type: CharacterType];
+  edit: [id: string];
+  delete: [id: string];
+  export: [id: string];
 }>();
+
+const aiCharacter = computed(() =>
+  props.type === 'ai' ? (props.character as AICharacter) : undefined
+);
 
 const cardClasses = computed(() => [
   'character-card',
   {
     'character-card--selected': props.isSelected,
-    'character-card--editing': props.isEditing,
   },
 ]);
+
+/** 名字首字作为头像，避免引入图片存储 */
+const initial = computed(() => props.character.name.trim().charAt(0) || '?');
+
+/** 已填写的正文字段，用于卡片上的紧凑标记 */
+const filledFields = computed(() => {
+  const character = aiCharacter.value;
+  if (!character) return [];
+
+  const fields: Array<{ key: string; label: string }> = [];
+  if (character.scenario?.trim()) fields.push({ key: 'scenario', label: '场景' });
+  if (character.firstMessage?.trim()) fields.push({ key: 'firstMessage', label: '开场白' });
+  if (character.alternateGreetings?.length) fields.push({ key: 'alternateGreetings', label: `备选开场白 ${character.alternateGreetings.length}` });
+  if (character.exampleDialogue?.trim()) fields.push({ key: 'exampleDialogue', label: '对话示例' });
+  if (character.creatorNotes?.trim()) fields.push({ key: 'creatorNotes', label: '作者注释' });
+
+  return fields;
+});
+
+const metaText = computed(() => {
+  const character = aiCharacter.value;
+  if (!character) return '';
+
+  const parts: string[] = [];
+  if (character.characterVersion?.trim()) parts.push(`v${character.characterVersion.trim()}`);
+  if (character.creator?.trim()) parts.push(`作者：${character.creator.trim()}`);
+
+  return parts.join(' · ');
+});
+
+const tags = computed(() => aiCharacter.value?.tags ?? []);
 
 const selectBtnClasses = computed(() => [
   'select-btn',
   { 'select-btn--active': props.isSelected },
 ]);
-
-const avatarClasses = computed(() => [
-  'character-avatar',
-  { 'character-avatar--ai': props.type === 'ai' },
-]);
-
-const updateName = (value: string | number | undefined) => {
-  if (props.editingData) {
-    props.editingData.name = String(value ?? '');
-  }
-};
-
-const updateDescription = (value: string | undefined) => {
-  if (props.editingData) {
-    props.editingData.description = value ?? '';
-  }
-};
-
-const updatePersonality = (value: string | undefined) => {
-  if (props.editingData && 'personality' in props.editingData) {
-    (props.editingData as AICharacter).personality = value ?? '';
-  }
-};
-
-// 计算是否可以保存
-const canSave = computed(() => {
-  return props.editingData?.name?.trim();
-});
-
-// 获取绑定的知识库名称
-const boundKnowledgeBaseName = computed(() => {
-  if (props.type !== 'ai') return null;
-
-  // 首先检查角色是否有明确绑定的知识库
-  const kbId = (props.character as AICharacter).knowledgeBaseId;
-  if (kbId) {
-    const kb = knowledgeBases.value.find(k => k.id === kbId);
-    return kb?.name || null;
-  }
-
-  // 如果没有明确绑定，检查是否有全局启用的知识库
-  const globalKb = knowledgeBases.value.find(k => k.globallyEnabled);
-  return globalKb?.name || null;
-});
-
-// 获取知识库绑定类型
-const knowledgeBindingType = computed(() => {
-  if (props.type !== 'ai') return null;
-
-  const kbId = (props.character as AICharacter).knowledgeBaseId;
-  if (kbId) {
-    return 'explicit'; // 明确绑定
-  }
-
-  const globalKb = knowledgeBases.value.find(k => k.globallyEnabled);
-  if (globalKb) {
-    return 'global'; // 全局启用
-  }
-
-  return null;
-});
-
-// 获取编辑中的 knowledgeBaseId
-const editingKnowledgeBaseId = computed({
-  get: () => {
-    if (props.type !== 'ai' || !props.editingData) return undefined;
-    return (props.editingData as AICharacter).knowledgeBaseId;
-  },
-  set: (value: string | undefined) => {
-    if (props.type === 'ai' && props.editingData) {
-      (props.editingData as AICharacter).knowledgeBaseId = value;
-    }
-  },
-});
 </script>
 
 <template>
-  <div :class="cardClasses">
-    <!-- 查看模式 -->
-    <template v-if="!isEditing">
-      <div class="character-header">
-        <div class="character-info">
-          <button
-            v-if="type === 'user'"
-            :class="selectBtnClasses"
-            @click="emit('select', character.id)"
-          >
-            <Check v-if="isSelected" :size="16" />
-          </button>
-          <div :class="avatarClasses">
-            <component :is="type === 'user' ? User : Bot" :size="20" />
-          </div>
-          <div class="character-name">{{ character.name }}</div>
-        </div>
-        <div class="character-actions">
-          <button class="action-btn" @click="emit('startEdit', character.id, type)">
-            <Edit2 :size="16" />
-          </button>
-          <button
-            class="action-btn action-btn--delete"
-            :disabled="!canDelete"
-            @click="emit('delete', character.id, type)"
-          >
-            <Trash2 :size="16" />
-          </button>
-        </div>
-      </div>
-      <div class="character-body">
-        <div class="character-detail">
-          <span class="detail-label">描述:</span>
-          <span class="detail-value">{{ character.description || '暂无描述' }}</span>
-        </div>
-        <div v-if="type === 'ai' && 'personality' in character && character.personality" class="character-detail">
-          <span class="detail-label">个性:</span>
-          <span class="detail-value">{{ character.personality }}</span>
-        </div>
-        <div v-if="type === 'ai' && boundKnowledgeBaseName" class="character-detail">
-          <span class="detail-label">知识库:</span>
-          <span class="detail-value">
-            {{ boundKnowledgeBaseName }}
-            <span v-if="knowledgeBindingType === 'global'" class="binding-tag binding-tag--global">全局</span>
-            <span v-if="knowledgeBindingType === 'explicit'" class="binding-tag binding-tag--explicit">绑定</span>
-          </span>
-        </div>
-      </div>
-    </template>
+  <div :class="cardClasses" data-testid="character-card">
+    <div class="character-header">
+      <div class="character-info">
+        <button
+          v-if="type === 'user'"
+          :class="selectBtnClasses"
+          :title="isSelected ? '当前使用中' : '设为当前用户角色'"
+          @click="emit('select', character.id)"
+        >
+          <Check v-if="isSelected" :size="16" />
+        </button>
 
-    <!-- 编辑模式 -->
-    <template v-else>
-      <div class="edit-form">
-        <div class="form-group">
-          <label class="form-label">角色名称</label>
-          <FormInput
-            :model-value="editingData?.name || ''"
-            type="text"
-            placeholder="角色名称"
-            @update:model-value="updateName"
+        <div :class="['character-avatar', `character-avatar--${type}`]">
+          <span class="character-avatar__initial">{{ initial }}</span>
+          <component
+            :is="type === 'user' ? User : Bot"
+            class="character-avatar__badge"
+            :size="12"
           />
         </div>
-        <div class="form-group">
-          <label class="form-label">角色描述</label>
-          <FormTextarea
-            :model-value="editingData?.description || ''"
-            placeholder="角色描述"
-            :rows="2"
-            @update:model-value="updateDescription"
-          />
+
+        <div class="character-title">
+          <div class="character-name">{{ character.name }}</div>
+          <div v-if="metaText" class="character-meta">{{ metaText }}</div>
         </div>
-        <div v-if="type === 'ai'" class="form-group">
-          <label class="form-label">个性描述</label>
-          <FormTextarea
-            :model-value="(editingData as AICharacter)?.personality || ''"
-            placeholder="个性描述"
-            :rows="2"
-            @update:model-value="updatePersonality"
-          />
-        </div>
-        <div v-if="type === 'ai' && knowledgeBases.length > 0" class="form-group">
-          <label class="form-label">绑定知识库</label>
-          <select
-            :value="editingKnowledgeBaseId || ''"
-            class="form-select"
-            @change="editingKnowledgeBaseId = ($event.target as HTMLSelectElement).value || undefined"
-          >
-            <option value="">不绑定知识库</option>
-            <option
-              v-for="kb in knowledgeBases"
-              :key="kb.id"
-              :value="kb.id"
-            >
-              {{ kb.name }} {{ kb.globallyEnabled ? '(全局启用)' : '' }}
-            </option>
-          </select>
-        </div>
-        <FormActions
-          :buttons="[
-            { type: 'secondary', label: '取消', icon: X },
-            { type: 'primary', label: '保存', icon: Check, disabled: !canSave },
-          ]"
-          :equal-width="true"
-          @click="(_, index) => index === 1 ? emit('saveEdit') : emit('cancelEdit')"
-        />
       </div>
-    </template>
+
+      <div class="character-actions">
+        <button
+          v-if="canExport"
+          class="action-btn"
+          title="导出为角色卡"
+          @click="emit('export', character.id)"
+        >
+          <Download :size="16" />
+        </button>
+        <button
+          class="action-btn"
+          title="编辑"
+          @click="emit('edit', character.id)"
+        >
+          <Edit2 :size="16" />
+        </button>
+        <button
+          class="action-btn action-btn--delete"
+          title="删除"
+          :disabled="!canDelete"
+          @click="emit('delete', character.id)"
+        >
+          <Trash2 :size="16" />
+        </button>
+      </div>
+    </div>
+
+    <div class="character-body">
+      <div class="character-detail">
+        <span class="detail-label">描述</span>
+        <span class="detail-value">{{ character.description || '暂无描述' }}</span>
+      </div>
+
+      <div v-if="aiCharacter?.personality" class="character-detail">
+        <span class="detail-label">个性</span>
+        <span class="detail-value">{{ aiCharacter.personality }}</span>
+      </div>
+
+      <div v-if="tags.length > 0" class="character-tags">
+        <span v-for="tag in tags" :key="tag" class="tag-chip">{{ tag }}</span>
+      </div>
+
+      <div v-if="filledFields.length > 0" class="character-fields">
+        <span
+          v-for="field in filledFields"
+          :key="field.key"
+          class="field-chip"
+          :data-testid="`field-chip-${field.key}`"
+        >
+          {{ field.label }}
+        </span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -246,15 +169,10 @@ const editingKnowledgeBaseId = computed({
   border-radius: 12px;
   border: 1px solid var(--border-color);
   overflow: hidden;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .character-card--selected {
-  border-color: var(--accent-purple);
-  box-shadow: 0 0 0 2px rgba(157, 141, 241, 0.1);
-}
-
-.character-card--editing {
   border-color: var(--accent-purple);
   box-shadow: 0 0 0 2px rgba(157, 141, 241, 0.1);
 }
@@ -263,7 +181,8 @@ const editingKnowledgeBaseId = computed({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -301,20 +220,47 @@ const editingKnowledgeBaseId = computed({
 }
 
 .character-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--accent-soft);
-  color: var(--accent-purple);
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  user-select: none;
+}
+
+.character-avatar--user {
+  background: var(--accent-soft);
+  color: var(--accent-purple);
 }
 
 .character-avatar--ai {
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
+}
+
+.character-avatar__initial {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.character-avatar__badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  background: var(--bg-secondary);
+  border-radius: 50%;
+  padding: 1px;
+}
+
+.character-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .character-name {
@@ -326,9 +272,17 @@ const editingKnowledgeBaseId = computed({
   text-overflow: ellipsis;
 }
 
+.character-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .character-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
@@ -363,16 +317,19 @@ const editingKnowledgeBaseId = computed({
 
 .character-body {
   padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .character-detail {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .detail-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -385,68 +342,31 @@ const editingKnowledgeBaseId = computed({
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  word-break: break-all;
+  word-break: break-word;
 }
 
-.binding-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 600;
-  margin-left: 6px;
-  letter-spacing: 0.3px;
+.character-tags,
+.character-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.binding-tag--global {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-}
-
-.binding-tag--explicit {
-  background: rgba(157, 141, 241, 0.2);
-  color: var(--accent-purple);
-}
-
-.edit-form {
-  padding: 14px;
-}
-
-.form-group {
-  margin-bottom: 12px;
-}
-
-.form-group:last-child {
-  margin-bottom: 0;
-}
-
-.form-label {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-  font-weight: 500;
-  display: block;
-}
-
-.form-select {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border-color);
+.tag-chip {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
   background: var(--bg-primary);
-  color: var(--text-main);
-  font-size: 13px;
-  transition: all 0.2s ease;
-  outline: none;
-  width: 100%;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
 }
 
-.form-select:focus {
-  border-color: var(--accent-purple);
-  box-shadow: 0 0 0 3px rgba(157, 141, 241, 0.1);
-}
-
-.form-select:active {
-  transform: scale(0.99);
+.field-chip {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  background: rgba(157, 141, 241, 0.12);
+  color: var(--accent-purple);
+  font-weight: 500;
 }
 </style>

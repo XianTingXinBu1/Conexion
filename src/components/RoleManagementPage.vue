@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Plus, X, User, Bot } from '@lucide/vue';
+import { Plus, User, Bot, Upload, Package } from '@lucide/vue';
 import type { UserCharacter, AICharacter, CharacterType } from '@/types';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
+import {
+  parseCharacterImport,
+  serializeCharacterBackup,
+  serializeCharacterCard,
+  toSafeFileName,
+  CharacterCardParseError,
+} from '@/modules/character-card';
+import type { ImportedCharacter } from '@/modules/character-card';
+import { loadKnowledgeBases } from '@/repositories/knowledgeBaseRepository';
+import { downloadTextFile, readFileAsText } from '@/utils/download';
 import {
   loadAICharacters as loadAICharactersFromRepository,
   loadSelectedUserCharacterId,
@@ -14,7 +24,7 @@ import {
   saveUserCharacters as saveUserCharactersToRepository,
 } from '@/repositories/characterRepository';
 import PageHeader from './common/PageHeader.vue';
-import CharacterForm from './role/CharacterForm.vue';
+import CharacterEditor from './role/CharacterEditor.vue';
 import UserCharacterList from './role/UserCharacterList.vue';
 import AICharacterList from './role/AICharacterList.vue';
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
@@ -22,42 +32,31 @@ import '../styles/role-management.css';
 
 const router = useRouter();
 
-// 使用确认对话框 composable
 const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete } = useConfirmDialog();
+const { showSuccess, showInfo, showError } = useNotifications();
 
-// 使用通知 composable
-const { showSuccess, showInfo } = useNotifications();
-
-// 角色类型标签页
 const activeTab = ref<CharacterType>('user');
 
-// 用户角色数据
 const userCharacters = ref<UserCharacter[]>([]);
 const selectedUserId = ref<string | null>(null);
-
-// AI角色数据
 const aiCharacters = ref<AICharacter[]>([]);
 
-// 编辑状态
-const editingId = ref<string | null>(null);
-const editingType = ref<CharacterType | null>(null);
-const editingCharacter = ref<Partial<UserCharacter | AICharacter>>({});
-const showNewForm = ref(false);
-
-// 当前正在删除的角色类型
 const deleteTargetType = ref<CharacterType | null>(null);
 
-// 加载用户角色
+// 编辑器状态：editingCharacter 为空表示新建
+const isEditorOpen = ref(false);
+const editorCharacter = ref<UserCharacter | AICharacter | null>(null);
+
+const importInput = ref<HTMLInputElement | null>(null);
+
 const loadUserCharacters = async () => {
   userCharacters.value = await loadUserCharactersFromRepository();
 };
 
-// 加载AI角色
 const loadAICharacters = async () => {
   aiCharacters.value = await loadAICharactersFromRepository();
 };
 
-// 加载选中的用户角色
 const loadSelectedUser = async () => {
   const stored = await loadSelectedUserCharacterId();
   if (stored) {
@@ -67,149 +66,108 @@ const loadSelectedUser = async () => {
   }
 };
 
-// 保存用户角色
 const saveUserCharacters = async () => {
   await saveUserCharactersToRepository(userCharacters.value);
 };
 
-// 保存AI角色
 const saveAICharacters = async () => {
   await saveAICharactersToRepository(aiCharacters.value);
 };
 
-// 保存选中的用户角色
 const saveSelectedUser = async () => {
   if (selectedUserId.value) {
     await saveSelectedUserCharacterId(selectedUserId.value);
   }
 };
 
-// 选择用户角色
 const selectUser = async (id: string) => {
   selectedUserId.value = id;
   await saveSelectedUser();
 };
 
-// 添加新角色
-const addCharacter = async (character: UserCharacter | AICharacter) => {
+// ==================== 新建 / 编辑 ====================
+
+const openCreateEditor = () => {
+  editorCharacter.value = null;
+  isEditorOpen.value = true;
+};
+
+const openEditEditor = (id: string) => {
+  const source = activeTab.value === 'user' ? userCharacters.value : aiCharacters.value;
+  const character = source.find(item => item.id === id);
+  if (!character) return;
+
+  editorCharacter.value = character;
+  isEditorOpen.value = true;
+};
+
+const closeEditor = () => {
+  isEditorOpen.value = false;
+  editorCharacter.value = null;
+};
+
+const handleEditorSubmit = async (character: UserCharacter | AICharacter) => {
+  const isNew = !editorCharacter.value;
+
   if (activeTab.value === 'user') {
-    userCharacters.value.push(character as UserCharacter);
-    await saveUserCharacters();
-    const msg = getNotificationMessage('CHARACTER_ADD_USER_SUCCESS', { name: character.name });
-    showSuccess(msg.title, msg.message);
-    // 如果是第一个角色，自动选中
-    if (userCharacters.value.length === 1) {
-      selectedUserId.value = character.id;
-      await saveSelectedUser();
-    }
-  } else {
-    aiCharacters.value.push(character as AICharacter);
-    await saveAICharacters();
-    const msg = getNotificationMessage('CHARACTER_ADD_AI_SUCCESS', { name: character.name });
-    showSuccess(msg.title, msg.message);
-  }
-  showNewForm.value = false;
-};
+    const next = character as UserCharacter;
 
-// 取消新建角色
-const cancelNewCharacter = () => {
-  showNewForm.value = false;
-};
-
-// 开始编辑
-const startEdit = (id: string, type: CharacterType) => {
-  editingId.value = id;
-  editingType.value = type;
-  if (type === 'user') {
-    const character = userCharacters.value.find(c => c.id === id);
-    if (character) {
-      editingCharacter.value = { ...character };
-    }
-  } else {
-    const character = aiCharacters.value.find(c => c.id === id);
-    if (character) {
-      editingCharacter.value = { ...character, knowledgeBaseId: character.knowledgeBaseId };
-    }
-  }
-};
-
-// 保存编辑
-const saveEdit = async () => {
-  if (!editingId.value || !editingType.value || !editingCharacter.value.name) return;
-
-  if (editingType.value === 'user') {
-    const index = userCharacters.value.findIndex(c => c.id === editingId.value);
-    if (index !== -1) {
-      userCharacters.value[index] = {
-        ...userCharacters.value[index],
-        ...editingCharacter.value,
-      } as UserCharacter;
-      await saveUserCharacters();
-      const msg = getNotificationMessage('CHARACTER_UPDATE_USER_SUCCESS', { name: editingCharacter.value.name });
-      showSuccess(msg.title, msg.message);
-    }
-  } else {
-    const index = aiCharacters.value.findIndex(c => c.id === editingId.value);
-    if (index !== -1) {
-      const editingKBId = (editingCharacter.value as AICharacter).knowledgeBaseId;
-      const updates: Partial<AICharacter> = {
-        ...editingCharacter.value,
-      };
-      // 只在 editingCharacter 中有明确设置 knowledgeBaseId 时才更新
-      // 避免意外清除原有的知识库绑定
-      if (editingKBId !== undefined) {
-        updates.knowledgeBaseId = editingKBId;
+    if (isNew) {
+      userCharacters.value.push(next);
+      if (userCharacters.value.length === 1) {
+        selectedUserId.value = next.id;
+        await saveSelectedUser();
       }
-      aiCharacters.value[index] = {
-        ...aiCharacters.value[index],
-        ...updates,
-      } as AICharacter;
-      await saveAICharacters();
-      const msg = getNotificationMessage('CHARACTER_UPDATE_AI_SUCCESS', { name: editingCharacter.value.name });
-      showSuccess(msg.title, msg.message);
+    } else {
+      const index = userCharacters.value.findIndex(item => item.id === next.id);
+      if (index !== -1) userCharacters.value[index] = next;
     }
-  }
-  editingId.value = null;
-  editingType.value = null;
-  editingCharacter.value = {};
-};
 
-// 取消编辑
-const cancelEdit = () => {
-  editingId.value = null;
-  editingType.value = null;
-  editingCharacter.value = {};
-};
-
-// 删除角色
-const deleteCharacter = (id: string, type: CharacterType) => {
-  deleteTargetType.value = type;
-  if (type === 'user') {
-    const character = userCharacters.value.find(c => c.id === id);
-    showDeleteConfirm(id, character?.name || '', '角色');
+    await saveUserCharacters();
+    const msg = getNotificationMessage(
+      isNew ? 'CHARACTER_ADD_USER_SUCCESS' : 'CHARACTER_UPDATE_USER_SUCCESS',
+      { name: next.name },
+    );
+    showSuccess(msg.title, msg.message);
   } else {
-    const character = aiCharacters.value.find(c => c.id === id);
-    showDeleteConfirm(id, character?.name || '', '角色');
+    const next = character as AICharacter;
+
+    if (isNew) {
+      aiCharacters.value.push(next);
+    } else {
+      const index = aiCharacters.value.findIndex(item => item.id === next.id);
+      if (index !== -1) aiCharacters.value[index] = next;
+    }
+
+    await saveAICharacters();
+    const msg = getNotificationMessage(
+      isNew ? 'CHARACTER_ADD_AI_SUCCESS' : 'CHARACTER_UPDATE_AI_SUCCESS',
+      { name: next.name },
+    );
+    showSuccess(msg.title, msg.message);
   }
+
+  closeEditor();
 };
 
-// 确认删除
+// ==================== 删除 ====================
+
+const deleteCharacter = (id: string) => {
+  deleteTargetType.value = activeTab.value;
+  const source = activeTab.value === 'user' ? userCharacters.value : aiCharacters.value;
+  const character = source.find(item => item.id === id);
+  showDeleteConfirm(id, character?.name || '', '角色');
+};
+
 const handleConfirmDelete = async () => {
   const id = confirmDelete();
   if (!id || !deleteTargetType.value) return;
 
-  const type = deleteTargetType.value;
-
-  if (type === 'user') {
-    // 如果删除的是选中的用户角色，选中第一个
+  if (deleteTargetType.value === 'user') {
     if (id === selectedUserId.value) {
       const remaining = userCharacters.value.filter(c => c.id !== id);
-      if (remaining.length > 0) {
-        selectedUserId.value = remaining[0]?.id || null;
-        await saveSelectedUser();
-      } else {
-        selectedUserId.value = null;
-      }
+      selectedUserId.value = remaining[0]?.id ?? null;
+      await saveSelectedUser();
     }
     userCharacters.value = userCharacters.value.filter(c => c.id !== id);
     await saveUserCharacters();
@@ -225,15 +183,81 @@ const handleConfirmDelete = async () => {
   deleteTargetType.value = null;
 };
 
-// 处理返回按钮点击
-const handleBack = () => {
-  if (showNewForm.value) {
-    showNewForm.value = false;
-  } else if (editingId.value) {
-    cancelEdit();
-  } else {
-    router.back();
+// ==================== 导入 / 导出 ====================
+
+const handleExportAll = () => {
+  if (aiCharacters.value.length === 0) {
+    showError('没有可导出的角色', 'AI角色列表为空');
+    return;
   }
+
+  downloadTextFile('conexion-ai-characters.json', serializeCharacterBackup(aiCharacters.value));
+  const msg = getNotificationMessage('CHARACTER_EXPORT_SUCCESS', { count: aiCharacters.value.length });
+  showSuccess(msg.title, msg.message);
+};
+
+const handleExportOne = (id: string) => {
+  const character = aiCharacters.value.find(item => item.id === id);
+  if (!character) return;
+
+  downloadTextFile(toSafeFileName(character.name), serializeCharacterCard(character));
+  const msg = getNotificationMessage('CHARACTER_EXPORT_SUCCESS', { count: 1 });
+  showSuccess(msg.title, msg.message);
+};
+
+const handleImportClick = () => {
+  importInput.value?.click();
+};
+
+/**
+ * 转成本地角色：一律分配新 id（导入是新增而不是覆盖），
+ * 并丢掉指向已不存在知识库的绑定。
+ */
+const toLocalCharacters = (imported: ImportedCharacter[], validKnowledgeBaseIds: Set<string>): AICharacter[] => {
+  const now = Date.now();
+
+  return imported.map((item, index) => ({
+    ...item,
+    id: `imported-${now}-${index}`,
+    createdAt: now,
+    knowledgeBaseId: item.knowledgeBaseId && validKnowledgeBaseIds.has(item.knowledgeBaseId)
+      ? item.knowledgeBaseId
+      : undefined,
+  }));
+};
+
+const handleImportFile = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+
+  if (!file) return;
+
+  try {
+    const text = await readFileAsText(file);
+    const imported = parseCharacterImport(text);
+
+    const knowledgeBases = await loadKnowledgeBases();
+    const validIds = new Set(knowledgeBases.map(kb => kb.id));
+
+    const nextCharacters = toLocalCharacters(imported, validIds);
+    aiCharacters.value.push(...nextCharacters);
+    await saveAICharacters();
+
+    const msg = getNotificationMessage('CHARACTER_IMPORT_SUCCESS', { count: nextCharacters.length });
+    showSuccess(msg.title, msg.message);
+    activeTab.value = 'ai';
+  } catch (error) {
+    const reason = error instanceof CharacterCardParseError || error instanceof Error
+      ? error.message
+      : '文件格式无法识别';
+    const msg = getNotificationMessage('CHARACTER_IMPORT_FAILED', { reason });
+    showError(msg.title, msg.message);
+  }
+};
+
+const handleBack = () => {
+  router.back();
 };
 
 onMounted(async () => {
@@ -245,23 +269,15 @@ onMounted(async () => {
 
 <template>
   <div class="role-management-page">
-    <!-- 顶部导航栏 -->
     <PageHeader
       title="角色管理"
       subtitle="Characters"
-      :show-action="!showNewForm"
+      :show-action="!isEditorOpen"
       :action-icon="Plus"
       @back="handleBack"
-      @action="showNewForm = true"
-    >
-      <template #extra>
-        <button class="nav-btn" @click="showNewForm = false" v-if="showNewForm">
-          <X :size="22" />
-        </button>
-      </template>
-    </PageHeader>
+      @action="openCreateEditor"
+    />
 
-    <!-- 标签页切换 -->
     <div class="tabs-container">
       <button
         :class="['tab-btn', { 'active': activeTab === 'user' }]"
@@ -279,44 +295,53 @@ onMounted(async () => {
       </button>
     </div>
 
-    <!-- 滚动内容区域 -->
-    <div class="content-scroll">
-      <!-- 新建角色表单 -->
-      <CharacterForm
-        v-if="showNewForm"
-        :type="activeTab"
-        @submit="addCharacter"
-        @cancel="cancelNewCharacter"
+    <!-- 导入 / 导出 -->
+    <div v-if="activeTab === 'ai'" class="toolbar">
+      <button class="toolbar-btn" @click="handleImportClick">
+        <Upload :size="16" />
+        <span>导入角色卡</span>
+      </button>
+      <button class="toolbar-btn" @click="handleExportAll">
+        <Package :size="16" />
+        <span>导出全部</span>
+      </button>
+      <input
+        ref="importInput"
+        class="toolbar-file-input"
+        type="file"
+        accept=".json,application/json"
+        data-testid="character-import-input"
+        @change="handleImportFile"
       />
+    </div>
 
-      <!-- 用户角色列表 -->
+    <div class="content-scroll">
       <UserCharacterList
         v-if="activeTab === 'user'"
         :characters="userCharacters"
         :selected-user-id="selectedUserId"
-        :editing-id="editingId"
-        :editing-data="editingCharacter"
         @select="selectUser"
-        @start-edit="startEdit"
-        @save-edit="saveEdit"
-        @cancel-edit="cancelEdit"
+        @edit="openEditEditor"
         @delete="deleteCharacter"
       />
 
-      <!-- AI角色列表 -->
       <AICharacterList
-        v-if="activeTab === 'ai'"
+        v-else
         :characters="aiCharacters"
-        :editing-id="editingId"
-        :editing-data="editingCharacter"
-        @start-edit="startEdit"
-        @save-edit="saveEdit"
-        @cancel-edit="cancelEdit"
+        @edit="openEditEditor"
         @delete="deleteCharacter"
+        @export="handleExportOne"
       />
     </div>
 
-    <!-- 删除确认对话框 -->
+    <CharacterEditor
+      :show="isEditorOpen"
+      :type="activeTab"
+      :character="editorCharacter"
+      @submit="handleEditorSubmit"
+      @cancel="closeEditor"
+    />
+
     <ConfirmDialog
       v-bind="confirmDialogProps"
       @confirm="handleConfirmDelete"
@@ -335,23 +360,34 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.nav-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  border: none;
-  background: transparent;
-  color: var(--text-main);
-  cursor: pointer;
+.toolbar {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 8px;
+  padding: 0 16px 12px;
   flex-shrink: 0;
 }
 
-.nav-btn:active {
-  transform: scale(0.9);
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toolbar-btn:active {
+  transform: scale(0.96);
   background: var(--accent-soft);
+  color: var(--accent-purple);
+}
+
+.toolbar-file-input {
+  display: none;
 }
 </style>

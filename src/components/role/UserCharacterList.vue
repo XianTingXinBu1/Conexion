@@ -7,27 +7,17 @@ import EmptyState from '../common/EmptyState.vue';
 interface Props {
   characters: UserCharacter[];
   selectedUserId: string | null;
-  editingId: string | null;
-  editingData?: Partial<UserCharacter>;
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
   select: [id: string];
-  startEdit: [id: string, type: 'user'];
-  saveEdit: [];
-  cancelEdit: [];
-  delete: [id: string, type: 'user'];
+  edit: [id: string];
+  delete: [id: string];
 }>();
 
-const isEmpty = computed(() => props.characters.length === 0);
-
-const isEditing = (id: string) => props.editingId === id;
-
-const isSelected = (id: string) => props.selectedUserId === id;
-
-const canDelete = () => props.characters.length > 1;
+const canDelete = computed(() => props.characters.length > 1);
 </script>
 
 <template>
@@ -37,7 +27,7 @@ const canDelete = () => props.characters.length > 1;
     </div>
 
     <EmptyState
-      v-if="isEmpty"
+      v-if="characters.length === 0"
       icon="UserCircle"
       title="暂无用户角色"
       hint="点击右上角 + 添加用户角色"
@@ -49,15 +39,11 @@ const canDelete = () => props.characters.length > 1;
         :key="character.id"
         :character="character"
         type="user"
-        :is-selected="isSelected(character.id)"
-        :is-editing="isEditing(character.id)"
-        :editing-data="editingData"
-        :can-delete="canDelete()"
+        :is-selected="character.id === selectedUserId"
+        :can-delete="canDelete"
         @select="emit('select', $event)"
-        @start-edit="emit('startEdit', $event, 'user')"
-        @save-edit="emit('saveEdit')"
-        @cancel-edit="emit('cancelEdit')"
-        @delete="emit('delete', $event, 'user')"
+        @edit="emit('edit', $event)"
+        @delete="emit('delete', $event)"
       />
     </div>
   </div>

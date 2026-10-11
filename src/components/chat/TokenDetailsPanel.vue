@@ -1,22 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Theme, Preset, ConversationCompressionMode } from '@/types';
+import type { ContentPlaceholder, SystemPromptResult } from '@/modules/system-prompt';
 
-type PlaceholderType = 'character' | 'user' | 'knowledge' | 'compression-summary' | 'chat-history' | 'user-instruction';
-
-interface BuildMetadata {
-  filledPlaceholders?: Record<string, {
-    placeholder?: PlaceholderType;
-    contentLength: number;
-  }>;
-  totalItems: number;
-  enabledItems: number;
-}
-
-interface SystemPromptResult {
-  estimatedTokens: number;
-  metadata?: BuildMetadata;
-}
+/**
+ * 面板只需要用量摘要，不关心完整 messages，
+ * 因此从模块类型里 Pick，而不是再手抄一份（抄一份就会漂移）。
+ *
+ * metadata 可缺：走回退链路（无预设）时构建结果不带元数据。
+ */
+type PromptResultSummary = Pick<SystemPromptResult, 'estimatedTokens'> & {
+  metadata?: SystemPromptResult['metadata'];
+};
 
 interface UsageStats {
   promptTokens: number;
@@ -40,7 +35,7 @@ interface Props {
   chatMessageCount: number;
   userMessageCount: number;
   aiMessageCount: number;
-  lastSystemPromptResult: SystemPromptResult | null;
+  lastSystemPromptResult: PromptResultSummary | null;
   currentApiPreset: Preset | null;
   usage: UsageStats | null;
   responseMetrics: ResponseMetrics | null;
@@ -107,7 +102,7 @@ const remainingTokens = ref(
 const compressionModeLabel = computed(() => props.compressionMode === 'auto' ? '自动压缩' : '手动压缩');
 const hasCompressionSummary = computed(() => props.compressionSummary.trim().length > 0);
 const placeholderStats = computed(() => {
-  const stats: Partial<Record<PlaceholderType, number>> = {};
+  const stats: Partial<Record<ContentPlaceholder, number>> = {};
   const filled = props.lastSystemPromptResult?.metadata?.filledPlaceholders;
 
   if (!filled) {
@@ -115,7 +110,7 @@ const placeholderStats = computed(() => {
   }
 
   Object.entries(filled).forEach(([key, value]) => {
-    const placeholder = value.placeholder ?? (key as PlaceholderType);
+    const placeholder = value.placeholder ?? (key as ContentPlaceholder);
     stats[placeholder] = (stats[placeholder] ?? 0) + value.contentLength;
   });
 
@@ -271,6 +266,14 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
               <div class="stat-row" v-if="placeholderStats.character">
                 <span class="stat-label">角色</span>
                 <span class="stat-value">{{ placeholderStats.character.toLocaleString() }}</span>
+              </div>
+              <div class="stat-row" v-if="placeholderStats.scenario">
+                <span class="stat-label">场景</span>
+                <span class="stat-value">{{ placeholderStats.scenario.toLocaleString() }}</span>
+              </div>
+              <div class="stat-row" v-if="placeholderStats['example-dialogue']">
+                <span class="stat-label">对话示例</span>
+                <span class="stat-value">{{ placeholderStats['example-dialogue'].toLocaleString() }}</span>
               </div>
               <div class="stat-row" v-if="placeholderStats.user">
                 <span class="stat-label">用户</span>

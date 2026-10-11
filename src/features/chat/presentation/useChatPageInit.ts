@@ -17,10 +17,12 @@ interface UseChatPageInitOptions {
   syncVisibleMessages: () => void;
   loadPromptPresets: () => Promise<void>;
   loadApiPresets: () => Promise<void>;
-  initCharacters: () => void;
-  initKnowledgeBases: () => void;
+  initCharacters: () => void | Promise<unknown>;
+  initKnowledgeBases: () => void | Promise<unknown>;
   loadMessages: () => void;
   refreshVisibleMessages?: () => void;
+  /** 进入角色会话时灌入开场白（是否需要由回调自行判断） */
+  seedGreeting?: (character: AICharacter) => void | Promise<void>;
 }
 
 export function useChatPageInit(options: UseChatPageInitOptions) {
@@ -40,7 +42,23 @@ export function useChatPageInit(options: UseChatPageInitOptions) {
     initKnowledgeBases,
     loadMessages,
     refreshVisibleMessages,
+    seedGreeting,
   } = options;
+
+  /**
+   * 角色会话的开场白：等角色 / 用户角色加载完再灌，
+   * 否则开场白里的 {{user}} 会展开成空。
+   */
+  const seedGreetingIfNeeded = async (charactersReady: void | Promise<unknown>) => {
+    if (!seedGreeting) return;
+    if (!props.characterId || props.conversationId) return;
+
+    const character = currentCharacter.value;
+    if (!character) return;
+
+    await charactersReady;
+    await seedGreeting(character);
+  };
 
   onMounted(async () => {
     if (props.characterId && !props.character) {
@@ -55,9 +73,13 @@ export function useChatPageInit(options: UseChatPageInitOptions) {
     syncVisibleMessages();
     await loadPromptPresets();
     await loadApiPresets();
-    initCharacters();
+
+    // 与之前一样先并发发起，不阻塞首屏（只把结果拿给开场白用）
+    const charactersReady = initCharacters();
     initKnowledgeBases();
     onPageLoad();
+
+    await seedGreetingIfNeeded(charactersReady);
   });
 
   watch(

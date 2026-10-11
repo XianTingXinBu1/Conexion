@@ -8,6 +8,7 @@ export type ChatMessageKey =
   | 'CHAT_SEND_FAILED'
   | 'CHAT_COMPRESSION_SUCCESS'
   | 'CHAT_COMPRESSION_FAILED'
+  | 'CHAT_COMPRESSION_THRESHOLD_REACHED'
   | 'CODE_COPY_SUCCESS'
   | 'CODE_COPY_FAILED';
 
@@ -37,6 +38,15 @@ export const CHAT_MESSAGES: Record<ChatMessageKey, (params?: Record<string, stri
     type: 'success',
     title: '已压缩',
     message: '会话摘要已生成，并会参与后续对话',
+  }),
+
+  /**
+   * 上下文达到压缩阈值
+   */
+  CHAT_COMPRESSION_THRESHOLD_REACHED: (params) => ({
+    type: 'warning',
+    title: '上下文接近上限',
+    message: `使用率已达 ${String(params?.usage ?? 0)}%（阈值 ${String(params?.threshold ?? 0)}%），可在上下文详情里手动压缩会话`,
   }),
 
   CHAT_COMPRESSION_FAILED: (params) => ({

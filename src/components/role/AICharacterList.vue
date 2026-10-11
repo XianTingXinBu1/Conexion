@@ -6,32 +6,27 @@ import EmptyState from '../common/EmptyState.vue';
 
 interface Props {
   characters: AICharacter[];
-  editingId: string | null;
-  editingData?: Partial<AICharacter>;
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  startEdit: [id: string, type: 'ai'];
-  saveEdit: [];
-  cancelEdit: [];
-  delete: [id: string, type: 'ai'];
+  edit: [id: string];
+  delete: [id: string];
+  export: [id: string];
 }>();
 
-const isEmpty = computed(() => props.characters.length === 0);
-
-const isEditing = (id: string) => props.editingId === id;
+const total = computed(() => props.characters.length);
 </script>
 
 <template>
   <div class="ai-character-list">
     <div class="ai-character-list__title">
-      <span>AI角色 ({{ characters.length }})</span>
+      <span>AI角色 ({{ total }})</span>
     </div>
 
     <EmptyState
-      v-if="isEmpty"
+      v-if="characters.length === 0"
       icon="Sparkles"
       title="暂无AI角色"
       hint="点击右上角 + 添加AI角色"
@@ -43,13 +38,10 @@ const isEditing = (id: string) => props.editingId === id;
         :key="character.id"
         :character="character"
         type="ai"
-        :is-selected="false"
-        :is-editing="isEditing(character.id)"
-        :editing-data="editingData"
-        @start-edit="emit('startEdit', $event, 'ai')"
-        @save-edit="emit('saveEdit')"
-        @cancel-edit="emit('cancelEdit')"
-        @delete="emit('delete', $event, 'ai')"
+        can-export
+        @edit="emit('edit', $event)"
+        @delete="emit('delete', $event)"
+        @export="emit('export', $event)"
       />
     </div>
   </div>

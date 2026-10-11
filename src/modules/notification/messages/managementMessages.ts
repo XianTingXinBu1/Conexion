@@ -26,6 +26,9 @@ export type ManagementMessageKey =
   | 'CHARACTER_UPDATE_AI_SUCCESS'
   | 'CHARACTER_DELETE_USER_SUCCESS'
   | 'CHARACTER_DELETE_AI_SUCCESS'
+  | 'CHARACTER_IMPORT_SUCCESS'
+  | 'CHARACTER_EXPORT_SUCCESS'
+  | 'CHARACTER_IMPORT_FAILED'
   // 会话管理相关
   | 'CONVERSATION_CREATE_TEMP_SUCCESS'
   | 'CONVERSATION_CREATE_CHARACTER_SUCCESS'
@@ -226,6 +229,33 @@ export const MANAGEMENT_MESSAGES: Record<ManagementMessageKey, (params?: Record<
     type: 'info',
     title: '角色已删除',
     message: 'AI角色已删除',
+  }),
+
+  /**
+   * 角色导入成功
+   */
+  CHARACTER_IMPORT_SUCCESS: (params) => ({
+    type: 'success',
+    title: '导入完成',
+    message: `新增 ${String(params?.count ?? 0)} 个角色${params?.skipped ? `，跳过 ${String(params.skipped)} 个无效条目` : ''}`,
+  }),
+
+  /**
+   * 角色导出成功
+   */
+  CHARACTER_EXPORT_SUCCESS: (params) => ({
+    type: 'success',
+    title: '已导出',
+    message: `已导出 ${String(params?.count ?? 0)} 个角色`,
+  }),
+
+  /**
+   * 角色导入失败
+   */
+  CHARACTER_IMPORT_FAILED: (params) => ({
+    type: 'error',
+    title: '导入失败',
+    message: String(params?.reason || '文件格式无法识别'),
   }),
 
   // ==================== 会话管理相关 ====================

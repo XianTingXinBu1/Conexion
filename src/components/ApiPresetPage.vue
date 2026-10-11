@@ -65,7 +65,12 @@ const {
   apiKeyInput,
   streamEnabled,
   temperature,
-  maxTokens,
+  topP,
+  frequencyPenalty,
+  presencePenalty,
+  stopSequences,
+  seed,
+  contextLength,
   maxOutputTokens,
   hasUnsavedChanges,
   updateOriginalData,
@@ -75,7 +80,11 @@ const {
   initialData: {
     streamEnabled: DEFAULTS.STREAM_ENABLED,
     temperature: DEFAULTS.TEMPERATURE,
-    maxTokens: DEFAULTS.MAX_TOKENS,
+    topP: DEFAULTS.TOP_P,
+    frequencyPenalty: DEFAULTS.FREQUENCY_PENALTY,
+    presencePenalty: DEFAULTS.PRESENCE_PENALTY,
+    stopSequences: [],
+    contextLength: DEFAULTS.CONTEXT_LENGTH,
     maxOutputTokens: DEFAULTS.MAX_OUTPUT_TOKENS,
   },
 });
@@ -287,11 +296,21 @@ async function handleTestConnection() {
       <ParameterSettings
         :stream-enabled="streamEnabled"
         :temperature="temperature"
-        :max-tokens="maxTokens"
+        :top-p="topP"
+        :frequency-penalty="frequencyPenalty"
+        :presence-penalty="presencePenalty"
+        :stop-sequences="stopSequences"
+        :seed="seed"
+        :context-length="contextLength"
         :max-output-tokens="maxOutputTokens"
         @update:stream-enabled="streamEnabled = $event"
         @update:temperature="temperature = $event"
-        @update:max-tokens="maxTokens = $event"
+        @update:top-p="topP = $event"
+        @update:frequency-penalty="frequencyPenalty = $event"
+        @update:presence-penalty="presencePenalty = $event"
+        @update:stop-sequences="stopSequences = $event"
+        @update:seed="seed = $event"
+        @update:context-length="contextLength = $event"
         @update:max-output-tokens="maxOutputTokens = $event"
       />
     </div>

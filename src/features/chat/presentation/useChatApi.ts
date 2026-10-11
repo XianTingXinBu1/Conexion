@@ -14,7 +14,7 @@ import {
   logApiError,
   logApiWarn,
 } from '@/modules/debug';
-import { ChatApi, REQUEST_CANCELLED_MESSAGE, type ApiClientConfig } from '@/api';
+import { ChatApi, REQUEST_CANCELLED_MESSAGE, type ApiClientConfig, type ChatSamplingOptions } from '@/api';
 import {
   loadApiPresets,
   loadCurrentApiPreset,
@@ -33,6 +33,24 @@ interface RequestTelemetry {
   startedAt: number;
   firstChunkAt: number | null;
   completedAt: number | null;
+}
+
+/**
+ * 预设 → 采样参数。
+ *
+ * 流式与非流式两条发送路径共用这里，避免新增参数时只改到其中一条
+ * （表现为「非流式生效、流式不生效」这类难查的不一致）。
+ */
+function toSamplingOptions(preset: Preset): ChatSamplingOptions {
+  return {
+    temperature: preset.temperature,
+    maxTokens: preset.maxOutputTokens,
+    topP: preset.topP,
+    frequencyPenalty: preset.frequencyPenalty,
+    presencePenalty: preset.presencePenalty,
+    stopSequences: preset.stopSequences,
+    seed: preset.seed,
+  };
 }
 
 export function useChatApi() {
@@ -156,10 +174,7 @@ export function useChatApi() {
       const chatApi = createChatApi(preset);
       activeChatApi = chatApi;
 
-      const response = await chatApi.sendMessage(messages, {
-        temperature: preset.temperature,
-        maxTokens: preset.maxOutputTokens,
-      });
+      const response = await chatApi.sendMessage(messages, toSamplingOptions(preset));
 
       logApi('响应成功', { contentLength: response.choices[0]?.message.content?.length || 0 });
 
@@ -298,8 +313,7 @@ export function useChatApi() {
       setRequestStatus('streaming');
 
       for await (const _chunk of chatApi.sendStreamMessage(messages, {
-        temperature: preset.temperature,
-        maxTokens: preset.maxOutputTokens,
+        ...toSamplingOptions(preset),
         onChunk: (content) => {
           if (!requestTelemetry.value?.firstChunkAt) {
             requestTelemetry.value = {

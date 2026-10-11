@@ -207,6 +207,30 @@ E2E 在健康检查中标记为**非关键项**（`critical: false`），失败�
   手势位移（否则卡片不跟手）；滚动范围必须钳制在手势开始时的 `maxScroll`——
   拖动项的 translate 会把内容掸出容器、掸大 `scrollHeight`，不钳制就是“掸出→又能滚”
   的正反馈无限滚；自动滚动帧里不能再调 `syncAutoScroll`（会排第二个循环指数级跑飞）。
+- **代理参数一律透传**：`/api/chat/completions` 不再维护逐字段白名单，除 `baseURL` /
+  `apiKey` 两个本地专用字段外全部转发给上游。曾经的白名单会把前端新加的 [OI] 参数
+  （`top_p`、`stop`、`stream_options` …）静默丢掉，表现为「参数传了但没效果」。
+  新增参数只需改前端，不要再把白名单加回来。
+- **流式 usage 必须显式请求**：`stream_options.include_usage` 由 `ChatApi.buildRequestBody`
+  在 `stream: true` 时自动带上。不传时上游可自行决定是否在末尾 chunk 带 usage，
+  Token 面板的真实用量会时有时无。
+- **采样参数有值才发 vs 总是发**：`temperature` / `max_tokens` / `top_p` /
+  `frequency_penalty` / `presence_penalty` 总是发送（未配置发 [OI] 默认值），
+  但 `stop` 仅在非空时发送、`seed` 仅在设置时发送。原因不是洁癖：空的 `stop: []`
+  部分上游会直接 400；而 `seed: 0` 是「固定种子」而不是「不设置」，总是发会让
+  本来应该每次不同的输出变得可复现。改 `buildRequestBody` 时别把这两条改成无条件发送。
+- **停止序列在 UI 里是「一行一条 + 转义」**：文本框一行一条，但支持 `\n` / `\t` / `\\`
+  转义，因为聊天模型最常用的停止序列恰是 `"\n\n"` 和 `"\n\nUser:"`，而一行一条的
+  输入框打不出真换行。转换规则集中在 `src/modules/api-preset/stopSequences.ts`
+  （`parseStopSequences` / `formatStopSequences`），组件只负责接线。
+  注意：这里**故意不 trim**，序列里的空白可能是有意义的。
+- **上下文窗口上限的唯一来源是 `Preset.contextLength`**。早期同一个概念同时存在
+  `maxTokens` 与 `contextLength`，`useChatStats` 又写成 `contextLength || maxTokens`，
+  于是「最大上下文 Tokens」滑块（绑的是 `maxTokens`）一旦被 `contextLength` 遮蔽，
+  就变成改不动的死控件。现已删除 `maxTokens`，滑块直接绑 `contextLength`。
+  旧数据由后端读写路径归一（`server/repositories/presetRepositories.ts` 的
+  `normalizeApiPreset` / `resolveContextLength`）：只有 `maxTokens` 的旧预设会迁移到
+  `contextLength`，两者同时存在时以 `contextLength` 为准。不要再引入第三个同义字段。
 - **预设状态的消费方**：`useApiPresets()` 每次调用都是独立实例，`currentPreset`
   只有在 `loadPresets()`（会一并同步后端记住的选中项）之后才有意义。请求参数走
   `repositories/apiPresetRepository.loadCurrentApiPreset()` 直接读设置，统计展示

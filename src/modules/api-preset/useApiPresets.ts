@@ -16,13 +16,19 @@ const DEFAULT_PRESET_FORM_DATA: PresetFormData = {
   model: '',
   streamEnabled: DEFAULTS.STREAM_ENABLED,
   temperature: DEFAULTS.TEMPERATURE,
-  maxTokens: DEFAULTS.MAX_TOKENS,
+  topP: DEFAULTS.TOP_P,
+  frequencyPenalty: DEFAULTS.FREQUENCY_PENALTY,
+  presencePenalty: DEFAULTS.PRESENCE_PENALTY,
+  stopSequences: [],
+  contextLength: DEFAULTS.CONTEXT_LENGTH,
   maxOutputTokens: DEFAULTS.MAX_OUTPUT_TOKENS,
 };
 
 function cloneDefaultPresetFormData(): PresetFormData {
   return {
     ...DEFAULT_PRESET_FORM_DATA,
+    // 数组字段要单独拷一份：浅拷会让多个表单共享同一个数组。
+    stopSequences: [...DEFAULT_PRESET_FORM_DATA.stopSequences],
   };
 }
 
@@ -34,7 +40,13 @@ function mapPresetToFormData(preset: Preset): PresetFormData {
     model: preset.model,
     streamEnabled: preset.streamEnabled,
     temperature: preset.temperature,
-    maxTokens: preset.maxTokens,
+    topP: preset.topP,
+    frequencyPenalty: preset.frequencyPenalty,
+    presencePenalty: preset.presencePenalty,
+    // 克隆数组：表单直接持有它，共享引用会让编辑表单反过来改到预设对象。
+    stopSequences: [...preset.stopSequences],
+    seed: preset.seed,
+    contextLength: preset.contextLength,
     maxOutputTokens: preset.maxOutputTokens,
   };
 }
@@ -112,16 +124,20 @@ export function useApiPresets() {
     const presetIndex = presets.value.findIndex(p => p.id === selectedPreset.value);
     if (presetIndex !== -1) {
       const existing = presets.value[presetIndex]!;
+      // 合并而非重建：保留表单未管理的字段，避免无关编辑把已有配置静默清空。
       presets.value[presetIndex] = {
-        id: existing.id,
-        name: existing.name,
-        createdAt: existing.createdAt,
+        ...existing,
         url: formData.url,
         apiKey: formData.apiKey,
         model: formData.model,
         streamEnabled: formData.streamEnabled,
         temperature: formData.temperature,
-        maxTokens: formData.maxTokens,
+        topP: formData.topP,
+        frequencyPenalty: formData.frequencyPenalty,
+        presencePenalty: formData.presencePenalty,
+        stopSequences: [...formData.stopSequences],
+        seed: formData.seed,
+        contextLength: formData.contextLength,
         maxOutputTokens: formData.maxOutputTokens,
         updatedAt: Date.now(),
       };
@@ -147,7 +163,12 @@ export function useApiPresets() {
       model: formData.model,
       streamEnabled: formData.streamEnabled,
       temperature: formData.temperature,
-      maxTokens: formData.maxTokens,
+      topP: formData.topP,
+      frequencyPenalty: formData.frequencyPenalty,
+      presencePenalty: formData.presencePenalty,
+      stopSequences: [...formData.stopSequences],
+      seed: formData.seed,
+      contextLength: formData.contextLength,
       maxOutputTokens: formData.maxOutputTokens,
       createdAt: Date.now(),
       updatedAt: Date.now(),

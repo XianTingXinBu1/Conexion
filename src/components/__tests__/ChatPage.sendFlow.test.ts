@@ -34,9 +34,8 @@ const PRESET = {
   model: 'test-model',
   streamEnabled: true,
   temperature: 0.7,
-  maxTokens: 2048,
-  maxOutputTokens: 4096,
   contextLength: 8192,
+  maxOutputTokens: 4096,
   createdAt: 1,
   updatedAt: 1,
 };

@@ -19,7 +19,7 @@ ApiPresetPage / useApiPresets
 - 预设 CRUD：创建、读取、更新、删除、重命名。
 - 当前预设选择：保存并恢复选中的预设 ID。
 - 表单适配：将预设数据映射为页面表单数据。
-- 模型配置：保存模型名、stream 开关、temperature、上下文和输出 token 参数。
+- 模型配置：保存模型名、stream 开关、temperature、top_p、惩罚系数、停止序列、种子、上下文和输出 token 参数。
 - 内建后端状态：页面表单会检查 `/api/health`。
 - 持久化存储：通过 `apiPresetRepository` 读写本地存储。
 
@@ -28,6 +28,7 @@ ApiPresetPage / useApiPresets
 ```txt
 src/modules/api-preset/
 ├── index.ts
+├── stopSequences.ts
 ├── types.ts
 ├── useApiPresets.ts
 ├── components/
@@ -99,7 +100,12 @@ await saveCurrentPreset({
   model: 'gpt-4o-mini',
   streamEnabled: true,
   temperature: 0.7,
-  maxTokens: 8192,
+  topP: 0.9,
+  frequencyPenalty: 0,
+  presencePenalty: 0,
+  stopSequences: ['\n\nUser:'],
+  seed: undefined,
+  contextLength: 8192,
   maxOutputTokens: 2048,
 })
 
@@ -119,7 +125,12 @@ interface ApiConfig {
   model: string;
   streamEnabled: boolean;
   temperature: number;
-  maxTokens: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  stopSequences: string[];
+  seed?: number;
+  contextLength: number;
   maxOutputTokens: number;
 }
 
@@ -131,7 +142,12 @@ interface Preset {
   model: string;
   streamEnabled: boolean;
   temperature: number;
-  maxTokens: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  stopSequences: string[];
+  seed?: number;
+  contextLength: number;
   maxOutputTokens: number;
   createdAt: number;
   updatedAt: number;
@@ -143,10 +159,33 @@ interface PresetFormData {
   model: string;
   streamEnabled: boolean;
   temperature: number;
-  maxTokens: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  stopSequences: string[];
+  seed?: number;
+  contextLength: number;
   maxOutputTokens: number;
 }
 ```
+
+### 生成参数
+
+预设里的生成参数与 [OI] 请求字段的对应关系（映射集中在 `src/api/chat.ts` 的 `buildRequestBody`）：
+
+| 预设字段 | 请求字段 | 说明 |
+| --- | --- | --- |
+| `temperature` | `temperature` | 0–2 |
+| `topP` | `top_p` | 0–1，总是发送（默认 1 = 关闭核采样） |
+| `frequencyPenalty` | `frequency_penalty` | −2–2，总是发送 |
+| `presencePenalty` | `presence_penalty` | −2–2，总是发送 |
+| `stopSequences` | `stop` | 非空才发送；[OI] 上限 4 条 |
+| `seed` | `seed` | 设置才发送；省略 = 每次随机 |
+| `contextLength` | — | 只用于上下文使用率/压缩阈值，不是请求参数 |
+| `maxOutputTokens` | `max_tokens` | 单次回复的输出上限 |
+
+`stop` 与 `seed` 采用「有值才发」而不是「总是发」：空的 `stop: []` 部分上游会直接报错，
+而 `seed: 0` 是「固定种子」而不是「不设置」，总是发会让输出失去随机性。
 
 ## 组件
 
@@ -180,8 +219,15 @@ API 配置表单组件。
 
 - stream 开关。
 - temperature。
-- maxTokens。
+- topP（滑块「Top P（核采样）」，0–1）。
+- frequencyPenalty / presencePenalty（滑块，−2–2）。
+- stopSequences（文本框，一行一条，最多 4 条；支持 `\n` / `\t` / `\\` 转义）。
+- seed（数字输入，留空 = 不发送 = 每次随机）。
+- contextLength（上下文窗口上限，滑块标签「最大上下文 Tokens」）。
 - maxOutputTokens。
+
+停止序列的文本 ↔ 数组转换在 `src/modules/api-preset/stopSequences.ts`，
+组件只负责接线；要改解析规则改那里，不要改组件。
 
 ### PresetSelector
 
@@ -219,6 +265,10 @@ POST /api/chat/completions
 - API Key 不应写死在代码中。
 - 页面不应直接读写 storage key，统一走 repository / composable。
 - 连接测试和模型加载应通过内建 `/api` 代理执行。
+- 新增生成参数时，`Preset` / `PresetFormData` / `ApiConfig` 三处类型、
+  `useFormDataManager`、`ParameterSettings.vue`、`useApiPresets.ts` 的默认值与映射，
+  以及 `src/api/chat.ts` 的字段名映射都要同步改。漏掉任意一处都会表现为
+  「UI 能改但请求里没生效」或「保存后又被重置」。
 
 ## 验证建议
 

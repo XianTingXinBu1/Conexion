@@ -37,10 +37,24 @@ export interface Preset {
   model: string;
   streamEnabled: boolean;
   temperature: number;
-  maxTokens: number;
+  /** 核采样阈值（top_p）。1 表示关闭核采样。 */
+  topP: number;
+  /** 频率惩罚（frequency_penalty），降低逐字重复。 */
+  frequencyPenalty: number;
+  /** 存在惩罚（presence_penalty），鼓励引入新话题。 */
+  presencePenalty: number;
+  /** 停止序列（stop）。命中即截断输出，最多 `MAX_STOP_SEQUENCES` 条。 */
+  stopSequences: string[];
+  /** 随机种子（seed）。未设置时由上游随机，设置后同参数输出可复现。 */
+  seed?: number;
+  /**
+   * 上下文窗口上限（token 数），上下文使用率与压缩阈值的**唯一来源**。
+   *
+   * 早期版本另有一个 `maxTokens` 字段承载同一个概念，导致「UI 改了但上限不变」。
+   * 现已移除，旧数据由后端读取时迁移（见 `server/repositories/presetRepositories.ts`）。
+   */
+  contextLength: number;
   maxOutputTokens: number;
-  /** 模型的上下文长度限制（token 数） */
-  contextLength?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -57,7 +71,12 @@ export interface ApiConfig {
   model: string;
   streamEnabled: boolean;
   temperature: number;
-  maxTokens: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  stopSequences: string[];
+  seed?: number;
+  contextLength: number;
   maxOutputTokens: number;
 }
 
@@ -216,7 +235,24 @@ export interface ChatCompletionRequest {
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
+  /** 核采样阈值。 */
+  top_p?: number;
+  /** 频率惩罚，按已出现频次压低重复用词。 */
+  frequency_penalty?: number;
+  /** 存在惩罚，鼓励引入新话题。 */
+  presence_penalty?: number;
+  /** 停止序列，命中即截断输出。 */
+  stop?: string[];
+  /** 随机种子。省略时由上游随机。 */
+  seed?: number;
   stream?: boolean;
+  /**
+   * 流式响应需显式请求 usage：不传时上游可自行决定是否返回，
+   * Token 面板会拿不到真实用量。
+   */
+  stream_options?: {
+    include_usage?: boolean;
+  };
 }
 
 /**

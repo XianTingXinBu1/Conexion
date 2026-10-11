@@ -1,8 +1,16 @@
 import { Hono } from 'hono';
 import type { Preset, PromptItem, PromptPreset } from '../../src/types';
+import { DEFAULTS } from '../../src/constants';
 import type { ServerConfig } from '../config';
 import { HttpError } from '../errors';
-import { ApiPresetRepository, PromptPresetRepository } from '../repositories/presetRepositories';
+import {
+  ApiPresetRepository,
+  PromptPresetRepository,
+  resolveContextLength,
+  resolveFiniteNumber,
+  resolveSeed,
+  resolveStopSequences,
+} from '../repositories/presetRepositories';
 import { ensureObjectPayload, readJsonBody, requireNonEmptyString } from '../utils/request';
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -29,11 +37,17 @@ function ensureApiPreset(value: unknown, fieldName: string): Preset {
     url: typeof value.url === 'string' ? value.url : '',
     apiKey: typeof value.apiKey === 'string' ? value.apiKey : '',
     model: typeof value.model === 'string' ? value.model : '',
-    streamEnabled: typeof value.streamEnabled === 'boolean' ? value.streamEnabled : true,
-    temperature: typeof value.temperature === 'number' && Number.isFinite(value.temperature) ? value.temperature : 0.7,
-    maxTokens: typeof value.maxTokens === 'number' && Number.isFinite(value.maxTokens) ? value.maxTokens : 2048,
-    maxOutputTokens: typeof value.maxOutputTokens === 'number' && Number.isFinite(value.maxOutputTokens) ? value.maxOutputTokens : 4096,
-    contextLength: typeof value.contextLength === 'number' && Number.isFinite(value.contextLength) ? value.contextLength : undefined,
+    streamEnabled: typeof value.streamEnabled === 'boolean' ? value.streamEnabled : DEFAULTS.STREAM_ENABLED,
+    temperature: resolveFiniteNumber(value.temperature, DEFAULTS.TEMPERATURE),
+    topP: resolveFiniteNumber(value.topP, DEFAULTS.TOP_P),
+    frequencyPenalty: resolveFiniteNumber(value.frequencyPenalty, DEFAULTS.FREQUENCY_PENALTY),
+    presencePenalty: resolveFiniteNumber(value.presencePenalty, DEFAULTS.PRESENCE_PENALTY),
+    stopSequences: resolveStopSequences(value.stopSequences),
+    seed: resolveSeed(value.seed),
+    // contextLength 是上下文窗口的唯一来源；maxTokens 是已废弃的旧字段，
+    // 仅在旧客户端/旧数据里出现，这里做一次迁移。
+    contextLength: resolveContextLength(value.contextLength, value.maxTokens),
+    maxOutputTokens: resolveFiniteNumber(value.maxOutputTokens, DEFAULTS.MAX_OUTPUT_TOKENS),
     createdAt,
     updatedAt: typeof value.updatedAt === 'number' && Number.isFinite(value.updatedAt) ? value.updatedAt : createdAt,
   };

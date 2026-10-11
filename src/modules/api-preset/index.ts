@@ -10,5 +10,8 @@ export type { ApiConfig, Preset, PresetFormData } from './types';
 // Composable
 export { useApiPresets } from './useApiPresets';
 
+// 停止序列的文本 ↔ 数组转换
+export { formatStopSequences, parseStopSequences } from './stopSequences';
+
 // 组件
 export { ApiConfigForm, ModelSelector, ParameterSettings, PresetSelector } from './components';

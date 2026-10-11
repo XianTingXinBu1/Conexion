@@ -4,6 +4,8 @@
  * 这些 key 用作后端 settings.json 的字段名，通过 /api/settings/<key> 读写。
  * 运行时业务数据的权威来源是后端 `.runtime/data/*.json`。
  */
+import type { Preset } from './types';
+
 export const SETTING_KEYS = {
   // settings.json: UI/选择项/偏好
   ENTER_TO_SEND: 'conexion_enter_to_send',
@@ -30,7 +32,14 @@ export const SETTING_KEYS = {
  */
 export const DEFAULTS = {
   TEMPERATURE: 0.7,
-  MAX_TOKENS: 2048,
+  /** 核采样阈值（top_p）。1 表示关闭核采样。 */
+  TOP_P: 1,
+  /** 频率惩罚（frequency_penalty），按已出现频次压低重复用词。 */
+  FREQUENCY_PENALTY: 0,
+  /** 存在惩罚（presence_penalty），鼓励引入新话题。 */
+  PRESENCE_PENALTY: 0,
+  /** 上下文窗口上限（token）。预设中 `contextLength` 的唯一来源与默认值。 */
+  CONTEXT_LENGTH: 2048,
   MAX_OUTPUT_TOKENS: 4096,
   STREAM_ENABLED: true as boolean,
   MODEL: '' as string,
@@ -43,6 +52,9 @@ export const DEFAULTS = {
   COMPRESSION_THRESHOLD_PERCENT: 75,
   COMPRESSION_MODE: 'manual' as const,
 };
+
+/** [OI] 规范中 `stop` 最多允许的停止序列条数。 */
+export const MAX_STOP_SEQUENCES = 4;
 
 /**
  * 默认正则规则
@@ -105,12 +117,16 @@ export const DEFAULT_API_PRESETS = [
     model: '',
     streamEnabled: true,
     temperature: 0.7,
-    maxTokens: 2048,
+    topP: 1,
+    frequencyPenalty: 0,
+    presencePenalty: 0,
+    stopSequences: [],
+    contextLength: 2048,
     maxOutputTokens: 4096,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
-] as const;
+] satisfies Preset[];
 
 /**
  * 默认提示词条目

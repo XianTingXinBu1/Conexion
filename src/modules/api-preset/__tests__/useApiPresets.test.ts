@@ -24,7 +24,11 @@ function buildPreset(overrides: Partial<Preset> & Pick<Preset, 'id'>): Preset {
     model: 'model',
     streamEnabled: true,
     temperature: 0.7,
-    maxTokens: 2048,
+    topP: 1,
+    frequencyPenalty: 0,
+    presencePenalty: 0,
+    stopSequences: [],
+    contextLength: 2048,
     maxOutputTokens: 4096,
     createdAt: 1,
     updatedAt: 1,
@@ -41,8 +45,8 @@ describe('useApiPresets', () => {
 
   it('loadPresets 会一并同步后端记住的选中预设', async () => {
     loadApiPresetsWithDefaults.mockResolvedValue([
-      buildPreset({ id: 'default', maxTokens: 2048 }),
-      buildPreset({ id: 'ds', maxTokens: 1000 }),
+      buildPreset({ id: 'default', contextLength: 2048 }),
+      buildPreset({ id: 'ds', contextLength: 1000 }),
     ]);
     loadSelectedApiPresetId.mockResolvedValue('ds');
 
@@ -50,12 +54,12 @@ describe('useApiPresets', () => {
     await loadPresets();
 
     expect(selectedPreset.value).toBe('ds');
-    expect(currentPreset.value?.maxTokens).toBe(1000);
+    expect(currentPreset.value?.contextLength).toBe(1000);
   });
 
   it('选中项不存在时回退到第一个预设并写回设置', async () => {
     loadApiPresetsWithDefaults.mockResolvedValue([
-      buildPreset({ id: 'first', maxTokens: 1234 }),
+      buildPreset({ id: 'first', contextLength: 1234 }),
       buildPreset({ id: 'second' }),
     ]);
     loadSelectedApiPresetId.mockResolvedValue('missing');
@@ -64,7 +68,38 @@ describe('useApiPresets', () => {
     await loadPresets();
 
     expect(selectedPreset.value).toBe('first');
-    expect(currentPreset.value?.maxTokens).toBe(1234);
+    expect(currentPreset.value?.contextLength).toBe(1234);
     expect(saveSelectedApiPresetId).toHaveBeenCalledWith('first');
+  });
+
+  it('saveCurrentPreset 把表单里的 contextLength 写回预设（上下文上限的唯一来源）', async () => {
+    loadApiPresetsWithDefaults.mockResolvedValue([
+      buildPreset({ id: 'default', contextLength: 8192, temperature: 0.7 }),
+    ]);
+    loadSelectedApiPresetId.mockResolvedValue('default');
+
+    const { loadPresets, currentPreset, saveCurrentPreset } = useApiPresets();
+    await loadPresets();
+
+    await saveCurrentPreset({
+      url: 'https://example.com/v1',
+      apiKey: '',
+      model: 'model',
+      streamEnabled: true,
+      temperature: 1.2,
+      topP: 0.9,
+      frequencyPenalty: 0.3,
+      presencePenalty: -0.2,
+      stopSequences: ['\n\nUser:'],
+      contextLength: 1000,
+      maxOutputTokens: 4096,
+    });
+
+    expect(currentPreset.value?.temperature).toBe(1.2);
+    expect(currentPreset.value?.contextLength).toBe(1000);
+    expect(currentPreset.value?.topP).toBe(0.9);
+    expect(currentPreset.value?.frequencyPenalty).toBe(0.3);
+    expect(currentPreset.value?.presencePenalty).toBe(-0.2);
+    expect(currentPreset.value?.stopSequences).toEqual(['\n\nUser:']);
   });
 });

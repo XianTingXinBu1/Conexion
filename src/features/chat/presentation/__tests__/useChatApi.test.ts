@@ -9,6 +9,12 @@ function createPreset() {
     apiKey: 'key',
     model: 'gpt-test',
     temperature: 0.7,
+    topP: 0.9,
+    frequencyPenalty: 0.3,
+    presencePenalty: -0.2,
+    stopSequences: ['\n\nUser:'],
+    seed: 42,
+    contextLength: 8192,
     maxOutputTokens: 256,
     streamEnabled: true,
   };
@@ -73,6 +79,15 @@ describe('useChatApi', () => {
       apiKey: 'key',
       model: 'gpt-test',
       stream: false,
+      // 预设里的采样参数要真的走到请求体里（camelCase → [OI] snake_case）。
+      // 只改 UI 不改 useChatApi 时，这里会先失败。
+      temperature: 0.7,
+      max_tokens: 256,
+      top_p: 0.9,
+      frequency_penalty: 0.3,
+      presence_penalty: -0.2,
+      stop: ['\n\nUser:'],
+      seed: 42,
     });
   });
 

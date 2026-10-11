@@ -6,6 +6,14 @@ import {
   isCompressionThresholdReached,
 } from '@/modules/conversation-compression';
 
+/**
+ * 未加载预设（`currentApiPreset` 为空）时的兜底上下文窗口。
+ *
+ * 这里不引 `@/constants`：聊天展示层不允许依赖 constants/storage，边界检查会拦。
+ * 正常情况下 `Preset.contextLength` 是必填的，只有预设尚未加载时才走这个兜底。
+ */
+const FALLBACK_CONTEXT_LENGTH = 2048;
+
 const countByType = (messages: Message[], type: Message['type']) => {
   let count = 0;
 
@@ -36,7 +44,7 @@ export function useChatStats(
   const currentContextCount = computed(() => countMessagesTokens(currentRequestMessages.value));
 
   const maxContextLength = computed(() => {
-    return currentApiPreset.value?.contextLength || currentApiPreset.value?.maxTokens || 4096;
+    return currentApiPreset.value?.contextLength || FALLBACK_CONTEXT_LENGTH;
   });
 
   const userTokens = computed(() => countTokensByRole(visibleMessages.value, 'user'));

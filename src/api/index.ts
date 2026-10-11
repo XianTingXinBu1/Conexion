@@ -18,6 +18,7 @@ export type { ApiClientConfig, RequestOptions } from './base';
 
 // 聊天 API
 export { ChatApi } from './chat';
+export type { ChatSamplingOptions } from './chat';
 
 // 模型 API
 export { ModelsApi } from './models';

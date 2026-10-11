@@ -24,20 +24,20 @@ export function clampCompressionThresholdPercent(value: number): number {
   );
 }
 
-export function getContextUsagePercent(currentTokens: number, maxTokens: number): number {
-  if (maxTokens <= 0) {
+export function getContextUsagePercent(currentTokens: number, maxContextTokens: number): number {
+  if (maxContextTokens <= 0) {
     return 0;
   }
 
-  return Math.min(100, Math.max(0, Math.round((currentTokens / maxTokens) * 100)));
+  return Math.min(100, Math.max(0, Math.round((currentTokens / maxContextTokens) * 100)));
 }
 
 export function isCompressionThresholdReached(
   currentTokens: number,
-  maxTokens: number,
+  maxContextTokens: number,
   thresholdPercent: number,
 ): boolean {
-  return getContextUsagePercent(currentTokens, maxTokens) >= clampCompressionThresholdPercent(thresholdPercent);
+  return getContextUsagePercent(currentTokens, maxContextTokens) >= clampCompressionThresholdPercent(thresholdPercent);
 }
 
 export function splitMessagesForCompression(

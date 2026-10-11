@@ -5,13 +5,17 @@ import { proxyUpstreamRequest } from '../upstream/client';
 import { validateUpstreamBaseUrl } from '../upstream/validation';
 import { ensureObjectPayload, readJsonBody, requireNonEmptyString } from '../utils/request';
 
-interface ProxyRequestPayload {
+/**
+ * 代理请求体。
+ *
+ * 除本地字段外不做逐字段建模：上游参数（`temperature`、`top_p`、`stop`、
+ * `stream_options` …）一律透传，新增参数不需要改这里。
+ */
+interface ProxyRequestPayload extends Record<string, unknown> {
   baseURL?: unknown;
   apiKey?: unknown;
   model?: unknown;
   messages?: unknown;
-  temperature?: unknown;
-  max_tokens?: unknown;
   stream?: unknown;
 }
 
@@ -43,6 +47,38 @@ function streamHeadersFromUpstream(upstreamHeaders: Headers): HeadersInit {
     'Cache-Control': upstreamHeaders.get('cache-control') || 'no-cache',
     Connection: 'keep-alive',
   };
+}
+
+/**
+ * 仅用于本地代理自身的字段，绝不能透传给上游。
+ */
+const LOCAL_ONLY_FIELDS = ['baseURL', 'apiKey'];
+
+/**
+ * 构造发给上游的 chat/completions 请求体。
+ *
+ * 早期这里是显式白名单（model / messages / temperature / max_tokens / stream），
+ * 导致前端新加的任何 [OI] 参数（`top_p`、`stop`、`stream_options`、
+ * `frequency_penalty` …）都会被静默丢弃，且每加一个参数都要同步改这里。
+ * 现在改为「透传 + 本地字段黑名单」：除了本地专用字段，其余原样转发。
+ */
+export function buildUpstreamChatBody(
+  payload: Record<string, unknown>,
+  model: string,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(payload)) {
+    if (LOCAL_ONLY_FIELDS.includes(key)) {
+      continue;
+    }
+    body[key] = value;
+  }
+
+  // model 用校验过的归一值（trim 过）覆盖
+  body.model = model;
+
+  return body;
 }
 
 export function createProxyRoutes(config: ServerConfig) {
@@ -103,13 +139,7 @@ export function createProxyRoutes(config: ServerConfig) {
       throw new HttpError(400, '缺少 messages');
     }
 
-    const body = JSON.stringify({
-      model,
-      messages: payload.messages,
-      temperature: payload.temperature,
-      max_tokens: payload.max_tokens,
-      stream: payload.stream,
-    });
+    const body = JSON.stringify(buildUpstreamChatBody(payload, model));
 
     if (payload.stream) {
       try {

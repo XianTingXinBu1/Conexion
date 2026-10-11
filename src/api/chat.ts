@@ -19,6 +19,27 @@ class StreamTimeoutError extends Error {
 }
 
 /**
+ * 采样参数。
+ *
+ * [OI] 字段名的映射集中在这里，避免每个调用方各自拼装请求体、
+ * 也避免新增参数时漏掉某条调用路径。
+ */
+export interface ChatSamplingOptions {
+  temperature?: number;
+  maxTokens?: number;
+  /** 核采样阈值，对应 `top_p`。 */
+  topP?: number;
+  /** 频率惩罚，对应 `frequency_penalty`。 */
+  frequencyPenalty?: number;
+  /** 存在惩罚，对应 `presence_penalty`。 */
+  presencePenalty?: number;
+  /** 停止序列，对应 `stop`。 */
+  stopSequences?: string[];
+  /** 随机种子，对应 `seed`。 */
+  seed?: number;
+}
+
+/**
  * 聊天 API 服务
  */
 export class ChatApi extends ApiClient {
@@ -44,19 +65,36 @@ export class ChatApi extends ApiClient {
 
   private buildRequestBody(
     messages: ChatMessage[],
-    options: {
-      temperature?: number;
-      maxTokens?: number;
-      stream: boolean;
-    },
+    options: ChatSamplingOptions & { stream: boolean },
   ): ChatCompletionRequest {
-    return {
+    const body: ChatCompletionRequest = {
       model: this.model,
       messages: this.normalizeMessages(messages),
       temperature: options.temperature ?? 0.7,
       max_tokens: options.maxTokens ?? 2048,
+      top_p: options.topP ?? 1,
+      frequency_penalty: options.frequencyPenalty ?? 0,
+      presence_penalty: options.presencePenalty ?? 0,
       stream: options.stream,
     };
+
+    // 空数组对上游没有意义（部分实现会直接报错），留空就不发这个字段。
+    const stop = (options.stopSequences ?? []).filter(sequence => sequence !== '');
+    if (stop.length > 0) {
+      body.stop = stop;
+    }
+
+    // 不设种子时必须省略：发 null 或 0 都是「固定种子」，会让每次输出都一样。
+    if (options.seed !== undefined) {
+      body.seed = options.seed;
+    }
+
+    if (options.stream) {
+      // 流式响应默认不一定带 usage，必须显式请求，否则 Token 面板拿不到真实用量。
+      body.stream_options = { include_usage: true };
+    }
+
+    return body;
   }
 
   private getStreamIdleTimeoutMs(): number {
@@ -92,14 +130,10 @@ export class ChatApi extends ApiClient {
    */
   async sendMessage(
     messages: ChatMessage[],
-    options: {
-      temperature?: number;
-      maxTokens?: number;
-    } = {}
+    options: ChatSamplingOptions = {}
   ): Promise<ChatCompletionResponse> {
     const requestBody = this.buildRequestBody(messages, {
-      temperature: options.temperature,
-      maxTokens: options.maxTokens,
+      ...options,
       stream: false,
     });
 
@@ -117,22 +151,19 @@ export class ChatApi extends ApiClient {
    */
   async *sendStreamMessage(
     messages: ChatMessage[],
-    options: {
-      temperature?: number;
-      maxTokens?: number;
+    options: ChatSamplingOptions & {
       onChunk?: (chunk: string) => void;
       onComplete?: (meta?: { usage?: StreamUsagePayload | null }) => void | Promise<void>;
       onError?: (error: string) => void | Promise<void>;
     } = {}
   ): AsyncGenerator<string> {
-    const { temperature, maxTokens, onChunk, onComplete, onError } = options;
+    const { onChunk, onComplete, onError, ...sampling } = options;
 
     try {
       this.validateUrl(this.baseURL);
 
       const requestBody = this.buildRequestBody(messages, {
-        temperature,
-        maxTokens,
+        ...sampling,
         stream: true,
       });
 

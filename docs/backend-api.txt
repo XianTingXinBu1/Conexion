@@ -460,8 +460,29 @@ POST /api/chat/completions
   "messages": [],
   "temperature": 0.7,
   "max_tokens": 4096,
-  "stream": true | false
+  "stream": true | false,
+  "top_p": 0.9,
+  "frequency_penalty": 0,
+  "presence_penalty": 0,
+  "stop": ["\n\n"],
+  "seed": 42,
+  "stream_options": { "include_usage": true }
 }
+
+字段生成规则（前端 src/api/chat.ts 的 buildRequestBody）：
+
+- temperature / max_tokens / top_p / frequency_penalty / presence_penalty：总是发送，未配置时发 [OI] 默认值。
+- stop：仅在非空时发送（空数组部分上游会报错），最多 4 条。
+- seed：仅在设置时发送；省略才是“每次随机”，发 0 是“固定种子”。
+- stream_options.include_usage：仅在 stream 为 true 时发送，否则 Token 面板拿不到真实用量。
+
+参数透传：
+
+除 `baseURL` / `apiKey` 两个本地专用字段外，请求体里的其余字段一律原样转发给上游，
+代理不做逐字段白名单。因此新增 [OI] 参数（`top_p`、`stop`、`stream_options`、
+`frequency_penalty`、`seed` …）不需要修改代理代码。
+
+`baseURL` / `apiKey` 只用于本地解析上游地址与鉴权，绝不会出现在转发给上游的请求体里。
 
 响应：
 - stream 为 false 时透传上游 JSON。
@@ -517,9 +538,8 @@ Preset:
   model: string
   streamEnabled: boolean
   temperature: number
-  maxTokens: number
+  contextLength: number
   maxOutputTokens: number
-  contextLength?: number
   createdAt: number
   updatedAt: number
 

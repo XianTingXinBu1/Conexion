@@ -19,6 +19,7 @@ Termux (Android/aarch64) 上 Playwright 自带的浏览器二进制无法运行�
 ```bash
 sh scripts/dev/manage.sh start     # 启动前后端
 sh scripts/dev/manage.sh status    # 查看状态
+sh scripts/dev/manage.sh restart   # 重启（整组终止，不留孤儿进程）
 sh scripts/dev/manage.sh stop      # 停止
 ```
 

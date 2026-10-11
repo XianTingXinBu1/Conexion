@@ -171,6 +171,25 @@ npm run dev
 
 `npm run dev` 等价于 Vite 前端开发服务器。需要完整 API 代理能力时，请同时运行 `npm run dev:server`。
 
+### 6. 一键启停前后端
+
+不想开两个终端时，用管理脚本：
+
+```bash
+sh scripts/dev/manage.sh start     # 启动前后端并等待健康检查通过
+sh scripts/dev/manage.sh restart   # 重启（改动后端代码后用这个）
+sh scripts/dev/manage.sh status    # 查看状态 / 端口 / 日志路径
+sh scripts/dev/manage.sh logs      # 跟随日志，可加 frontend / backend
+sh scripts/dev/manage.sh stop      # 停止前后端
+```
+
+pid 与日志写在 `.runtime/`：`pids/{frontend,backend}.pid`、`logs/{frontend,backend}.log`。
+
+两个进程都用 `setsid` 启动为独立进程组，停止时整组终止。这是必要的：`npm run dev:server`
+会派生 `sh -c` → `tsx` → `node`（以及 esbuild 子进程），只杀 npm 那个 pid 会留下孤儿进程
+继续占住 3100 / 3900。启动前脚本还会回收占着这两个端口的**本项目**遗留进程；如果端口被
+无关进程占用，则报错退出而不误杀。
+
 ## 常用脚本
 
 ```bash

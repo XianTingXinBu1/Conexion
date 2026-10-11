@@ -300,27 +300,6 @@
   gap: 8px;
 }
 
-.compression-warning-btn {
-  border: none;
-  border-radius: 10px;
-  background: rgba(157, 141, 241, 0.14);
-  color: var(--accent-purple);
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.compression-warning-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.compression-warning-btn:active {
-  transform: scale(0.97);
-}
-
 .compression-badge {
   display: inline-flex;
   align-items: center;
@@ -332,8 +311,7 @@
   font-weight: 700;
 }
 
-.compression-warning,
-.manual-compression-bar {
+.compression-warning {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -352,14 +330,4 @@
 .compression-warning.dark {
   background: rgba(245, 158, 11, 0.12);
   color: #fbbf24;
-}
-
-.manual-compression-bar.light {
-  background: rgba(157, 141, 241, 0.08);
-  color: var(--text-muted);
-}
-
-.manual-compression-bar.dark {
-  background: rgba(157, 141, 241, 0.12);
-  color: var(--text-muted);
 }

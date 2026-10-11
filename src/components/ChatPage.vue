@@ -107,21 +107,6 @@ const {
       </div>
     </div>
 
-    <div
-      v-if="compressionMode === 'manual' && canUseConversationCompression && canCompress"
-      class="manual-compression-bar"
-      :class="theme"
-    >
-      <span>可压缩历史上下文，压缩后会隐藏已摘要的旧消息。</span>
-      <button
-        class="compression-warning-btn"
-        :disabled="isCompressing"
-        @click="handleCompressConversation"
-      >
-        {{ isCompressing ? '压缩中...' : '手动压缩' }}
-      </button>
-    </div>
-
     <div :ref="(el) => { chatViewport.messagesContainer.value = el as HTMLElement | undefined; }" class="chat-messages">
       <CompressionSummaryCard
         v-if="compressionSummary"

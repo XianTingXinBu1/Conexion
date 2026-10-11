@@ -81,4 +81,63 @@ export default {
       await driver.quit();
     }
   },
+
+  '浏览器运行时下聊天内容管线展开宏并跳过代码区域': async () => {
+    const driver = buildDriver();
+    try {
+      await driver.get(BASE_URL);
+      await waitForVisible(driver, '#app', 15000);
+
+      const result = await driver.executeAsyncScript(function (done) {
+        (async () => {
+          try {
+            const mod = await import('/src/features/chat/application/chatContentPipeline.ts');
+
+            const macroContext = {
+              aiCharacter: { id: 'ai-1', name: '小助手', description: '', personality: '', createdAt: 0 },
+              userCharacter: { id: 'user-1', name: '小明', description: '', createdAt: 0 },
+              now: new Date(2026, 6, 8, 13, 9, 45),
+            };
+
+            const rules = [
+              {
+                id: 'r1', name: 'after', enabled: true, flags: 'g',
+                pattern: '小助手', replacement: 'AI',
+                scope: 'all', applyTo: 'after-macro',
+              },
+            ];
+
+            const userContent = mod.processChatContent(
+              '你好 {{char}}，现在是 {{date}}；示例：`{{ user }}`',
+              { scope: 'user', rules: [], macroContext },
+            );
+
+            const assistantContent = mod.processChatContent(
+              '我是 {{char}}',
+              { scope: 'assistant', rules, macroContext },
+            );
+
+            done({ ok: true, userContent, assistantContent });
+          } catch (err) {
+            done({ ok: false, error: String(err && err.message ? err.message : err) });
+          }
+        })();
+      });
+
+      if (!result.ok) {
+        throw new Error(`管线执行失败: ${result.error}`);
+      }
+
+      if (result.userContent !== '你好 小助手，现在是 2026-07-08；示例：`{{ user }}`') {
+        throw new Error(`用户输入展开不符合预期: ${result.userContent}`);
+      }
+
+      // after-macro 规则命中的是展开后的角色名，而不是字面量 {{char}}
+      if (result.assistantContent !== '我是 AI') {
+        throw new Error(`AI 输出展开不符合预期: ${result.assistantContent}`);
+      }
+    } finally {
+      await driver.quit();
+    }
+  },
 };

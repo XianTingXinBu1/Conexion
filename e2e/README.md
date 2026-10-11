@@ -96,8 +96,11 @@ export default {
 ## 现有用例
 
 - `smoke.mjs` — 应用能加载
+- `back-guard.mjs` — 覆盖层打开时系统返回键只关覆盖层（不离开当前页），
+  且界面按钮关闭后不留下吞噬返回键的残余历史记录
 - `macro.mjs` — 提示词界面的变量 chips 存在且可插入
-- `macro-replacement.mjs` — 浏览器运行时下 `{{...}}` 变量被正确替换
+- `macro-replacement.mjs` — 浏览器运行时下 `{{...}}` 变量被正确替换（提示词构建 + 聊天内容管线，
+  含代码区域不展开与 before/after 时机）
 - `markdown-render.mjs` — 行内代码渲染、per-tag 属性白名单、危险协议拦截、链接硬化
 - `prompt-drag.mjs` — 提示词列表拖拽的让位几何、插入指示与边缘自动滚动（触摸 / 鼠标
   两条路径）。刻意不落位（触摸用 `touchcancel`、鼠标只发 `dragend`），不给用户预设留

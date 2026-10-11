@@ -1,7 +1,7 @@
 import type { AICharacter, ChatMessage, KnowledgeBase, Message, RegexRule, UserCharacter } from '@/types';
-import type { MergeMode } from '@/modules/system-prompt';
+import type { MacroContext, MergeMode } from '@/modules/system-prompt';
 import { REQUEST_CANCELLED_MESSAGE } from '@/api/errors';
-import { applyRules } from '@/utils/regexEngine';
+import { processChatContent } from './chatContentPipeline';
 import { StreamMessageAssembler } from './streamMessageAssembler';
 
 export interface SendMessageUseCaseDeps {
@@ -52,6 +52,14 @@ export class SendMessageUseCase {
   private readonly deps: SendMessageUseCaseDeps;
   private readonly flushIntervalMs: number;
 
+  /**
+   * 本次回合的宏上下文。
+   *
+   * 在 execute 开始时固定一次：用户输入与它的回复共用同一个时间戳，
+   * 流式过程中 `{{time}}` 不会抖动；发送后即使切换角色也不影响本次回合。
+   */
+  private macroContext: MacroContext = {};
+
   constructor(
     deps: SendMessageUseCaseDeps,
     options: SendMessageUseCaseOptions = {},
@@ -61,10 +69,20 @@ export class SendMessageUseCase {
   }
 
   async execute(content: string): Promise<void> {
+    this.macroContext = {
+      aiCharacter: this.deps.getCurrentCharacter(),
+      userCharacter: this.deps.getSelectedUser(),
+      now: new Date(),
+    };
+
     this.deps.resetUsage();
     await this.deps.loadRegexRules();
 
-    const processedContent = applyRules(content, 'user', 'after-macro', this.deps.getRegexRules());
+    const processedContent = processChatContent(content, {
+      scope: 'user',
+      rules: this.deps.getRegexRules(),
+      macroContext: this.macroContext,
+    });
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -117,6 +135,7 @@ export class SendMessageUseCase {
     const streamAssembler = new StreamMessageAssembler({
       flushIntervalMs: this.flushIntervalMs,
       getRegexRules: this.deps.getRegexRules,
+      macroContext: this.macroContext,
       onFlush: (processedAssistantContent) => {
         const msg = this.findMessage(assistantMessageId);
         if (!msg) return;

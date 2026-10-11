@@ -54,6 +54,9 @@ const applyToOptions = [
   { value: 'after-macro', label: '宏作用后' },
 ] as const;
 
+// 写死在脚本里而不是模板里：模板文本会解析 {{...}}，需要避免被当成插值。
+const applyToHint = '宏作用于聊天内容（用户输入 / AI 输出）。宏作用前：规则看到的是 {{char}} 原文；宏作用后：看到的是替换后的角色名。代码块与行内代码里的宏不展开。';
+
 const localValue = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val),
@@ -133,6 +136,7 @@ const updateField = <K extends keyof RegexRule>(field: K, value: RegexRule[K]) =
             <span>{{ opt.label }}</span>
           </button>
         </div>
+        <p class="apply-hint">{{ applyToHint }}</p>
       </div>
     </div>
     
@@ -238,6 +242,13 @@ const updateField = <K extends keyof RegexRule>(field: K, value: RegexRule[K]) =
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.apply-hint {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .scope-btn,

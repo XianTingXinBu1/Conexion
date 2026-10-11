@@ -12,12 +12,20 @@
 相关文档：
 
 ```txt
-README.md                       项目入口与运行方式
+README.md                       项目入口与运行方式（英文主文档）
+README.zh-CN.md                 中文版，与主文档内容对等
+```
+
+其他：
+
+```txt
 docs/chat-architecture.md       聊天模块分层与边界规则（聊天相关细节看它）
 docs/backend-api.txt            后端 API 契约
 e2e/README.md                   E2E 用例编写方式与运行命令
 src/modules/<name>/README.md    各 module 的独立说明（缺 chat-prompt、conversation-compression）
 ```
+
+> 两份 README 内容对等，改一份就要同步另一份（结构、命令表、配置表、机制说明都要一致）。
 
 ---
 
@@ -50,7 +58,13 @@ npm run health-check           # 提交前的完整检查（6 项，约 65s）
 - 上游重试策略收拢到后端代理，按请求是否幂等决定
 - 支持取消进行中的非流式请求（会话压缩）
 - 移除前端遗留的浏览器存储清理机制与相关依赖
-- 提示词宏变量替换（`src/modules/system-prompt/core/macro.ts`，表单侧带变量 chips）
+- 提示词宏变量替换（`src/modules/system-prompt/core/macro.ts`）：变量表 `MACRO_DEFINITIONS` 单一真源，
+  取值表 / `SUPPORTED_MACROS` / 表单 chips 均由其派生；宏只作用于作者提示词文本，
+  槽位注入的运行时数据（角色字段、知识库正文等）按原样写入，不做二次展开
+- 聊天内容处理管线（`src/features/chat/application/chatContentPipeline.ts`）：
+  原文 → before-macro 规则 → 宏展开（跳过代码块与行内代码）→ after-macro 规则 → 落库，
+  让正则的「应用时机」真正生效；用户输入与 AI 输出共用一条管线，
+  每回合固定 `now`，展开结果直接落库保持展示 / 存储 / 上游一致
 - token 计数统一走 `@/utils/tokenCounter`（gpt-tokenizer cl100k），废除按字符折算的估算
 - Markdown 清理改为按标签维度的属性白名单，修复行内代码被当作 HTML 解析
 - Markdown 支持 `<details>/<summary>` 折叠块与 `kbd` / `mark` / `sub` / `sup` / `abbr` 等语义标签

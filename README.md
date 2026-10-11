@@ -1,403 +1,199 @@
 # Conexion
 
-Conexion 是一个移动端优先的 AI 聊天应用，支持 OpenAI 兼容接口。
+**English** | [简体中文](./README.zh-CN.md)
 
-项目包含：
+Conexion is a mobile-first LLM chat roleplay app that talks to any OpenAI-compatible endpoint.
 
-- Vue 3 + TypeScript + Vite 前端
-- 内建 Node.js 后端代理
-- OpenAI 兼容 `/chat/completions` 与 `/models` 转发
-- Vitest 测试、Selenium E2E、聊天架构边界检查和健康检查脚本
+The project consists of:
 
-## 功能特性
+- A Vue 3 + TypeScript + Vite frontend
+- A Node.js backend that proxies upstream requests and persists data as JSON
 
-- 多会话
-  - 临时会话 / 持久化会话
-  - 会话列表
-  - 消息编辑 / 删除
-- OpenAI 兼容 API 接入
-  - API 预设管理
-  - 模型列表加载
-  - 连接测试
-  - 流式 / 非流式请求
-- 内建后端代理
-  - `GET /api/health`
-  - `GET|POST /api/models`
-  - `POST /api/connection-test`
-  - `POST /api/chat/completions`
-- Prompt 预设
-  - 多条目提示词
-  - `system` / `user` / `assistant` 角色类型
-  - 插入位置排序
-  - Prompt 预览
-- 角色设定
-  - 用户角色
-  - AI 角色
-  - AI 角色可绑定知识库
-- 知识库
-  - 多知识库 / 多条目
-  - 启用 / 禁用
-  - 优先级排序
-- 正则脚本
-  - 用户输入处理
-  - AI 输出处理
-  - 可配置作用域与应用时机
-- Markdown 渲染
-  - `marked`
-  - `DOMPurify`
-  - 代码块复制
-  - KaTeX 数学公式（`$...$` / `$$...$$`）
-  - `<details>` 折叠块与脚注（`[^1]`）
-- 上下文统计与会话压缩
-  - token 估算
-  - 上下文使用率
-  - 手动 / 自动压缩
-- 后端持久化
-  - Hono API
-  - JSON 文件数据源（`.runtime/data/*.json`）
-  - 前端不再作为权威持久化层
-
-## 技术栈
-
-- Vue 3
-- TypeScript
-- Vite
-- Vue Router
-- Vitest
-- Tailwind CSS / PostCSS
-- marked
-- DOMPurify
-- gpt-tokenizer
-- lucide-vue-next
-- Hono + @hono/node-server
-
-## 数据存储
-
-运行时数据默认写入：
-
-```txt
-.runtime/data/
-  conversations.json
-  user-characters.json
-  ai-characters.json
-  knowledge-bases.json
-  api-presets.json
-  prompt-presets.json
-  regex-rules.json
-  settings.json
-```
-
-可通过环境变量覆盖：
-
-```bash
-CONEXION_DATA_DIR=/path/to/data npm run dev:server
-```
-
-旧版浏览器 localStorage / IndexedDB 数据不会迁移，也不再做清理：新版应用完全不读写浏览器本地存储，遗留数据留在原处不影响使用，需要时可在浏览器控制台手动清除。
-
-## 本地开发
-
-### 1. 安装依赖
+## Quick start
 
 ```bash
 npm install
+cp .env.example .env              # adjust upstream, port, data directory
+sh scripts/dev/manage.sh start    # start backend + frontend, wait for health check
 ```
 
-### 2. 配置环境变量
+Then open `http://127.0.0.1:3100` in a browser.
 
-复制示例配置：
+The other `manage.sh` commands:
 
 ```bash
-cp .env.example .env
+sh scripts/dev/manage.sh restart   # restart
+sh scripts/dev/manage.sh status    # status / ports / log paths
+sh scripts/dev/manage.sh logs      # follow logs, optionally frontend / backend
+sh scripts/dev/manage.sh stop      # stop
 ```
 
-`.env.example` 默认配置：
+PIDs and logs live under `.runtime/` (`pids/`, `logs/`). Both processes are started as their own
+process group and terminated as a group: `npm run dev:server` spawns `sh -c` → `tsx` → `node`, so
+terminating only npm's PID would leave orphaned processes still occupying the port. Before starting,
+the script reclaims **this project's** leftover processes on 3100 / 3900; if either port is held by
+something unrelated, it exits with an error instead of killing it.
 
-```env
-HOST=127.0.0.1
-PORT=3900
-CLIENT_ORIGIN=http://127.0.0.1:3100
-DEFAULT_UPSTREAM_BASE_URL=
-DEFAULT_UPSTREAM_API_KEY=
-ALLOW_PRIVATE_UPSTREAMS=
-MAX_BODY_BYTES=
-```
+## Configuration
 
-常用变量说明：
+| Variable | Default | Description |
+|---|---|---|
+| `HOST` | `127.0.0.1` | Backend listen address |
+| `PORT` | `3900` | Backend port |
+| `CLIENT_ORIGIN` | `http://127.0.0.1:3100` | Allowed CORS origin |
+| `DEFAULT_UPSTREAM_BASE_URL` | empty | Default OpenAI-compatible upstream |
+| `DEFAULT_UPSTREAM_API_KEY` | empty | Default upstream API key |
+| `ALLOW_PRIVATE_UPSTREAMS` | empty | Allow localhost / LAN upstreams |
+| `MAX_BODY_BYTES` | `1048576` | Request body limit (1 MiB) |
+| `CONEXION_DATA_DIR` | `.runtime/data` | Data directory |
 
-- `HOST`：后端代理监听地址，默认 `127.0.0.1`
-- `PORT`：后端代理端口，默认 `3900`
-- `CLIENT_ORIGIN`：允许跨域的前端地址，默认 `http://127.0.0.1:3100`
-- `DEFAULT_UPSTREAM_BASE_URL`：默认上游 OpenAI 兼容 API 地址
-- `DEFAULT_UPSTREAM_API_KEY`：默认上游 API Key
-- `ALLOW_PRIVATE_UPSTREAMS`：是否允许访问本机 / 内网上游
-- `MAX_BODY_BYTES`：请求体最大字节数，默认 1 MiB
+## Data storage
 
-### 3. 启动前端
-
-```bash
-npm run dev:client
-```
-
-前端默认运行在：
+Runtime data is plain local JSON:
 
 ```txt
-http://127.0.0.1:3100
+.runtime/data/
+  conversations.json       user-characters.json    ai-characters.json
+  knowledge-bases.json     api-presets.json        prompt-presets.json
+  regex-rules.json         settings.json
 ```
 
-Vite 会把 `/api` 代理到：
+The backend is the source of truth; the frontend never reads or writes browser localStorage / IndexedDB.
+
+## Backend
+
+The frontend sends requests to the local `/api`, and the backend proxies them upstream; streaming
+chat responses are passed through as-is.
 
 ```txt
-http://127.0.0.1:3900
+server/index.ts        # process entry: reads config, starts @hono/node-server
+server/app.ts          # Hono wiring: CORS, routes, error handling
+server/routes/*.ts     # domain-split routes
 ```
 
-### 4. 启动后端代理
+- Error retries happen only in the backend: GET retries twice; POST failures are not retried
+- `baseURL` only accepts `http` / `https`
+- Localhost / LAN upstreams are allowed only while the backend is bound to a local address; binding to a public address disallows them by default
+- Set `ALLOW_PRIVATE_UPSTREAMS=true` to allow them explicitly
 
-```bash
-npm run dev:server
-```
+The full API contract lives in `docs/backend-api.txt`.
 
-后端默认运行在：
+## Key mechanics
+
+### Macros and regex
+
+User input and AI output go through the same pipeline:
 
 ```txt
-http://127.0.0.1:3900
+raw --[before-macro rules]--> macro expansion --> [after-macro rules] --> stored / displayed
 ```
 
-### 5. 或仅启动前端
+- **Every rule runs exactly once**: `before-macro` and `after-macro` are mutually exclusive
+- **Macros expand exactly once**, between the two stages: a `{{char}}` introduced by an
+  `after-macro` rule is never expanded again
+- **Code regions are left untouched**: `{{...}}` inside fenced code blocks (``` / ~~~) and inline
+  code stays as-is, so snippets like `{{ user }}` in Vue / Handlebars examples survive
+- **Expansion happens before storage**: display, storage, and the upstream request always agree,
+  and history is never re-expanded, so `{{date}}` does not drift from day to day
+- **One timestamp per turn**: `now` is captured once on send, so a user message and its reply share it
 
-```bash
-npm run dev
-```
+Macro scope differs between the two sides:
 
-`npm run dev` 等价于 Vite 前端开发服务器。需要完整 API 代理能力时，请同时运行 `npm run dev:server`。
+| Location | Macros expanded? |
+|---|---|
+| Custom prompt item `prompt`, built-in templates themselves | yes |
+| Chat content (user input / AI output) outside code regions | yes |
+| Injected runtime data (character fields, knowledge base text, compression summary, chat history) | no, inserted verbatim |
+| Code blocks and inline code inside chat content | no |
 
-### 6. 一键启停前后端
+See `src/modules/system-prompt/README.md` for the variable list.
 
-不想开两个终端时，用管理脚本：
+### Prompt building and conversation compression
 
-```bash
-sh scripts/dev/manage.sh start     # 启动前后端并等待健康检查通过
-sh scripts/dev/manage.sh restart   # 重启（改动后端代码后用这个）
-sh scripts/dev/manage.sh status    # 查看状态 / 端口 / 日志路径
-sh scripts/dev/manage.sh logs      # 跟随日志，可加 frontend / backend
-sh scripts/dev/manage.sh stop      # 停止前后端
-```
-
-pid 与日志写在 `.runtime/`：`pids/{frontend,backend}.pid`、`logs/{frontend,backend}.log`。
-
-两个进程都用 `setsid` 启动为独立进程组，停止时整组终止。这是必要的：`npm run dev:server`
-会派生 `sh -c` → `tsx` → `node`（以及 esbuild 子进程），只杀 npm 那个 pid 会留下孤儿进程
-继续占住 3100 / 3900。启动前脚本还会回收占着这两个端口的**本项目**遗留进程；如果端口被
-无关进程占用，则报错退出而不误杀。
-
-## 常用脚本
-
-```bash
-npm run dev
-npm run dev:client
-npm run dev:server
-npm run build
-npm run preview
-npm run test
-npm run test:run
-npm run test:coverage
-npm run check:architecture
-npm run e2e
-npm run health-check
-npm run health-check:quick
-npm run health-check:verbose
-```
-
-说明：
-
-- `dev` / `dev:client`：启动 Vite 前端开发服务器
-- `dev:server`：启动内建后端代理
-- `build`：类型检查并构建前端
-- `test:run`：运行 Vitest
-- `test:coverage`：运行测试并生成覆盖率
-- `check:architecture`：检查聊天模块架构边界
-- `e2e`：运行 Selenium 端到端测试（需前后端服务在线，见 `e2e/README.md`）
-- `health-check`：执行项目健康检查
-- `health-check:quick`：跳过测试、构建与 E2E 的快速健康检查（只跑类型、依赖、架构）
-- `health-check:verbose`：输出更详细的健康检查日志
-
-## 内建后端代理
-
-后端入口：
+Send, prompt preview, and context stats share a single build chain (`buildSystemPrompt`):
 
 ```txt
-server/index.ts        # 进程入口：读取配置并启动 @hono/node-server
-server/app.ts          # Hono app 装配：CORS、路由注册、错误处理
-server/routes/*.ts     # 按领域拆分的路由（proxy / conversations / presets / ...）
+send / preview / stats -> buildChatSystemMessagesUseCase -> buildSystemPrompt
 ```
 
-上游代理接口：
+Compression marks everything outside the summary as summarized: **the original messages stay in the
+conversation file** and are merely hidden from the message list and the prompt, replaced by the
+summary. Manual compression consumes all current messages (keeps 0); automatic compression keeps the
+last 2.
+
+## Project layout
 
 ```txt
-GET  /api/health
-GET  /api/models
-POST /api/models
-POST /api/connection-test
-POST /api/chat/completions
+server/          built-in backend (Hono routes, repositories, JSON storage)
+scripts/         architecture boundary check, health check, dev process management
+e2e/             Selenium end-to-end tests
+docs/            architecture, backend API contract, project status
+src/
+  api/           HTTP client and stream parsing
+  app/           app-level providers / injection keys
+  components/    page components and shared UI
+  composables/   cross-page capabilities
+  features/      feature-scoped modules (including chat's application / presentation layers)
+  modules/       mostly self-contained modules (system-prompt, markdown, notification…)
+  repositories/  storage access entry points
+  router/        routing
+  services/      service layer
+  styles/ utils/ styles and shared helpers
 ```
 
-数据读写接口（本地 JSON 数据源）：
-
-```txt
-/api/conversations
-/api/characters/users
-/api/characters/ai
-/api/knowledge-bases
-/api/api-presets
-/api/prompt-presets
-/api/regex-rules
-/api/settings
-DELETE /api/data
-```
-
-完整接口说明见：
-
-```txt
-docs/backend-api.txt
-```
-
-代理行为：
-
-- 前端配置 OpenAI 兼容上游 `baseURL` 和 `apiKey`
-- 请求先发到本地 `/api`
-- 后端代理再转发到上游服务
-- 流式聊天会透传上游 stream 响应
-- 重试只由后端做：GET 失败重试 2 次，POST 一律不重试（上游可能已开始生成，重发会导致重复计费）。前端不自行重试
-
-安全限制：
-
-- `baseURL` 只允许 `http` / `https`
-- 默认仅在后端绑定本机时允许本机 / 内网上游
-- 如果后端绑定到公网地址，默认禁止访问本机 / 内网上游
-- 可通过 `ALLOW_PRIVATE_UPSTREAMS=true` 显式放开
-
-## 项目结构
-
-```txt
-.
-├── server/                  # 内建后端代理
-│   ├── index.ts
-│   └── index.test.ts
-├── scripts/                 # 架构检查和健康检查脚本
-├── e2e/                     # Selenium 端到端测试（用例 / 运行器 / 驱动封装）
-├── docs/                    # 项目文档
-├── src/
-│   ├── api/                 # 前端 API client 与 stream 解析
-│   ├── app/                 # 应用级 provider / injection key
-│   ├── components/          # 页面组件与通用 UI
-│   ├── composables/         # Vue composable 与页面适配逻辑
-│   ├── features/            # 按功能收敛的新架构模块
-│   │   └── chat/
-│   │       ├── application/ # 聊天 use case
-│   │       └── presentation/# 聊天页面 ViewModel / Controller
-│   ├── modules/             # 相对独立的功能模块
-│   ├── repositories/        # 存储访问入口
-│   ├── router/              # Vue Router
-│   ├── services/            # 服务层
-│   ├── styles/              # 全局样式
-│   ├── utils/               # 通用工具函数
-│   ├── constants.ts
-│   └── types.ts
-├── .env.example
-├── package.json
-└── vite.config.ts
-```
-
-## 聊天模块架构
-
-聊天模块遵循：
+## Architecture boundaries
 
 ```txt
 View -> ViewModel -> Controller/Facade -> UseCase -> Repository/Gateway -> Storage/API
 ```
 
-核心文件：
-
-```txt
-src/components/ChatPage.vue
-src/features/chat/presentation/useChatPageViewModel.ts
-src/features/chat/presentation/useChatSessionFacade.ts
-src/features/chat/presentation/useChatPromptController.ts
-src/features/chat/presentation/useChatLifecycleController.ts
-src/features/chat/application/sendMessage.usecase.ts
-src/features/chat/application/streamMessageAssembler.ts
-src/modules/chat-prompt/application/buildChatSystemMessages.usecase.ts
-src/modules/conversation-compression/presentation/useChatCompressionController.ts
-src/modules/conversation-compression/core/conversationCompression.ts
-```
-
-架构边界由脚本检查：
-
 ```bash
 npm run check:architecture
 ```
 
-当前核心规则包括：
+- `ChatPage.vue` must not depend directly on the API, repositories, services, modules, or shared composable business logic
+- chat presentation must not reach raw storage / constants
+- chat application must not depend on Vue, UI, storage, notification, or composables
 
-- `ChatPage.vue` 不直接依赖 API、repository、service、module、通用 composable 业务细节
-- chat presentation 不直接访问 raw storage / constants
-- chat application 不依赖 Vue、UI、storage、notification、composables
+Layering details live in `docs/chat-architecture.md`.
 
-更多说明见：
+## Commands
 
-```txt
-docs/chat-architecture.md
-```
+| Command | Purpose |
+|---|---|
+| `npm run dev` / `dev:client` | Vite dev server (:3100) |
+| `npm run dev:server` | Built-in backend (:3900) |
+| `npm run build` | Type-check and build the frontend |
+| `npm run preview` | Preview the build output |
+| `npm run test:run` | Vitest unit tests (`test` runs in watch mode) |
+| `npm run test:coverage` | Unit tests with coverage |
+| `npm run check:architecture` | Architecture boundary check |
+| `npm run e2e` | Selenium end-to-end tests, backend + frontend must be running (see `e2e/README.md`) |
+| `npm run health-check` | Full health check (types / deps / architecture / tests / build / E2E) |
+| `npm run health-check:quick` | Skip tests, build, and E2E |
 
-## 验证建议
+Verification scope by change type:
 
-普通开发后建议运行：
+| Type | Verification needed |
+|---|---|
+| General change | `test:run` + `check:architecture` + `build` |
+| Chat module | `test:run` + `check:architecture` |
+| Rendering / macros / routing (browser behavior) | additionally run `e2e` |
+| Before committing | `health-check` |
 
-```bash
-npm run test:run
-npm run check:architecture
-npm run build
-```
+## Docs
 
-提交前建议运行：
+- `docs/chat-architecture.md`: chat module layering and boundary rules
+- `docs/backend-api.txt`: backend API contract
+- `docs/project-status.md`: current state, conventions, roadmap
+- `e2e/README.md`: writing and running end-to-end tests
 
-```bash
-npm run health-check
-```
+Module docs: `src/modules/{api-preset,character-card,debug,markdown,notification,system-prompt}/README.md`
+(`chat-prompt` and `conversation-compression` are covered in `docs/chat-architecture.md`)
 
-涉及渲染 / 浏览器行为（Markdown、宏变量、路由）时，额外跑一遍 E2E：
+> Docs under `docs/`, module READMEs, and code comments are currently Chinese-only.
 
-```bash
-sh scripts/dev/manage.sh start
-npm run e2e
-```
-
-聊天相关代码改动后，至少运行：
-
-```bash
-npm run test:run
-npm run check:architecture
-```
-
-## 文档
-
-推荐优先阅读：
-
-- `docs/chat-architecture.md`：聊天模块分层与边界规则
-- `docs/project-status.md`：项目现状、工程约定与后续路线
-- `docs/backend-api.txt`：后端 API 契约
-- `e2e/README.md`：端到端测试的编写与运行方式
-
-模块文档：
-
-- `src/modules/api-preset/README.md`
-- `src/modules/chat-prompt/`（暂无独立 README，见 `docs/chat-architecture.md`）
-- `src/modules/conversation-compression/`（暂无独立 README，见 `docs/chat-architecture.md`）
-- `src/modules/debug/README.md`
-- `src/modules/markdown/README.md`
-- `src/modules/notification/README.md`
-- `src/modules/system-prompt/README.md`
-- `src/modules/system-prompt/USAGE.md`
+Other languages: [简体中文](./README.zh-CN.md)
 
 ## License
 

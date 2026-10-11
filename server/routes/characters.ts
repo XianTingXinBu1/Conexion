@@ -9,6 +9,32 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * 可选文本字段：缺省 / 非字符串 / 空白 → undefined。
+ *
+ * 归一化输出里用 undefined 而不是 ''，让 JSON.stringify 直接丢掉该键：
+ * 旧数据与旧客户端的往返结果不变，不会凭空多出一堆空字段。
+ */
+function optionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? value : undefined;
+}
+
+/**
+ * 可选字符串数组：缺省 / 非数组 → undefined；逐个过滤空项，全空 → undefined
+ */
+function optionalStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const items = value
+    .filter((item): item is string => typeof item === 'string')
+    .map(item => item.trim())
+    .filter(item => item.length > 0);
+
+  return items.length > 0 ? items : undefined;
+}
+
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -42,6 +68,14 @@ function ensureAICharacter(value: unknown, fieldName: string): AICharacter {
     knowledgeBaseId: typeof value.knowledgeBaseId === 'string' && value.knowledgeBaseId.trim()
       ? value.knowledgeBaseId
       : undefined,
+    creator: optionalString(value.creator),
+    characterVersion: optionalString(value.characterVersion),
+    creatorNotes: optionalString(value.creatorNotes),
+    tags: optionalStringArray(value.tags),
+    scenario: optionalString(value.scenario),
+    firstMessage: optionalString(value.firstMessage),
+    alternateGreetings: optionalStringArray(value.alternateGreetings),
+    exampleDialogue: optionalString(value.exampleDialogue),
     createdAt: typeof value.createdAt === 'number' && Number.isFinite(value.createdAt) ? value.createdAt : Date.now(),
   };
 }

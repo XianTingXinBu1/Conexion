@@ -121,6 +121,13 @@ export interface UserCharacter {
 
 /**
  * AI角色接口
+ *
+ * 可选字段一律「缺省即省略」：服务端归一化会把空值转成 undefined，
+ * JSON.stringify 会丢掉 undefined，因此旧数据与旧客户端的往返结果不变。
+ *
+ * 附加信息与正文字段命名对齐 SillyTavern v2 角色卡
+ * （creator / character_version / creator_notes / tags / scenario / first_mes / mes_example），
+ * 便于直接互通，映射见 src/modules/character-card/。
  */
 export interface AICharacter {
   id: string;
@@ -128,6 +135,25 @@ export interface AICharacter {
   description: string;
   personality: string;
   knowledgeBaseId?: string;
+
+  /** 附加信息：作者 */
+  creator?: string;
+  /** 附加信息：角色卡版本 */
+  characterVersion?: string;
+  /** 附加信息：创作者注释（给使用者看的说明，不进提示词） */
+  creatorNotes?: string;
+  /** 附加信息：标签 */
+  tags?: string[];
+
+  /** 正文：场景设定 */
+  scenario?: string;
+  /** 正文：开场白（新会话首条消息） */
+  firstMessage?: string;
+  /** 正文：备选开场白（已存储、可导入导出，暂未接入切换 UI） */
+  alternateGreetings?: string[];
+  /** 正文：对话示例 */
+  exampleDialogue?: string;
+
   createdAt: number;
 }
 

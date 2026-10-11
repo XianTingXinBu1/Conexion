@@ -5,4 +5,5 @@
 export { buildSystemPrompt } from './builder';
 export { fillItemContent, isChatHistoryItem, isUserInstructionItem, isCompressionSummaryItem } from './content-filler';
 export { mergeMessages, mergeAdjacentMessages, mergeAllMessages } from './merger';
-export { applyMacros, renderMacros, buildMacroValues, SUPPORTED_MACROS } from './macro';
+export { applyMacros, renderMacros, buildMacroValues, SUPPORTED_MACROS, MACRO_DEFINITIONS, DISPLAYED_MACROS } from './macro';
+export type { MacroDefinition } from '../types';

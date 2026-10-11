@@ -32,6 +32,7 @@ src/modules/system-prompt/
 │   └── constants.ts
 ├── __tests__/
 │   ├── builder.test.ts
+│   ├── macro.test.ts
 │   └── merger.test.ts
 ├── README.md
 └── USAGE.md
@@ -80,7 +81,7 @@ console.log(result.metadata)
 ## 宏（变量）替换
 
 自定义提示词内容（例如“角色设定”以外的普通条目、或给特殊条目手写的内容）会执行 `{{...}}` 宏替换。
-宏替换同样作用于特殊条目的内置模板结果。
+特殊条目没有自定义内容时，内置模板本身会执行宏替换，但**注入进去的运行时数据不会**。
 
 | 变量 | 含义 |
 |------|------|
@@ -100,6 +101,20 @@ console.log(result.metadata)
 - 未识别的变量保持原样，不会报错。
 - 角色为空时对应变量替换为空字符串。
 - 时间变量基于构建时刻，可通过 `buildSystemPrompt({ now })` 注入固定时间便于测试。
+
+作用域（重要）：
+
+- 宏只展开**作者写的提示词文本**：条目自定义 `prompt`、内置模板自身。
+- 通过槽位注入的**运行时数据一律按原样写入，不参与宏展开**：角色 `description` / `personality`、
+  知识库正文、压缩摘要，以及聊天历史与用户输入。
+- 因此角色描述里写的字面量 `{{user}}` 不会被替换，知识库正文也不会被误改。
+- 变量清单的单一真源是 `src/modules/system-prompt/core/macro.ts` 的 `MACRO_DEFINITIONS`：
+  运行时取值表、`SUPPORTED_MACROS` 与表单变量 chips（`PROMPT_MACRO_HINTS`）全部由它派生，
+  别名（`charname` / `username`）不单独展示 chip 但仍可用。
+
+本模块之外还有一处展开：聊天内容（用户输入 / AI 输出）由
+`src/features/chat/application/chatContentPipeline.ts` 展开宏，并跳过代码块与行内代码。
+两边共用 `MACRO_DEFINITIONS`，但作用对象不同，改动宏表时两边都会生效。
 
 ## API 参考
 

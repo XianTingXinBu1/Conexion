@@ -45,6 +45,7 @@ export type {
   ContentFillerContext,
   MacroContext,
   MacroVariableName,
+  MacroDefinition,
   MergeResult,
 } from './types';
 
@@ -56,6 +57,8 @@ export {
   renderMacros,
   buildMacroValues,
   SUPPORTED_MACROS,
+  MACRO_DEFINITIONS,
+  DISPLAYED_MACROS,
 } from './core';
 
 // 工具函数

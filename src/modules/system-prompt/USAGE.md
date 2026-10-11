@@ -68,6 +68,16 @@ console.log('Metadata:', result.metadata)
 - 变量名不区分大小写，允许 `{{ name }}` 带空格。
 - 未识别的变量保持原样。
 
+作用域：
+
+- 宏只展开作者写的提示词文本（条目 `prompt` 与内置模板自身）。
+- 注入的运行时数据（角色 `description` / `personality`、知识库正文、压缩摘要、聊天历史、用户输入）
+  按原样写入，**不参与宏展开**；所以角色描述或知识库正文里的字面量 `{{...}}` 不会被替换。
+- 变量清单的单一真源是 `MACRO_DEFINITIONS`（`src/modules/system-prompt/core/macro.ts`），
+  表单 chips 由它派生。
+- 聊天内容（用户输入 / AI 输出）的宏展开不在本模块，见
+  `src/features/chat/application/chatContentPipeline.ts`；那边会跳过代码块与行内代码。
+
 示例：
 
 ```txt

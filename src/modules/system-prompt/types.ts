@@ -9,6 +9,8 @@ import type { PromptPreset, UserCharacter, AICharacter, KnowledgeBase, Message, 
  */
 export type ContentPlaceholder =
   | 'character'             // 角色设定
+  | 'scenario'              // 场景
+  | 'example-dialogue'      // 对话示例
   | 'user'                  // 用户设定
   | 'knowledge'             // 知识库
   | 'compression-summary'   // 压缩摘要
@@ -98,11 +100,28 @@ export type MacroVariableName =
   | 'username'
   | 'description'
   | 'personality'
+  | 'scenario'
+  | 'example_dialogue'
   | 'user_description'
   | 'time'
   | 'date'
   | 'weekday'
   | 'hour';
+
+/**
+ * 宏变量定义
+ *
+ * 运行时取值表、支持列表与前端 chips 都从这份表派生，
+ * 避免「文档 / UI / 实现」三处手工同步造成漂移。
+ */
+export interface MacroDefinition {
+  /** 变量名（小写） */
+  name: MacroVariableName;
+  /** 中文说明，用于表单 chips 悬浮提示 */
+  label: string;
+  /** 若该变量只是别名，指向主变量；别名不单独展示 chip */
+  aliasOf?: MacroVariableName;
+}
 
 /**
  * 宏替换上下文

@@ -143,13 +143,31 @@ export const DEFAULT_PROMPT_ITEMS = [
     insertPosition: 1
   },
   {
+    id: 'scenario',
+    name: '场景',
+    description: 'AI角色的场景设定（自动填充，不可编辑）',
+    enabled: true,
+    prompt: '',
+    roleType: 'system' as const,
+    insertPosition: 2
+  },
+  {
+    id: 'example-dialogue',
+    name: '对话示例',
+    description: 'AI角色的对话示例（自动填充，不可编辑）',
+    enabled: true,
+    prompt: '',
+    roleType: 'system' as const,
+    insertPosition: 3
+  },
+  {
     id: 'user-setting',
     name: '用户设定',
     description: '配置用户身份信息（自动填充，不可编辑）',
     enabled: true,
     prompt: '',
     roleType: 'system' as const,
-    insertPosition: 2
+    insertPosition: 4
   },
   {
     id: 'knowledge-base',
@@ -158,7 +176,7 @@ export const DEFAULT_PROMPT_ITEMS = [
     enabled: true,
     prompt: '',
     roleType: 'system' as const,
-    insertPosition: 3
+    insertPosition: 5
   },
   {
     id: 'compression-summary',
@@ -167,7 +185,7 @@ export const DEFAULT_PROMPT_ITEMS = [
     enabled: true,
     prompt: '',
     roleType: 'system' as const,
-    insertPosition: 4
+    insertPosition: 6
   },
   {
     id: 'chat-history',
@@ -176,7 +194,7 @@ export const DEFAULT_PROMPT_ITEMS = [
     enabled: true,
     prompt: '',
     roleType: 'system' as const,
-    insertPosition: 5
+    insertPosition: 7
   },
   {
     id: 'user-instruction',
@@ -185,7 +203,7 @@ export const DEFAULT_PROMPT_ITEMS = [
     enabled: true,
     prompt: '',
     roleType: 'user' as const,
-    insertPosition: 6
+    insertPosition: 8
   }
 ] as const;
 

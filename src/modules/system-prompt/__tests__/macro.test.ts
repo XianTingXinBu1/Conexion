@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { applyMacros, buildMacroValues, renderMacros } from '../core/macro';
+import { applyMacros, buildMacroValues, renderMacros, MACRO_DEFINITIONS, SUPPORTED_MACROS } from '../core/macro';
 import { fillItemContent } from '../core/content-filler';
-import type { AICharacter, PromptItem, UserCharacter } from '@/types';
+import type { AICharacter, KnowledgeBase, PromptItem, UserCharacter } from '@/types';
 
 const now = 1_700_000_000_000;
 
@@ -96,5 +96,66 @@ describe('system-prompt macros', () => {
   it('returns text unchanged when it has no macros', () => {
     const text = '普通文本 without braces';
     expect(applyMacros(text, buildMacroValues({ aiCharacter }))).toBe(text);
+  });
+
+  it('keeps the value table and the definition table in sync', () => {
+    expect(Object.keys(buildMacroValues({})).sort()).toEqual([...SUPPORTED_MACROS].sort());
+    expect(SUPPORTED_MACROS).toEqual(MACRO_DEFINITIONS.map(definition => definition.name));
+  });
+});
+
+describe('system-prompt macro scope', () => {
+  it('does not re-expand macros that come from injected data', () => {
+    // 角色描述里的 {{user}} 是数据，不是模板，必须原样保留
+    const result = fillItemContent(
+      item({ id: 'character-setting', name: '角色设定', prompt: '' }),
+      {
+        aiCharacter: { ...aiCharacter, description: '称呼用户为 {{user}}' },
+        userCharacter,
+      },
+    );
+
+    expect(result.content).toContain('称呼用户为 {{user}}');
+    expect(result.content).not.toContain('称呼用户为 小明');
+  });
+
+  it('does not expand macros inside knowledge base content', () => {
+    const knowledgeBases: KnowledgeBase[] = [
+      {
+        id: 'kb-1',
+        name: '知识库',
+        description: '',
+        globallyEnabled: true,
+        createdAt: now,
+        updatedAt: now,
+        entries: [
+          {
+            id: 'entry-1',
+            name: '条目',
+            content: '正文里的 {{char}} 与 $& 应原样保留',
+            enabled: true,
+            priority: 1,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      },
+    ];
+
+    const result = fillItemContent(
+      item({ id: 'knowledge-base', name: '知识库', prompt: '' }),
+      { aiCharacter, userCharacter, knowledgeBases },
+    );
+
+    expect(result.content).toContain('正文里的 {{char}} 与 $& 应原样保留');
+  });
+
+  it('still expands macros written by the author in custom prompts', () => {
+    const result = fillItemContent(
+      item({ prompt: '你是{{char}}，服务{{user}}' }),
+      { aiCharacter, userCharacter },
+    );
+
+    expect(result.content).toBe('你是小助手，服务小明');
   });
 });

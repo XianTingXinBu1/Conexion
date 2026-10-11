@@ -4,7 +4,11 @@
  * 负责把自定义提示词内容中的 {{...}} 变量替换为运行时数据，
  * 覆盖角色卡设定、用户设定、主提示词等普通条目。
  *
- * 支持的变量：
+ * 作用域约定：宏只展开**作者写的提示词文本**（条目 prompt 与内置模板本身）。
+ * 通过槽位注入的运行时数据（角色字段、知识库正文、压缩摘要等）一律按原样写入，
+ * 不做二次展开，避免数据里的 `{{...}}` 被误替换。
+ *
+ * 支持的变量见 MACRO_DEFINITIONS（单一真源）：
  * - {{char}} / {{charname}}  AI 角色名
  * - {{user}} / {{username}}  用户角色名
  * - {{description}}       AI 角色描述
@@ -16,24 +20,40 @@
  * - {{hour}}              实时小时（00-23）
  */
 
-import type { MacroContext, MacroVariableName } from '../types';
+import type { MacroContext, MacroDefinition, MacroVariableName } from '../types';
 
 /**
- * 支持的宏变量名列表（用于文档与测试）
+ * 支持的宏变量定义表（单一真源）
  */
-export const SUPPORTED_MACROS: readonly MacroVariableName[] = [
-  'char',
-  'charname',
-  'user',
-  'username',
-  'description',
-  'personality',
-  'user_description',
-  'time',
-  'date',
-  'weekday',
-  'hour',
+export const MACRO_DEFINITIONS: readonly MacroDefinition[] = [
+  { name: 'char', label: 'AI 角色名' },
+  { name: 'charname', label: 'AI 角色名（别名）', aliasOf: 'char' },
+  { name: 'user', label: '用户角色名' },
+  { name: 'username', label: '用户角色名（别名）', aliasOf: 'user' },
+  { name: 'description', label: 'AI 角色描述' },
+  { name: 'personality', label: 'AI 角色性格' },
+  { name: 'scenario', label: 'AI 角色场景' },
+  { name: 'example_dialogue', label: 'AI 角色对话示例' },
+  { name: 'user_description', label: '用户描述' },
+  { name: 'time', label: '实时日期时间' },
+  { name: 'date', label: '实时日期' },
+  { name: 'weekday', label: '实时星期' },
+  { name: 'hour', label: '实时小时' },
 ] as const;
+
+/**
+ * 支持的宏变量名列表（用于文档与测试，由 MACRO_DEFINITIONS 派生）
+ */
+export const SUPPORTED_MACROS: readonly MacroVariableName[] = MACRO_DEFINITIONS.map(
+  definition => definition.name
+);
+
+/**
+ * 需要展示为 chip 的宏（排除别名）
+ */
+export const DISPLAYED_MACROS: readonly MacroDefinition[] = MACRO_DEFINITIONS.filter(
+  definition => !definition.aliasOf
+);
 
 const WEEKDAY_LABELS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'] as const;
 
@@ -76,6 +96,8 @@ export function buildMacroValues(context: MacroContext): Record<MacroVariableNam
   const userName = userCharacter?.name ?? '';
   const aiDescription = aiCharacter?.description ?? '';
   const aiPersonality = aiCharacter?.personality ?? '';
+  const aiScenario = aiCharacter?.scenario ?? '';
+  const aiExampleDialogue = aiCharacter?.exampleDialogue ?? '';
   const userDescription = userCharacter?.description ?? '';
 
   return {
@@ -85,6 +107,8 @@ export function buildMacroValues(context: MacroContext): Record<MacroVariableNam
     username: userName,
     description: aiDescription,
     personality: aiPersonality,
+    scenario: aiScenario,
+    example_dialogue: aiExampleDialogue,
     user_description: userDescription,
     time: timeValues.time,
     date: timeValues.date,

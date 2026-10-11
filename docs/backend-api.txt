@@ -519,6 +519,17 @@ AICharacter:
   description: string
   personality: string
   knowledgeBaseId?: string
+  # 以下均为可选：缺省 / 空串 / 空数组一律省略该键，旧数据往返不变
+  # 附加信息（命名对齐 SillyTavern v2 角色卡）
+  creator?: string            # 作者
+  characterVersion?: string   # 角色卡版本
+  creatorNotes?: string       # 创作者注释（仅展示，不进提示词）
+  tags?: string[]             # 标签
+  # 正文
+  scenario?: string           # 场景（可用条目名“场景”自动注入提示词）
+  firstMessage?: string       # 开场白（新会话首条 assistant 消息）
+  alternateGreetings?: string[] # 备选开场白（已存储，暂未接入切换 UI）
+  exampleDialogue?: string    # 对话示例（可用条目名“对话示例”自动注入提示词）
   createdAt: number
 
 KnowledgeBase:
@@ -558,4 +569,7 @@ RegexRule:
   flags: string
   replacement: string
   scope: 'user' | 'assistant' | 'all'
+  # 应用时机：before-macro 规则作用于宏展开前的原文（还能看到 {{char}} 这类字面量），
+  # after-macro 规则作用于宏展开后的文本（看到的是替换后的角色名）。
+  # 每条规则只在一个阶段执行一次；代码块与行内代码里的宏不展开。
   applyTo: 'before-macro' | 'after-macro'

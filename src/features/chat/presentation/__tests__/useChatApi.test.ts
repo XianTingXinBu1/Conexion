@@ -91,6 +91,25 @@ describe('useChatApi', () => {
     });
   });
 
+  it('压缩用量与聊天用量通过独立 API 实例隔离', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/api-presets') return createApiPresetResponse();
+      if (String(input) === '/api/settings/conexion_selected_preset') {
+        return new Response(JSON.stringify({ value: 'preset-1' }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: '摘要' } }],
+        usage: { prompt_tokens: 200, completion_tokens: 30, total_tokens: 230 },
+      }), { status: 200 });
+    }) as typeof fetch;
+    const chat = useChatApi();
+    const compression = useChatApi();
+    await compression.sendChatRequest([{ role: 'user', content: '压缩历史' }]);
+    expect(compression.usage.value?.promptTokens).toBe(200);
+    expect(chat.usage.value).toBeNull();
+    expect(chat.contextTokenBaseline.value).toBeNull();
+  });
+
   it('cancels active stream request and updates state', async () => {
     let readDeferred: { reject: (reason?: unknown) => void } | null = null;
 
@@ -242,7 +261,18 @@ describe('useChatApi', () => {
       completionTokens: 2,
       totalTokens: 3,
     });
+    expect(api.contextTokenBaseline.value).toMatchObject({
+      model: 'gpt-test', baseURL: 'https://api.example.com', promptTokens: 1,
+      messages: [{ role: 'user', content: 'hi' }],
+    });
     expect(api.requestStatus.value).toBe('completed');
+
+    api.resetUsage();
+    expect(api.contextTokenBaseline.value?.promptTokens).toBe(1);
+    chunks.splice(0, chunks.length, encoder.encode('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n'));
+    await api.sendStreamChatRequest([{ role: 'user', content: 'next' }], vi.fn(), vi.fn(), vi.fn());
+    expect(api.contextTokenBaseline.value).toBeNull();
+    expect(api.usage.value).toBeNull();
   });
 
   it('awaits async stream completion handlers before resolving', async () => {

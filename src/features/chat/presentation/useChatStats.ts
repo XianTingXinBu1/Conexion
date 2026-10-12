@@ -1,6 +1,7 @@
 import { computed, type Ref } from 'vue';
 import type { ChatMessage, Message, Preset } from '@/types';
 import { countMessagesTokens } from '@/utils/tokenCounter';
+import { resolveContextTokens, type ContextTokenBaseline } from '../application/contextTokens';
 import {
   getContextUsagePercent,
   isCompressionThresholdReached,
@@ -40,17 +41,32 @@ export function useChatStats(
   currentRequestMessages: Ref<ChatMessage[]>,
   currentApiPreset: Ref<Preset | undefined>,
   compressionThresholdPercent: Ref<number>,
+  apiPresetsReady: Ref<boolean>,
+  baseline?: Ref<ContextTokenBaseline | null>,
 ) {
-  const currentContextCount = computed(() => countMessagesTokens(currentRequestMessages.value));
+  const resolveTokens = (messages: ChatMessage[]) => resolveContextTokens(
+    messages, baseline?.value ?? null, currentApiPreset.value?.model, currentApiPreset.value?.url,
+  );
+  const contextTokens = computed(() => resolveTokens(currentRequestMessages.value));
+  const currentContextCount = computed(() => contextTokens.value.tokens);
+  const contextTokenSource = computed(() => contextTokens.value.source);
+  const contextTokenSourceLabel = computed(() => ({
+    api: 'API 实际输入',
+    'api-with-estimate': 'API 实际输入 + 新增内容估算',
+    estimate: '本地估算',
+  })[contextTokenSource.value]);
 
   const maxContextLength = computed(() => {
+    if (!apiPresetsReady.value) return 0;
     return currentApiPreset.value?.contextLength || FALLBACK_CONTEXT_LENGTH;
   });
 
   const userTokens = computed(() => countTokensByRole(visibleMessages.value, 'user'));
   const aiTokens = computed(() => countTokensByRole(visibleMessages.value, 'assistant'));
-  const usagePercent = computed(() => getContextUsagePercent(currentContextCount.value, maxContextLength.value));
-  const isCompressionThresholdReachedValue = computed(() => isCompressionThresholdReached(
+  const usagePercent = computed(() => apiPresetsReady.value
+    ? getContextUsagePercent(currentContextCount.value, maxContextLength.value)
+    : 0);
+  const isCompressionThresholdReachedValue = computed(() => apiPresetsReady.value && isCompressionThresholdReached(
     currentContextCount.value,
     maxContextLength.value,
     compressionThresholdPercent.value,
@@ -62,6 +78,9 @@ export function useChatStats(
 
   return {
     currentContextCount,
+    contextTokenSource,
+    contextTokenSourceLabel,
+    resolveTokens,
     maxContextLength,
     userTokens,
     aiTokens,

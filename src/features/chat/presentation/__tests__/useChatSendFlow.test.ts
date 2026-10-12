@@ -35,6 +35,7 @@ const toGroupedDeps = (deps: any) => ({
   },
   transport: {
     resetUsage: deps.resetUsage,
+    resolveContextTokens: deps.resolveContextTokens,
     loadRegexRules: deps.loadRegexRules,
     sendStreamChatRequest: deps.sendStreamChatRequest,
     cancelRequest: deps.cancelRequest,
@@ -148,6 +149,37 @@ describe('useChatSendFlow', () => {
 
     expect(compressConversation).not.toHaveBeenCalled();
     expect(deps.sendStreamChatRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('自动压缩按完整提示词和统一的实际输入基准判断，包含角色设定和知识库', async () => {
+    const request: ChatMessage[] = [{ role: 'system', content: '角色设定与知识库' }, { role: 'user', content: '继续' }];
+    const compress = vi.fn(async () => true);
+    const resolveTokens = vi.fn(() => ({ tokens: 800 }));
+    const build = vi.fn(() => request);
+    const send = vi.fn(async () => undefined);
+    const flow = useChatSendFlow({
+      state: {
+        messages: ref([]), requestMessages: ref([]), regexRules: ref([]),
+        currentCharacter: ref(undefined), selectedUser: ref(undefined), knowledgeBases: ref([]),
+        promptMergeMode: ref('adjacent'),
+      },
+      compression: {
+        mode: ref('auto'), canUse: ref(true), thresholdReached: ref(false),
+        thresholdPercent: ref(75), maxContextLength: ref(1000), currentCompression: ref(undefined),
+        compress, isCompressing: ref(false), summary: ref(''),
+      },
+      session: { persistedConversationId: ref('conv-1'), createNewConversation: vi.fn(), saveConversation: vi.fn() },
+      transport: {
+        resetUsage: vi.fn(), loadRegexRules: vi.fn(), sendStreamChatRequest: send,
+        cancelRequest: vi.fn(), buildSystemMessages: build, resolveContextTokens: resolveTokens,
+      },
+      uiEffects: { onStreamFlush: vi.fn(), onMessageSend: vi.fn(), showSuccess: vi.fn(), showError: vi.fn() },
+    });
+    await flow.handleSendMessage('继续');
+    expect(resolveTokens).toHaveBeenCalledWith(request);
+    expect(compress).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledOnce();
+    expect(build).toHaveBeenCalledWith(expect.objectContaining({ userInstruction: '继续', includeUserInstructionMessage: true }));
   });
 
   it('does not re-apply non-idempotent assistant regex rules to old streamed content', async () => {

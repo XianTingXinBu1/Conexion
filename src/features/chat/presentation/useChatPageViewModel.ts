@@ -1,4 +1,4 @@
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useChatApi } from './useChatApi';
 import { useConfirmDialog } from '@/composables/useConfirmDialog';
@@ -64,19 +64,21 @@ export function useChatPageViewModel(props: ChatPageProps) {
   });
 
   const {
-    sendChatRequest,
     sendStreamChatRequest,
     cancelRequest,
     usage,
+    contextTokenBaseline,
     responseMetrics,
     resetUsage,
     requestStatus,
     isRequestActive,
   } = useChatApi();
+  const compressionApi = useChatApi();
   const { showSuccess, showError, showInfo, showWarning } = useNotifications();
   const { selectedUser, init: initCharacters } = useCharacters();
   const { knowledgeBases, init: initKnowledgeBases } = useKnowledgeBases();
   const { currentPreset: currentApiPreset, loadPresets: loadApiPresets } = useApiPresets();
+  const apiPresetsReady = ref(false);
 
   const {
     compression,
@@ -92,7 +94,7 @@ export function useChatPageViewModel(props: ChatPageProps) {
     currentConversation,
     canUseConversationCompression,
     saveConversation,
-    sendChatRequest,
+    sendChatRequest: compressionApi.sendChatRequest,
     showInfo,
     showSuccess,
     showError,
@@ -143,6 +145,8 @@ export function useChatPageViewModel(props: ChatPageProps) {
 
   const {
     currentContextCount,
+    contextTokenSourceLabel,
+    resolveTokens,
     maxContextLength,
     userTokens,
     aiTokens,
@@ -151,7 +155,7 @@ export function useChatPageViewModel(props: ChatPageProps) {
     aiMessageCount,
     usagePercent,
     isCompressionThresholdReached,
-  } = useChatStats(effectiveMessages, currentContextMessages, currentApiPreset, compressionThresholdPercent);
+  } = useChatStats(effectiveMessages, currentContextMessages, currentApiPreset, compressionThresholdPercent, apiPresetsReady, contextTokenBaseline);
 
   /**
    * 跨过上下文阈值时用全局通知提醒一次。
@@ -172,6 +176,9 @@ export function useChatPageViewModel(props: ChatPageProps) {
     const msg = getNotificationMessage('CHAT_COMPRESSION_THRESHOLD_REACHED', {
       usage: usagePercent.value,
       threshold: compressionThresholdPercent.value,
+      tokens: currentContextCount.value.toLocaleString(),
+      limit: maxContextLength.value.toLocaleString(),
+      source: contextTokenSourceLabel.value,
     });
     showWarning(msg.title, msg.message);
   });
@@ -186,7 +193,10 @@ export function useChatPageViewModel(props: ChatPageProps) {
     loadConversation,
     syncVisibleMessages,
     loadPromptPresets,
-    loadApiPresets,
+    loadApiPresets: async () => {
+      await loadApiPresets();
+      apiPresetsReady.value = true;
+    },
     initCharacters,
     initKnowledgeBases,
     loadMessages,
@@ -241,8 +251,9 @@ export function useChatPageViewModel(props: ChatPageProps) {
       resetUsage,
       loadRegexRules,
       sendStreamChatRequest,
-      cancelRequest,
+      cancelRequest: () => { cancelRequest(); compressionApi.cancelRequest(); },
       buildSystemMessages,
+      resolveContextTokens: resolveTokens,
     },
     uiEffects: {
       onStreamFlush: scrollPolicy.onStreamFlush,
@@ -287,6 +298,8 @@ export function useChatPageViewModel(props: ChatPageProps) {
     isCompressionThresholdReached,
     isCompressing,
     currentContextCount,
+    contextTokenSourceLabel,
+    compressionUsage: compressionApi.usage,
     maxContextLength,
     userTokens,
     aiTokens,
@@ -306,6 +319,7 @@ export function useChatPageViewModel(props: ChatPageProps) {
     currentApiPreset,
     currentPromptPreset,
     usage,
+    contextTokenBaseline,
     responseMetrics,
     isSending,
     isRequestActive,

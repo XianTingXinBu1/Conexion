@@ -11,8 +11,9 @@ import { getNotificationMessage } from '@/modules/notification';
 import type { MergeMode } from '@/modules/system-prompt';
 import type { Ref } from 'vue';
 import { SendMessageUseCase } from '@/features/chat/application/sendMessage.usecase';
+import { countMessagesTokens } from '@/utils/tokenCounter';
 import {
-  getEffectiveConversationTokenCount,
+  getEffectiveChatHistory,
   isCompressionThresholdReached,
 } from '@/modules/conversation-compression';
 
@@ -46,6 +47,7 @@ interface SendFlowSessionDeps {
 
 interface SendFlowTransportDeps {
   resetUsage: () => void;
+  resolveContextTokens?: (messages: ChatMessage[]) => { tokens: number };
   loadRegexRules: () => Promise<void>;
   sendStreamChatRequest: (
     messages: ChatMessage[],
@@ -114,12 +116,25 @@ export function useChatSendFlow(deps: SendFlowDeps) {
           return deps.compression.thresholdReached.value;
         }
 
-        return isCompressionThresholdReached(
-          getEffectiveConversationTokenCount(messages, deps.compression.currentCompression.value),
-          deps.compression.maxContextLength.value,
-          deps.compression.thresholdPercent.value,
-        );
-      },
+      const activeMessages = getEffectiveChatHistory(messages, deps.compression.currentCompression.value);
+      const lastMessage = activeMessages[activeMessages.length - 1];
+      const hasUserInstruction = lastMessage?.type === 'user';
+      const prompt = deps.transport.buildSystemMessages({
+        aiCharacter: deps.state.currentCharacter.value,
+        userCharacter: deps.state.selectedUser.value,
+        knowledgeBases: deps.state.knowledgeBases.value,
+        chatHistory: hasUserInstruction ? activeMessages.slice(0, -1) : activeMessages,
+        userInstruction: hasUserInstruction ? lastMessage.content : '',
+        mergeMode: deps.state.promptMergeMode.value,
+        includeUserInstructionMessage: hasUserInstruction,
+        compressionSummary: deps.compression.summary.value,
+      });
+      return isCompressionThresholdReached(
+        deps.transport.resolveContextTokens?.(prompt).tokens ?? countMessagesTokens(prompt),
+        deps.compression.maxContextLength.value,
+        deps.compression.thresholdPercent.value,
+      );
+    },
       compressConversation: deps.compression.compress,
       getCompressionSummary: () => deps.compression.summary.value,
       getPersistedConversationId: () => deps.session.persistedConversationId.value,

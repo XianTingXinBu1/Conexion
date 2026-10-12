@@ -5,6 +5,7 @@
  */
 
 import { computed, ref } from 'vue';
+import type { ContextTokenBaseline } from '../application/contextTokens';
 import type {
   ChatMessage,
   Preset,
@@ -71,6 +72,14 @@ export function useChatApi() {
 
   // Token 使用统计
   const usage = ref<UsageStats | null>(null);
+  const contextTokenBaseline = ref<ContextTokenBaseline | null>(null);
+
+  const recordInputUsage = (messages: ChatMessage[], preset: Preset, promptTokens?: number) => {
+    contextTokenBaseline.value = typeof promptTokens === 'number' && Number.isFinite(promptTokens) && promptTokens >= 0
+      ? { model: preset.model, baseURL: preset.url, promptTokens,
+        messages: messages.map(message => ({ role: message.role, content: message.content })) }
+      : null;
+  };
   const requestTelemetry = ref<RequestTelemetry | null>(null);
 
   const responseMetrics = computed(() => {
@@ -144,6 +153,7 @@ export function useChatApi() {
    * 发送聊天请求（非流式）
    */
   async function sendChatRequest(messages: ChatMessage[]): Promise<string> {
+    usage.value = null;
     error.value = null;
     wasCancelled.value = false;
     requestTelemetry.value = {
@@ -178,6 +188,7 @@ export function useChatApi() {
 
       logApi('响应成功', { contentLength: response.choices[0]?.message.content?.length || 0 });
 
+      recordInputUsage(messages, preset, response.usage?.prompt_tokens);
       // 提取并存储 usage 数据
       if (response.usage) {
         usage.value = {
@@ -239,6 +250,7 @@ export function useChatApi() {
     onComplete: () => void | Promise<void>,
     onError: (error: string) => void | Promise<void>,
   ): Promise<void> {
+    usage.value = null;
     error.value = null;
     wasCancelled.value = false;
     requestTelemetry.value = {
@@ -332,6 +344,7 @@ export function useChatApi() {
           }
         },
         onComplete: async (meta) => {
+          recordInputUsage(messages, preset, meta?.usage?.prompt_tokens);
           if (meta?.usage) {
             usage.value = {
               promptTokens: meta.usage.prompt_tokens,
@@ -403,6 +416,7 @@ export function useChatApi() {
     isRequestActive,
     error,
     usage,
+    contextTokenBaseline,
     requestTelemetry,
     responseMetrics,
     requestStatus,

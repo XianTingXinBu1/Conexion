@@ -45,8 +45,8 @@ export const CHAT_MESSAGES: Record<ChatMessageKey, (params?: Record<string, stri
    */
   CHAT_COMPRESSION_THRESHOLD_REACHED: (params) => ({
     type: 'warning',
-    title: '上下文接近上限',
-    message: `使用率已达 ${String(params?.usage ?? 0)}%（阈值 ${String(params?.threshold ?? 0)}%），可在上下文详情里手动压缩会话`,
+    title: '上下文达到压缩阈值',
+    message: `${String(params?.source ?? '本地估算')}：当前上下文 ${String(params?.tokens ?? 0)} / ${String(params?.limit ?? 0)} tokens，使用率 ${String(params?.usage ?? 0)}%（阈值 ${String(params?.threshold ?? 0)}%）。可在上下文详情里手动压缩会话`,
   }),
 
   CHAT_COMPRESSION_FAILED: (params) => ({

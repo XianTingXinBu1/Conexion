@@ -31,6 +31,8 @@ const {
   isCompressionThresholdReached,
   isCompressing,
   currentContextCount,
+  contextTokenSourceLabel,
+  compressionUsage,
   maxContextLength,
   userTokens,
   aiTokens,
@@ -89,6 +91,7 @@ const {
       <ContextRing
         :current="currentContextCount"
         :max="maxContextLength"
+        :title="contextTokenSourceLabel"
         :theme="theme"
         :clickable="true"
         @click="toggleTokenDetails"
@@ -101,7 +104,7 @@ const {
       :class="theme"
     >
       <div>
-        上下文使用率已达到 {{ usagePercent }}%（阈值 {{ compressionThresholdPercent }}%）。
+        上下文使用率（{{ contextTokenSourceLabel }}）已达到 {{ usagePercent }}%（阈值 {{ compressionThresholdPercent }}%）。
         <span v-if="compressionMode === 'auto'">正在自动压缩历史上下文。</span>
         <span v-else>可手动压缩会话以保留关键上下文。</span>
       </div>
@@ -140,6 +143,8 @@ const {
     <TokenDetailsPanel
       v-if="showTokenDetails"
       :current-context-count="currentContextCount"
+      :context-token-source-label="contextTokenSourceLabel"
+      :compression-usage="compressionUsage"
       :max-context-length="maxContextLength"
       :user-tokens="userTokens"
       :ai-tokens="aiTokens"

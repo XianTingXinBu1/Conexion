@@ -29,6 +29,8 @@ interface ResponseMetrics {
 
 interface Props {
   currentContextCount: number;
+  contextTokenSourceLabel: string;
+  compressionUsage: UsageStats | null;
   maxContextLength: number;
   userTokens: number;
   aiTokens: number;
@@ -141,7 +143,7 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
             <div class="summary-value token-details-percent">{{ usagePercent }}%</div>
           </div>
           <div class="summary-item">
-            <div class="summary-label">总使用</div>
+            <div class="summary-label">当前上下文</div>
             <div class="summary-value">{{ currentContextCount.toLocaleString() }}</div>
           </div>
           <div class="summary-item">
@@ -149,10 +151,12 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
             <div class="summary-value">{{ remainingTokens.toLocaleString() }}</div>
           </div>
           <div class="summary-item">
-            <div class="summary-label">上限</div>
+            <div class="summary-label">预设上限</div>
             <div class="summary-value">{{ maxContextLength.toLocaleString() }}</div>
           </div>
         </div>
+
+        <p class="token-source-note">{{ contextTokenSourceLabel }}；新增内容使用本地估算，上限由 API 预设配置。</p>
 
         <div v-if="showCompressionSection" class="token-card expandable" @click="toggleSection('compression')">
           <div class="card-header expandable">
@@ -195,7 +199,7 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
         <!-- 聊天历史 -->
         <div class="token-card expandable" @click="toggleSection('chatHistory')">
           <div class="card-header expandable">
-            <span class="card-title">聊天历史</span>
+            <span class="card-title">聊天历史（本地估算）</span>
             <div class="card-right">
               <span class="card-badge">{{ chatMessageCount }} 条</span>
               <svg :class="['expand-icon', { expanded: expandedSections.chatHistory }]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -220,19 +224,19 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
         <!-- 本次请求 -->
         <div class="token-card" v-if="usage || responseMetrics">
           <div class="card-header">
-            <span class="card-title">本次请求</span>
+            <span class="card-title">最近一次聊天请求 · API 用量</span>
           </div>
           <div class="card-content">
             <div class="stat-row" v-if="usage">
-              <span class="stat-label">Prompt</span>
+              <span class="stat-label">实际输入</span>
               <span class="stat-value">{{ usage.promptTokens.toLocaleString() }}</span>
             </div>
             <div class="stat-row" v-if="usage">
-              <span class="stat-label">Completion</span>
+              <span class="stat-label">实际输出（含上游计入的推理用量）</span>
               <span class="stat-value">{{ usage.completionTokens.toLocaleString() }}</span>
             </div>
             <div class="stat-row" v-if="usage">
-              <span class="stat-label">Total</span>
+              <span class="stat-label">请求总用量</span>
               <span class="stat-value token-details-total">{{ usage.totalTokens.toLocaleString() }}</span>
             </div>
             <div class="stat-row" v-if="responseMetrics">
@@ -250,10 +254,19 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
           </div>
         </div>
 
+        <div v-if="compressionUsage" class="token-card">
+          <div class="card-header"><span class="card-title">最近一次压缩请求 · API 用量</span></div>
+          <div class="card-content">
+            <div class="stat-row"><span class="stat-label">实际输入</span><span class="stat-value">{{ compressionUsage.promptTokens.toLocaleString() }}</span></div>
+            <div class="stat-row"><span class="stat-label">实际输出</span><span class="stat-value">{{ compressionUsage.completionTokens.toLocaleString() }}</span></div>
+            <div class="stat-row"><span class="stat-label">请求总用量</span><span class="stat-value">{{ compressionUsage.totalTokens.toLocaleString() }}</span></div>
+          </div>
+        </div>
+
         <!-- 系统提示词 -->
         <div class="token-card expandable" v-if="lastSystemPromptResult" @click="toggleSection('promptDetails')">
           <div class="card-header expandable">
-            <span class="card-title">系统提示词</span>
+            <span class="card-title">提示词构建（本地估算）</span>
             <div class="card-right">
               <span class="card-badge">{{ lastSystemPromptResult.estimatedTokens.toLocaleString() }}</span>
               <svg :class="['expand-icon', { expanded: expandedSections.promptDetails }]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -326,6 +339,12 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
 </template>
 
 <style scoped>
+.token-source-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
 .token-details-panel {
   position: fixed;
   top: 64px;

@@ -47,7 +47,7 @@ const nameInputRef = ref<{ focus: () => void } | null>(null);
 
 // 计算是否可以保存
 const canSave = computed(() => {
-  return formData.value.name?.trim() && formData.value.description?.trim();
+  return Boolean(formData.value.name?.trim());
 });
 
 // 不显示提示词的系统预设条目 ID
@@ -119,10 +119,6 @@ const handleSave = () => {
     nameInputRef.value?.focus();
     return;
   }
-  if (!formData.value.description?.trim()) {
-    formError.value = '请输入描述内容';
-    return;
-  }
 
   emit('save', {
     name: formData.value.name.trim(),
@@ -169,12 +165,11 @@ const handleNameKeydown = (event: KeyboardEvent) => {
       />
     </div>
     <div class="form-group">
-      <label class="form-label">描述 <span class="required">*</span></label>
+      <label class="form-label">描述（选填）</label>
       <FormTextarea
         v-model="formData.description"
         placeholder="输入描述内容"
         :rows="3"
-        :error="!!formError && !formData.description?.trim()"
       />
     </div>
     <div v-if="shouldShowPrompt" class="form-group">

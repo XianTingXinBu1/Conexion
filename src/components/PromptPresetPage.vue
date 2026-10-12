@@ -204,12 +204,12 @@ const handleConfirmDelete = async () => {
 
 // 条目操作相关函数
 const addNewItem = async (item: Partial<PromptItem>) => {
-  if (!item.name || !item.description) return;
+  if (!item.name?.trim()) return;
 
   const newItemData: PromptItem = {
     id: 'custom-' + Date.now(),
     name: item.name,
-    description: item.description,
+    description: item.description ?? '',
     prompt: item.prompt || '',
     roleType: item.roleType || 'system',
     enabled: true,
@@ -230,14 +230,14 @@ const startEdit = (item: PromptItem) => {
 };
 
 const saveEdit = async () => {
-  if (!editingId.value || !editingItem.value?.name || !editingItem.value?.description) return;
+  if (!editingId.value || !editingItem.value?.name?.trim()) return;
 
   const index = promptItems.value.findIndex(i => i.id === editingId.value);
   if (index !== -1 && promptItems.value[index]) {
     promptItems.value[index] = {
       id: promptItems.value[index].id,
       name: editingItem.value.name,
-      description: editingItem.value.description,
+      description: editingItem.value.description ?? '',
       prompt: editingItem.value.prompt || '',
       roleType: editingItem.value.roleType || 'system',
       enabled: promptItems.value[index].enabled,

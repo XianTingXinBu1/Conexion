@@ -107,7 +107,7 @@ const ROLE_OPTIONS = [
 
 // 计算是否可以保存
 const canSave = computed(() => {
-  return props.editingData?.name?.trim() && props.editingData?.description?.trim();
+  return Boolean(props.editingData?.name?.trim());
 });
 
 // 不显示提示词的系统预设条目 ID
@@ -204,7 +204,7 @@ const onTouchCancel = (event: TouchEvent) => {
           />
         </div>
         <div class="form-group">
-          <label class="form-label">描述</label>
+          <label class="form-label">描述（选填）</label>
           <FormTextarea
             :model-value="getEditingDataDescription()"
             placeholder="输入描述"

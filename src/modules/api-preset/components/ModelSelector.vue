@@ -35,8 +35,7 @@ const handleInput = (e: Event) => {
 
 const selectModel = (modelId: string) => {
   emit('update:selectedModel', modelId);
-  const model = props.models.find(m => m.id === modelId);
-  emit('update:modelInput', model?.name ?? modelId);
+  emit('update:modelInput', modelId);
   showModelList.value = false;
 };
 
@@ -59,6 +58,9 @@ const formatContextLength = (length: number): string => {
           :value="modelInput"
           class="dropdown-input"
           placeholder="输入或选择模型..."
+          autocapitalize="none"
+          autocorrect="off"
+          :spellcheck="false"
           @focus="showModelList = true"
           @input="handleInput"
         />
@@ -73,7 +75,7 @@ const formatContextLength = (length: number): string => {
               class="dropdown-item"
               @click="selectModel(model.id)"
             >
-              <div class="model-name">{{ model.name }}</div>
+              <div class="model-name">{{ model.id }}</div>
               <div v-if="model.description" class="model-description">{{ model.description }}</div>
               <div v-if="model.contextLength" class="model-info">上下文: {{ formatContextLength(model.contextLength) }}</div>
             </div>

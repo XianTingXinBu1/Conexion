@@ -188,8 +188,7 @@ Verification scope by change type:
 - `docs/project-status.md`: current state, conventions, roadmap
 - `e2e/README.md`: writing and running end-to-end tests
 
-Module docs: `src/modules/{api-preset,character-card,debug,markdown,notification,system-prompt}/README.md`
-(`chat-prompt` and `conversation-compression` are covered in `docs/chat-architecture.md`)
+Module docs: `src/modules/{api-preset,character-card,chat-prompt,conversation-compression,debug,markdown,notification,system-prompt}/README.md`
 
 > Docs under `docs/`, module READMEs, and code comments are currently Chinese-only.
 

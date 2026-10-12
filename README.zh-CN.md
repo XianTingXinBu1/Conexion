@@ -180,8 +180,7 @@ npm run check:architecture
 - `docs/project-status.md`：项目现状、工程约定与后续路线
 - `e2e/README.md`：端到端测试的编写与运行
 
-模块文档：`src/modules/{api-preset,character-card,debug,markdown,notification,system-prompt}/README.md`
-（`chat-prompt` 与 `conversation-compression` 见 `docs/chat-architecture.md`）
+模块文档：`src/modules/{api-preset,character-card,chat-prompt,conversation-compression,debug,markdown,notification,system-prompt}/README.md`
 
 > 项目文档（`docs/`、各 module README、代码注释）目前均为中文。
 

@@ -6,6 +6,7 @@ interface FormData {
   apiKey: string;
   model: string;
   streamEnabled: boolean;
+  showThinking?: boolean;
   temperature: number;
   /** 核采样阈值（top_p）。 */
   topP: number;
@@ -38,6 +39,7 @@ export function useFormDataManager(options: FormDataManagerOptions = {}) {
   const apiKeyInput = ref(initialData?.apiKey ?? '');
   const modelInput = ref(initialData?.model ?? '');
   const streamEnabled = ref(initialData?.streamEnabled ?? DEFAULTS.STREAM_ENABLED);
+  const showThinking = ref(initialData?.showThinking ?? true);
   const temperature = ref(initialData?.temperature ?? DEFAULTS.TEMPERATURE);
   const topP = ref(initialData?.topP ?? DEFAULTS.TOP_P);
   const frequencyPenalty = ref(initialData?.frequencyPenalty ?? DEFAULTS.FREQUENCY_PENALTY);
@@ -52,6 +54,7 @@ export function useFormDataManager(options: FormDataManagerOptions = {}) {
     apiKey: initialData?.apiKey ?? '',
     model: initialData?.model ?? '',
     streamEnabled: initialData?.streamEnabled ?? DEFAULTS.STREAM_ENABLED,
+    showThinking: initialData?.showThinking ?? true,
     temperature: initialData?.temperature ?? DEFAULTS.TEMPERATURE,
     topP: initialData?.topP ?? DEFAULTS.TOP_P,
     frequencyPenalty: initialData?.frequencyPenalty ?? DEFAULTS.FREQUENCY_PENALTY,
@@ -68,6 +71,7 @@ export function useFormDataManager(options: FormDataManagerOptions = {}) {
       apiKeyInput.value !== originalData.value.apiKey ||
       modelInput.value !== originalData.value.model ||
       streamEnabled.value !== originalData.value.streamEnabled ||
+      showThinking.value !== (originalData.value.showThinking ?? true) ||
       temperature.value !== originalData.value.temperature ||
       topP.value !== originalData.value.topP ||
       frequencyPenalty.value !== originalData.value.frequencyPenalty ||
@@ -85,6 +89,7 @@ export function useFormDataManager(options: FormDataManagerOptions = {}) {
       apiKey: apiKeyInput.value,
       model: modelInput.value,
       streamEnabled: streamEnabled.value,
+      showThinking: showThinking.value,
       temperature: temperature.value,
       topP: topP.value,
       frequencyPenalty: frequencyPenalty.value,
@@ -102,6 +107,7 @@ export function useFormDataManager(options: FormDataManagerOptions = {}) {
       apiKey: apiKeyInput.value,
       model: modelInput.value,
       streamEnabled: streamEnabled.value,
+      showThinking: showThinking.value,
       temperature: temperature.value,
       topP: topP.value,
       frequencyPenalty: frequencyPenalty.value,
@@ -118,6 +124,7 @@ export function useFormDataManager(options: FormDataManagerOptions = {}) {
     apiKeyInput.value = data.apiKey ?? '';
     modelInput.value = data.model ?? '';
     streamEnabled.value = data.streamEnabled ?? DEFAULTS.STREAM_ENABLED;
+    showThinking.value = data.showThinking ?? true;
     temperature.value = data.temperature ?? DEFAULTS.TEMPERATURE;
     topP.value = data.topP ?? DEFAULTS.TOP_P;
     frequencyPenalty.value = data.frequencyPenalty ?? DEFAULTS.FREQUENCY_PENALTY;
@@ -133,6 +140,7 @@ export function useFormDataManager(options: FormDataManagerOptions = {}) {
     apiKeyInput.value = data.apiKey;
     modelInput.value = data.model;
     streamEnabled.value = data.streamEnabled;
+    showThinking.value = data.showThinking ?? true;
     temperature.value = data.temperature;
     topP.value = data.topP;
     frequencyPenalty.value = data.frequencyPenalty;
@@ -148,6 +156,7 @@ export function useFormDataManager(options: FormDataManagerOptions = {}) {
     apiKeyInput,
     modelInput,
     streamEnabled,
+    showThinking,
     temperature,
     topP,
     frequencyPenalty,

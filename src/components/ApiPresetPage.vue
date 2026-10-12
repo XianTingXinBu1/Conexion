@@ -64,6 +64,7 @@ const {
   urlInput,
   apiKeyInput,
   streamEnabled,
+  showThinking,
   temperature,
   topP,
   frequencyPenalty,
@@ -295,6 +296,7 @@ async function handleTestConnection() {
       <!-- 参数设置 -->
       <ParameterSettings
         :stream-enabled="streamEnabled"
+        :show-thinking="showThinking"
         :temperature="temperature"
         :top-p="topP"
         :frequency-penalty="frequencyPenalty"
@@ -304,6 +306,7 @@ async function handleTestConnection() {
         :context-length="contextLength"
         :max-output-tokens="maxOutputTokens"
         @update:stream-enabled="streamEnabled = $event"
+        @update:show-thinking="showThinking = $event"
         @update:temperature="temperature = $event"
         @update:top-p="topP = $event"
         @update:frequency-penalty="frequencyPenalty = $event"

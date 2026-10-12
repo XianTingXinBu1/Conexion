@@ -10,6 +10,7 @@ import { formatStopSequences, parseStopSequences } from '../stopSequences';
 
 interface Props {
   streamEnabled: boolean;
+  showThinking?: boolean;
   temperature: number;
   topP: number;
   frequencyPenalty: number;
@@ -24,6 +25,7 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
   'update:streamEnabled': [value: boolean];
+  'update:showThinking': [value: boolean];
   'update:temperature': [value: number];
   'update:topP': [value: number];
   'update:frequencyPenalty': [value: number];
@@ -71,6 +73,11 @@ const seedText = computed({
         @update:model-value="emit('update:streamEnabled', $event)"
       />
     </div>
+    <div class="toggle-item">
+      <div class="toggle-label">显示思考内容</div>
+      <FormToggle :model-value="showThinking ?? true" @update:model-value="emit('update:showThinking', $event)" />
+    </div>
+    <p class="field-note">展示模型返回的原生思考内容，支持折叠查看。</p>
     <FormSlider
       :model-value="temperature"
       :min="0"

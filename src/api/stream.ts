@@ -12,6 +12,8 @@ export interface StreamChunkPayload {
   choices?: Array<{
     delta?: {
       content?: string;
+      reasoning_content?: string;
+      reasoning?: string;
     };
   }>;
   usage?: StreamUsagePayload;
@@ -46,11 +48,12 @@ export function parseStreamChunk(
   buffer: string,
   incomingText: string,
   options: ParseStreamChunkOptions = {},
-): { chunks: string[]; usage: StreamUsagePayload | null; remainder: string } {
+): { chunks: string[]; reasoningChunks: string[]; usage: StreamUsagePayload | null; remainder: string } {
   const nextBuffer = normalizeSseText(buffer + incomingText);
   const eventBlocks = nextBuffer.split('\n\n');
   const remainder = options.flush ? '' : (eventBlocks.pop() ?? '');
   const chunks: string[] = [];
+  const reasoningChunks: string[] = [];
   let usage: StreamUsagePayload | null = null;
 
   const completedBlocks = options.flush ? eventBlocks.filter(Boolean) : eventBlocks;
@@ -67,6 +70,8 @@ export function parseStreamChunk(
     try {
       const data = JSON.parse(payload) as StreamChunkPayload;
       const content = data.choices?.[0]?.delta?.content;
+      const reasoning = data.choices?.[0]?.delta?.reasoning_content ?? data.choices?.[0]?.delta?.reasoning;
+      if (typeof reasoning === 'string' && reasoning) reasoningChunks.push(reasoning);
 
       if (content) {
         chunks.push(content);
@@ -80,5 +85,5 @@ export function parseStreamChunk(
     }
   }
 
-  return { chunks, usage, remainder };
+  return { chunks, reasoningChunks, usage, remainder };
 }

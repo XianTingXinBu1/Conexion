@@ -10,6 +10,8 @@ export interface ApiConfig {
   apiKey: string;
   model: string;
   streamEnabled: boolean;
+  /** 是否展示上游返回的思考内容，默认开启。 */
+  showThinking?: boolean;
   temperature: number;
   topP: number;
   frequencyPenalty: number;
@@ -30,6 +32,8 @@ export interface Preset {
   apiKey: string;
   model: string;
   streamEnabled: boolean;
+  /** 是否展示上游返回的思考内容，默认开启。 */
+  showThinking?: boolean;
   temperature: number;
   /** 核采样阈值（top_p）。 */
   topP: number;
@@ -59,6 +63,8 @@ export interface PresetFormData {
   apiKey: string;
   model: string;
   streamEnabled: boolean;
+  /** 是否展示上游返回的思考内容，默认开启。 */
+  showThinking?: boolean;
   temperature: number;
   topP: number;
   frequencyPenalty: number;

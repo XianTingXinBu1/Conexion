@@ -58,6 +58,8 @@ function ensureMessage(value: unknown, fieldName: string): Message {
       ? value.timestamp
       : Date.now(),
     ...(variants ? { variants } : {}),
+    ...(typeof value.reasoningContent === 'string' ? { reasoningContent: value.reasoningContent } : {}),
+    ...(value.reasoningVariants === undefined ? {} : { reasoningVariants: ensureOptionalStringArray(value.reasoningVariants, `${fieldName}.reasoningVariants`) }),
     ...(activeVariantIndex === undefined ? {} : { activeVariantIndex }),
   };
 }

@@ -6,8 +6,10 @@ import { ChevronLeft, ChevronRight, Edit2, RefreshCw, Trash2 } from '@lucide/vue
 
 interface Props {
   message: Message;
+  showThinking?: boolean;
   selectionMode?: boolean;
   selected?: boolean;
+  isGenerating?: boolean;
   index: number;
   totalMessages: number;
   displayCount: number;
@@ -117,6 +119,11 @@ const messageLabel = computed(() => {
       <input type="checkbox" :checked="selected" :disabled="actionsDisabled" @change="emit('toggleSelection', message.id)" />
       选择消息
     </label>
+    <details v-if="(showThinking ?? true) && message.type === 'assistant' && message.reasoningContent" class="message-thinking">
+      <summary>{{ isGenerating && !message.content ? '正在思考…' : '思考内容' }}</summary>
+      <MarkdownRenderer v-if="enableMarkdown" :content="message.reasoningContent" :streaming="isGenerating" />
+      <div v-else class="thinking-text">{{ message.reasoningContent }}</div>
+    </details>
     <div class="message-content">
       <MarkdownRenderer
         v-if="enableMarkdown"
@@ -164,6 +171,9 @@ const messageLabel = computed(() => {
   border-radius: 8px;
 }
 .message-selection { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.message-thinking { border-left: 2px solid var(--accent-purple); padding: 8px 12px; color: var(--text-muted); font-size: 13px; overflow-wrap: anywhere; }
+.message-thinking summary { cursor: pointer; margin-bottom: 6px; }
+.thinking-text { white-space: pre-wrap; }
 
 .message-item {
   display: flex;

@@ -249,6 +249,7 @@ export function useChatApi() {
     onChunk: (chunk: string) => void,
     onComplete: () => void | Promise<void>,
     onError: (error: string) => void | Promise<void>,
+    onReasoningChunk?: (chunk: string) => void,
   ): Promise<void> {
     usage.value = null;
     error.value = null;
@@ -326,6 +327,7 @@ export function useChatApi() {
 
       for await (const _chunk of chatApi.sendStreamMessage(messages, {
         ...toSamplingOptions(preset),
+        onReasoningChunk,
         onChunk: (content) => {
           if (!requestTelemetry.value?.firstChunkAt) {
             requestTelemetry.value = {

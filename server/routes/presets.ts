@@ -38,6 +38,7 @@ function ensureApiPreset(value: unknown, fieldName: string): Preset {
     apiKey: typeof value.apiKey === 'string' ? value.apiKey : '',
     model: typeof value.model === 'string' ? value.model : '',
     streamEnabled: typeof value.streamEnabled === 'boolean' ? value.streamEnabled : DEFAULTS.STREAM_ENABLED,
+    ...(typeof value.showThinking === 'boolean' ? { showThinking: value.showThinking } : {}),
     temperature: resolveFiniteNumber(value.temperature, DEFAULTS.TEMPERATURE),
     topP: resolveFiniteNumber(value.topP, DEFAULTS.TOP_P),
     frequencyPenalty: resolveFiniteNumber(value.frequencyPenalty, DEFAULTS.FREQUENCY_PENALTY),

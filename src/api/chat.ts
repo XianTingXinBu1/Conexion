@@ -153,11 +153,12 @@ export class ChatApi extends ApiClient {
     messages: ChatMessage[],
     options: ChatSamplingOptions & {
       onChunk?: (chunk: string) => void;
+      onReasoningChunk?: (chunk: string) => void;
       onComplete?: (meta?: { usage?: StreamUsagePayload | null }) => void | Promise<void>;
       onError?: (error: string) => void | Promise<void>;
     } = {}
   ): AsyncGenerator<string> {
-    const { onChunk, onComplete, onError, ...sampling } = options;
+    const { onChunk, onReasoningChunk, onComplete, onError, ...sampling } = options;
 
     try {
       this.validateUrl(this.baseURL);
@@ -238,6 +239,7 @@ export class ChatApi extends ApiClient {
             latestUsage = parsed.usage;
           }
 
+          for (const reasoning of parsed.reasoningChunks) onReasoningChunk?.(reasoning);
           for (const content of parsed.chunks) {
             onChunk?.(content);
             yield content;
@@ -252,6 +254,7 @@ export class ChatApi extends ApiClient {
             latestUsage = parsed.usage;
           }
 
+          for (const reasoning of parsed.reasoningChunks) onReasoningChunk?.(reasoning);
           for (const content of parsed.chunks) {
             onChunk?.(content);
             yield content;

@@ -54,6 +54,7 @@ interface SendFlowTransportDeps {
     onChunk: (chunk: string) => void,
     onComplete: () => void | Promise<void>,
     onError: (error: string) => void | Promise<void>,
+    onReasoningChunk?: (chunk: string) => void,
   ) => Promise<void>;
   cancelRequest: () => void;
   buildSystemMessages: (context: {

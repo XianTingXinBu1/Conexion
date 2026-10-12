@@ -141,10 +141,12 @@ const {
       </button>
       <template v-for="(message, index) in displayMessages" :key="message.id">
         <MessageItem
-          v-if="message.type !== 'assistant' || Boolean(message.content.trim()) || isSelectingMessages"
+          v-if="message.type !== 'assistant' || Boolean(message.content.trim()) || Boolean(message.reasoningContent?.trim()) || isSelectingMessages"
           :message="message"
+          :show-thinking="currentApiPreset?.showThinking ?? true"
           :selection-mode="isSelectingMessages"
           :selected="selectedMessageIds.includes(message.id)"
+          :is-generating="isSending && index === displayMessages.length - 1"
           @toggle-selection="toggleMessageSelection"
           :user-name="userName"
           :ai-name="aiName"

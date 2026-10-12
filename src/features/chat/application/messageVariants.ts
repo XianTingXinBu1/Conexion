@@ -79,6 +79,7 @@ export function setActiveVariant(message: Message, index: number): void {
   const next = Math.min(variants.length - 1, Math.max(0, index));
   message.activeVariantIndex = next;
   message.content = variants[next] ?? '';
+  message.reasoningContent = message.reasoningVariants?.[next];
 }
 
 /**
@@ -90,6 +91,10 @@ export function beginNewVariant(message: Message): number {
   const previousIndex = getActiveVariantIndex(message);
   const nextVariants = [...getMessageVariants(message), ''];
 
+  message.reasoningVariants = getMessageVariants(message).map((_, index) =>
+    message.reasoningVariants?.[index] ?? (index === previousIndex ? message.reasoningContent ?? '' : ''));
+  message.reasoningVariants.push('');
+  message.reasoningContent = '';
   message.variants = nextVariants;
   message.activeVariantIndex = nextVariants.length - 1;
   message.content = '';
@@ -117,14 +122,17 @@ export function revertLastVariant(message: Message, previousIndex: number): bool
     return false;
   }
 
-  if (message.content.trim()) {
+  if (message.content.trim() || message.reasoningContent?.trim()) {
     return false;
   }
 
   const remaining = variants.slice(0, -1);
+  message.reasoningVariants = message.reasoningVariants?.slice(0, -1);
   const restoreIndex = Math.min(remaining.length - 1, Math.max(0, previousIndex));
 
+  message.reasoningContent = message.reasoningVariants?.[restoreIndex];
   if (remaining.length <= 1) {
+    message.reasoningVariants = undefined;
     message.variants = undefined;
     message.activeVariantIndex = undefined;
     message.content = remaining[0] ?? '';

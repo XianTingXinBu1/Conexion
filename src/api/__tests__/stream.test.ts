@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { parseStreamChunk } from '../stream';
 
 describe('parseStreamChunk', () => {
+  it('keeps native reasoning separate from answer content across fragmented events', () => {
+    const first = parseStreamChunk('', 'data: {"choices":[{"delta":{"reasoning_content":"思');
+    const result = parseStreamChunk(first.remainder,
+      '考"}}]}\n\ndata: {"choices":[{"delta":{"reasoning":"继续","content":"答案"}}]}', { flush: true });
+    expect(result.reasoningChunks).toEqual(['思考', '继续']);
+    expect(result.chunks).toEqual(['答案']);
+  });
   it('extracts content chunks and keeps remainder for incomplete data', () => {
     const first = parseStreamChunk(
       '',

@@ -14,6 +14,8 @@ export interface Message {
   type: MessageType;
   content: string;
   timestamp: number;
+  reasoningContent?: string;
+  reasoningVariants?: string[];
   /**
    * AI 回复的重试变体。
    *
@@ -45,6 +47,8 @@ export interface Preset {
   apiKey: string;
   model: string;
   streamEnabled: boolean;
+  /** 是否展示上游返回的思考内容，默认开启。 */
+  showThinking?: boolean;
   temperature: number;
   /** 核采样阈值（top_p）。1 表示关闭核采样。 */
   topP: number;
@@ -79,6 +83,8 @@ export interface ApiConfig {
   apiKey: string;
   model: string;
   streamEnabled: boolean;
+  /** 是否展示上游返回的思考内容，默认开启。 */
+  showThinking?: boolean;
   temperature: number;
   topP: number;
   frequencyPenalty: number;

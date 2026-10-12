@@ -30,6 +30,7 @@ export interface SendMessageUseCaseDeps {
     onChunk: (chunk: string) => void,
     onComplete: () => void | Promise<void>,
     onError: (error: string) => void | Promise<void>,
+    onReasoningChunk?: (chunk: string) => void,
   ) => Promise<void>;
   buildSystemMessages: (context: {
     aiCharacter?: AICharacter;
@@ -171,6 +172,7 @@ export class SendMessageUseCase {
           applyVariantContent(msg, `错误: ${error}`);
           this.deps.onError('send', error);
         },
+        (chunk) => this.appendReasoning(assistantMessageId, chunk),
       );
     } catch (err) {
       if (hasCompleted || isCancelled) {
@@ -296,6 +298,7 @@ export class SendMessageUseCase {
           await this.deps.saveConversation();
           this.deps.onError('send', error);
         },
+        (chunk) => this.appendReasoning(messageId, chunk),
       );
     } catch (err) {
       if (hasCompleted || isCancelled) {
@@ -367,6 +370,16 @@ export class SendMessageUseCase {
       this.deps.onError('compression', errorMessage);
       return !blockOnFailure;
     }
+  }
+
+  private appendReasoning(id: string, chunk: string): void {
+    const message = this.findMessage(id);
+    if (!message) return;
+    message.reasoningContent = (message.reasoningContent ?? '') + chunk;
+    if (message.reasoningVariants) {
+      message.reasoningVariants[message.activeVariantIndex ?? 0] = message.reasoningContent;
+    }
+    this.deps.onStreamFlush();
   }
 
   private findMessage(id: string): Message | undefined {

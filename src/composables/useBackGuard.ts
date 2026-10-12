@@ -12,7 +12,7 @@
  * 多个覆盖层嵌套时用全局栈区分层级：一次返回只关最上层那个。
  */
 
-import { onUnmounted, watch, type Ref } from 'vue';
+import { nextTick, onUnmounted, watch, type Ref } from 'vue';
 
 /** 写入 history.state 的标记，便于调试与测试 */
 export const BACK_GUARD_STATE_KEY = '__conexionBackGuard';
@@ -36,15 +36,26 @@ function pushSentinel(): void {
  * 不记数的话它会被当成用户按了返回，进而关掉下一层覆盖层。
  */
 let selfInitiatedBacks = 0;
+const pendingCleanup: Array<{ promise: Promise<void>; resolve: () => void }> = [];
+
+/** Close the overlay first, then await its asynchronous history.back before routing. */
+export async function waitForBackGuardCleanup(): Promise<void> {
+  await nextTick();
+  await Promise.all(pendingCleanup.map(entry => entry.promise));
+}
 
 function discardSentinel(): void {
   selfInitiatedBacks += 1;
+  let resolve!: () => void;
+  const promise = new Promise<void>(done => { resolve = done; });
+  pendingCleanup.push({ promise, resolve });
   window.history.back();
 }
 
 function handlePopState(): void {
   if (selfInitiatedBacks > 0) {
     selfInitiatedBacks -= 1;
+    pendingCleanup.shift()?.resolve();
     return;
   }
 

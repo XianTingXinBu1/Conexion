@@ -9,6 +9,7 @@ interface Props {
   size?: 'sm' | 'md' | 'lg' | 'full';
   closeOnClickOutside?: boolean;
   closeOnEscape?: boolean;
+  guardBack?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -16,6 +17,7 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   closeOnClickOutside: true,
   closeOnEscape: true,
+  guardBack: true,
 });
 
 const emit = defineEmits<{
@@ -35,7 +37,7 @@ const handleClose = () => {
 
 // 系统返回键先关弹窗（含嵌套弹窗的最上层），而不是离开页面
 useBackGuard({
-  isOpen: () => props.show,
+  isOpen: () => props.show && props.guardBack,
   onBack: handleClose,
 });
 

@@ -60,6 +60,6 @@ const total = computed(() => props.characters.length);
 .ai-character-list__items {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
 </style>

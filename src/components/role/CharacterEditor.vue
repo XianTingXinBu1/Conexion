@@ -16,6 +16,7 @@ import FormActions from '../form/FormActions.vue';
 
 interface Props {
   show: boolean;
+  guardBack?: boolean;
   type: CharacterType;
   /** 传入则为编辑，null / undefined 为新建 */
   character?: UserCharacter | AICharacter | null;
@@ -63,7 +64,7 @@ const knowledgeBases = ref<KnowledgeBase[]>([]);
 
 // 安卓系统返回键先关编辑器，而不是直接离开角色管理页
 useBackGuard({
-  isOpen: () => props.show,
+  isOpen: () => props.show && props.guardBack !== false,
   onBack: () => emit('cancel'),
 });
 
@@ -75,9 +76,9 @@ const title = computed(() => {
   return `${action}${isAI.value ? 'AI 角色' : '用户角色'}`;
 });
 
-const namePlaceholder = computed(() => (isAI.value ? '例如：智能助手' : '例如：小明'));
+const namePlaceholder = computed(() => (isAI.value ? '' : '例如：小明'));
 const descriptionPlaceholder = computed(() =>
-  isAI.value ? '一句话说明这个角色是谁' : '描述用户的基本信息'
+  isAI.value ? '' : '描述用户的基本信息'
 );
 
 /** 空串统一转 undefined，避免把空字段写进数据文件 */
@@ -220,7 +221,6 @@ const handleSubmit = () => {
           <label class="editor-label">个性描述</label>
           <FormTextarea
             v-model="draft.personality"
-            placeholder="性格特点、说话风格"
             :rows="3"
           />
         </div>
@@ -246,7 +246,6 @@ const handleSubmit = () => {
             <label class="editor-label">场景</label>
             <FormTextarea
               v-model="draft.scenario"
-              placeholder="故事发生的场景、当前情境"
               :rows="3"
             />
           </div>
@@ -254,7 +253,6 @@ const handleSubmit = () => {
             <label class="editor-label">开场白</label>
             <FormTextarea
               v-model="draft.firstMessage"
-              placeholder="进入该角色会话时作为首条消息出现"
               :rows="4"
             />
           </div>
@@ -262,7 +260,6 @@ const handleSubmit = () => {
             <label class="editor-label">备选开场白</label>
             <FormTextarea
               v-model="draft.alternateGreetingsText"
-              placeholder="每行一条，可用于不同开局"
               :rows="4"
             />
             <p class="field-hint">已存储并可导入导出；切换开场白的入口尚未实现。</p>
@@ -271,7 +268,6 @@ const handleSubmit = () => {
             <label class="editor-label">对话示例</label>
             <FormTextarea
               v-model="draft.exampleDialogue"
-              placeholder="示例对话，用于示范语气与节奏"
               :rows="5"
             />
           </div>
@@ -284,22 +280,21 @@ const handleSubmit = () => {
           <div class="editor-field-row">
             <div class="editor-field">
               <label class="editor-label">作者</label>
-              <FormInput v-model="draft.creator" placeholder="角色卡作者" />
+              <FormInput v-model="draft.creator" />
             </div>
             <div class="editor-field">
               <label class="editor-label">版本</label>
-              <FormInput v-model="draft.characterVersion" placeholder="例如 1.0" />
+              <FormInput v-model="draft.characterVersion" />
             </div>
           </div>
           <div class="editor-field">
             <label class="editor-label">标签</label>
-            <FormInput v-model="draft.tagsText" placeholder="用逗号分隔，例如：科幻, 助手" />
+            <FormInput v-model="draft.tagsText" />
           </div>
           <div class="editor-field">
             <label class="editor-label">创作者注释</label>
             <FormTextarea
               v-model="draft.creatorNotes"
-              placeholder="给使用者看的说明"
               :rows="3"
             />
           </div>

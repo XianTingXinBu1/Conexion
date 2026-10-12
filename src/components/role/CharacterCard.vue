@@ -45,33 +45,16 @@ const cardClasses = computed(() => [
 /** 名字首字作为头像，避免引入图片存储 */
 const initial = computed(() => props.character.name.trim().charAt(0) || '?');
 
-/** 已填写的正文字段，用于卡片上的紧凑标记 */
-const filledFields = computed(() => {
-  const character = aiCharacter.value;
-  if (!character) return [];
-
-  const fields: Array<{ key: string; label: string }> = [];
-  if (character.scenario?.trim()) fields.push({ key: 'scenario', label: '场景' });
-  if (character.firstMessage?.trim()) fields.push({ key: 'firstMessage', label: '开场白' });
-  if (character.alternateGreetings?.length) fields.push({ key: 'alternateGreetings', label: `备选开场白 ${character.alternateGreetings.length}` });
-  if (character.exampleDialogue?.trim()) fields.push({ key: 'exampleDialogue', label: '对话示例' });
-  if (character.creatorNotes?.trim()) fields.push({ key: 'creatorNotes', label: '作者注释' });
-
-  return fields;
-});
-
 const metaText = computed(() => {
   const character = aiCharacter.value;
   if (!character) return '';
 
   const parts: string[] = [];
-  if (character.characterVersion?.trim()) parts.push(`v${character.characterVersion.trim()}`);
+  if (character.characterVersion?.trim()) parts.push(`版本：${character.characterVersion.trim()}`);
   if (character.creator?.trim()) parts.push(`作者：${character.creator.trim()}`);
 
   return parts.join(' · ');
 });
-
-const tags = computed(() => aiCharacter.value?.tags ?? []);
 
 const selectBtnClasses = computed(() => [
   'select-btn',
@@ -102,8 +85,8 @@ const selectBtnClasses = computed(() => [
         </div>
 
         <div class="character-title">
-          <div class="character-name">{{ character.name }}</div>
-          <div v-if="metaText" class="character-meta">{{ metaText }}</div>
+          <div class="character-name" :title="character.name">{{ character.name }}</div>
+          <div v-if="metaText" class="character-meta" :title="metaText">{{ metaText }}</div>
         </div>
       </div>
 
@@ -134,39 +117,16 @@ const selectBtnClasses = computed(() => [
       </div>
     </div>
 
-    <div class="character-body">
-      <div class="character-detail">
-        <span class="detail-label">描述</span>
-        <span class="detail-value">{{ character.description || '暂无描述' }}</span>
-      </div>
 
-      <div v-if="aiCharacter?.personality" class="character-detail">
-        <span class="detail-label">个性</span>
-        <span class="detail-value">{{ aiCharacter.personality }}</span>
-      </div>
-
-      <div v-if="tags.length > 0" class="character-tags">
-        <span v-for="tag in tags" :key="tag" class="tag-chip">{{ tag }}</span>
-      </div>
-
-      <div v-if="filledFields.length > 0" class="character-fields">
-        <span
-          v-for="field in filledFields"
-          :key="field.key"
-          class="field-chip"
-          :data-testid="`field-chip-${field.key}`"
-        >
-          {{ field.label }}
-        </span>
-      </div>
-    </div>
   </div>
 </template>
 
 <style scoped>
 .character-card {
+  height: 72px;
+  flex-shrink: 0;
   background: var(--bg-secondary);
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--border-color);
   overflow: hidden;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -182,8 +142,9 @@ const selectBtnClasses = computed(() => [
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border-color);
+  height: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
 }
 
 .character-info {
@@ -221,9 +182,9 @@ const selectBtnClasses = computed(() => [
 
 .character-avatar {
   position: relative;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -287,7 +248,7 @@ const selectBtnClasses = computed(() => [
 }
 
 .action-btn {
-  width: 32px;
+  width: 28px;
   height: 32px;
   border-radius: 8px;
   border: none;
@@ -315,58 +276,4 @@ const selectBtnClasses = computed(() => [
   color: #ef4444;
 }
 
-.character-body {
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.character-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.detail-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.detail-value {
-  font-size: 13px;
-  color: var(--text-main);
-  line-height: 1.5;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  word-break: break-word;
-}
-
-.character-tags,
-.character-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.tag-chip {
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-}
-
-.field-chip {
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  background: rgba(157, 141, 241, 0.12);
-  color: var(--accent-purple);
-  font-weight: 500;
-}
 </style>

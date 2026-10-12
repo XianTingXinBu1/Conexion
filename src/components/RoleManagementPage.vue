@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useBackGuard } from '@/composables/useBackGuard';
+import Modal from './common/Modal.vue';
 import { useRouter } from 'vue-router';
-import { Plus, User, Bot, Upload, Package } from '@lucide/vue';
+import { Plus, User, Bot, Upload } from '@lucide/vue';
 import type { UserCharacter, AICharacter, CharacterType } from '@/types';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import {
   parseCharacterImport,
-  serializeCharacterBackup,
   serializeCharacterCard,
   toSafeFileName,
   CharacterCardParseError,
@@ -44,10 +45,22 @@ const aiCharacters = ref<AICharacter[]>([]);
 const deleteTargetType = ref<CharacterType | null>(null);
 
 // 编辑器状态：editingCharacter 为空表示新建
+const isCreateOpen = ref(false);
+const isImporting = ref(false);
 const isEditorOpen = ref(false);
 const editorCharacter = ref<UserCharacter | AICharacter | null>(null);
 
 const importInput = ref<HTMLInputElement | null>(null);
+
+// 创建方式弹窗与编辑器共用一条历史记录，切换时不回退 / 重建占位记录。
+useBackGuard({
+  isOpen: () => isCreateOpen.value || isEditorOpen.value,
+  onBack: () => {
+    isCreateOpen.value = false;
+    isEditorOpen.value = false;
+    editorCharacter.value = null;
+  },
+});
 
 const loadUserCharacters = async () => {
   userCharacters.value = await loadUserCharactersFromRepository();
@@ -88,6 +101,7 @@ const selectUser = async (id: string) => {
 // ==================== 新建 / 编辑 ====================
 
 const openCreateEditor = () => {
+  isCreateOpen.value = false;
   editorCharacter.value = null;
   isEditorOpen.value = true;
 };
@@ -185,17 +199,6 @@ const handleConfirmDelete = async () => {
 
 // ==================== 导入 / 导出 ====================
 
-const handleExportAll = () => {
-  if (aiCharacters.value.length === 0) {
-    showError('没有可导出的角色', 'AI角色列表为空');
-    return;
-  }
-
-  downloadTextFile('conexion-ai-characters.json', serializeCharacterBackup(aiCharacters.value));
-  const msg = getNotificationMessage('CHARACTER_EXPORT_SUCCESS', { count: aiCharacters.value.length });
-  showSuccess(msg.title, msg.message);
-};
-
 const handleExportOne = (id: string) => {
   const character = aiCharacters.value.find(item => item.id === id);
   if (!character) return;
@@ -231,8 +234,9 @@ const handleImportFile = async (event: Event) => {
   const file = input.files?.[0];
   input.value = '';
 
-  if (!file) return;
+  if (!file || isImporting.value) return;
 
+  isImporting.value = true;
   try {
     const text = await readFileAsText(file);
     const imported = parseCharacterImport(text);
@@ -241,8 +245,9 @@ const handleImportFile = async (event: Event) => {
     const validIds = new Set(knowledgeBases.map(kb => kb.id));
 
     const nextCharacters = toLocalCharacters(imported, validIds);
+    await saveAICharactersToRepository([...aiCharacters.value, ...nextCharacters]);
     aiCharacters.value.push(...nextCharacters);
-    await saveAICharacters();
+    isCreateOpen.value = false;
 
     const msg = getNotificationMessage('CHARACTER_IMPORT_SUCCESS', { count: nextCharacters.length });
     showSuccess(msg.title, msg.message);
@@ -253,6 +258,8 @@ const handleImportFile = async (event: Event) => {
       : '文件格式无法识别';
     const msg = getNotificationMessage('CHARACTER_IMPORT_FAILED', { reason });
     showError(msg.title, msg.message);
+  } finally {
+    isImporting.value = false;
   }
 };
 
@@ -272,10 +279,10 @@ onMounted(async () => {
     <PageHeader
       title="角色管理"
       subtitle="Characters"
-      :show-action="!isEditorOpen"
+      :show-action="!isEditorOpen && !isCreateOpen"
       :action-icon="Plus"
       @back="handleBack"
-      @action="openCreateEditor"
+      @action="isCreateOpen = true"
     />
 
     <div class="tabs-container">
@@ -295,25 +302,32 @@ onMounted(async () => {
       </button>
     </div>
 
-    <!-- 导入 / 导出 -->
-    <div v-if="activeTab === 'ai'" class="toolbar">
-      <button class="toolbar-btn" @click="handleImportClick">
-        <Upload :size="16" />
-        <span>导入角色卡</span>
-      </button>
-      <button class="toolbar-btn" @click="handleExportAll">
-        <Package :size="16" />
-        <span>导出全部</span>
-      </button>
-      <input
-        ref="importInput"
-        class="toolbar-file-input"
-        type="file"
-        accept=".json,application/json"
-        data-testid="character-import-input"
-        @change="handleImportFile"
-      />
-    </div>
+    <Modal
+      :show="isCreateOpen"
+      :guard-back="false"
+      :title="activeTab === 'ai' ? '新建 AI 角色' : '新建用户角色'"
+      size="sm"
+      @update:show="isCreateOpen = false"
+    >
+      <div class="create-options">
+        <button class="create-option" :disabled="isImporting" data-testid="create-character-manually" @click="openCreateEditor">
+          <Plus :size="20" />
+          <span>从空白创建</span>
+        </button>
+        <button v-if="activeTab === 'ai'" class="create-option" :disabled="isImporting" @click="handleImportClick">
+          <Upload :size="20" />
+          <span>{{ isImporting ? '导入中…' : '导入角色卡' }}</span>
+        </button>
+      </div>
+    </Modal>
+    <input
+      ref="importInput"
+      class="toolbar-file-input"
+      type="file"
+      accept=".json,application/json"
+      data-testid="character-import-input"
+      @change="handleImportFile"
+    />
 
     <div class="content-scroll">
       <UserCharacterList
@@ -336,6 +350,7 @@ onMounted(async () => {
 
     <CharacterEditor
       :show="isEditorOpen"
+      :guard-back="false"
       :type="activeTab"
       :character="editorCharacter"
       @submit="handleEditorSubmit"
@@ -360,18 +375,17 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.toolbar {
+.create-options {
   display: flex;
-  gap: 8px;
-  padding: 0 16px 12px;
-  flex-shrink: 0;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.toolbar-btn {
+.create-option {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 14px;
   border-radius: 10px;
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
@@ -381,7 +395,7 @@ onMounted(async () => {
   transition: all 0.2s ease;
 }
 
-.toolbar-btn:active {
+.create-option:active:not(:disabled) {
   transform: scale(0.96);
   background: var(--accent-soft);
   color: var(--accent-purple);

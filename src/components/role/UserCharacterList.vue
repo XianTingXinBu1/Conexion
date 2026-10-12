@@ -62,6 +62,6 @@ const canDelete = computed(() => props.characters.length > 1);
 .user-character-list__items {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
 </style>

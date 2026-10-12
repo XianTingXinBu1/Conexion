@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { waitForBackGuardCleanup } from '@/composables/useBackGuard';
 import { ArrowLeft, Plus, Clock, MessageSquare, Search, XCircle, SearchX } from '@lucide/vue';
 import type { AICharacter, Conversation } from '@/types';
 import { CharacterSelector, ConversationItem } from './conversation';
@@ -179,10 +180,18 @@ const handleTempChatClick = () => {
 };
 
 // 选择角色并进入会话
-const selectCharacter = (character: AICharacter) => {
-  prepareRoute('/chat');
-  router.push(`/chat/character/${character.id}`);
-  showCharacterSelector.value = false;
+let isStartingConversation = false;
+const selectCharacter = async (character: AICharacter) => {
+  if (isStartingConversation) return;
+  isStartingConversation = true;
+  try {
+    prepareRoute('/chat');
+    showCharacterSelector.value = false;
+    await waitForBackGuardCleanup();
+    await router.push(`/chat/character/${encodeURIComponent(character.id)}`);
+  } finally {
+    isStartingConversation = false;
+  }
 };
 </script>
 

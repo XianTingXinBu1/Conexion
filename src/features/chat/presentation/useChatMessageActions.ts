@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Message } from '@/types';
 import {
   applyVariantContent,
@@ -102,27 +102,60 @@ export function useChatMessageActions(options: UseChatMessageActionsOptions) {
     await saveConversation();
   };
 
+  const isSelectingMessages = ref(false);
+  const selectedMessageIds = ref<string[]>([]);
+  const selectedMessageCount = computed(() => selectedMessageIds.value.length);
+  const cancelMessageSelection = () => {
+    if (isUpdatingMessage.value) return;
+    isSelectingMessages.value = false;
+    selectedMessageIds.value = [];
+  };
+  watch(() => messages.value.map(message => message.id), ids => {
+    selectedMessageIds.value = selectedMessageIds.value.filter(id => ids.includes(id));
+    if (!ids.length) isSelectingMessages.value = false;
+  });
+
   const handleDeleteMessage = (messageId: string) => {
     if (isUpdatingMessage.value || !options.canModifyMessage()) return;
-    const message = messages.value.find(m => m.id === messageId);
-    if (!message) return;
-    const preview = message.content.slice(0, 40);
-    const suffix = message.content.length > 40 ? '…' : '';
-    showDeleteConfirmDialog(messageId, `「${preview}${suffix}」`, '消息');
+    const index = messages.value.findIndex(message => message.id === messageId);
+    if (index === -1) return;
+    isSelectingMessages.value = true;
+    selectedMessageIds.value = messages.value.slice(index).map(message => message.id);
+  };
+
+  const toggleMessageSelection = (messageId: string) => {
+    if (!isSelectingMessages.value || isUpdatingMessage.value) return;
+    if (selectedMessageIds.value.includes(messageId)) {
+      selectedMessageIds.value = selectedMessageIds.value.filter(id => id !== messageId);
+    } else if (messages.value.some(message => message.id === messageId)) {
+      selectedMessageIds.value = [...selectedMessageIds.value, messageId];
+    }
+  };
+
+  const requestDeleteSelected = () => {
+    if (!selectedMessageCount.value || isUpdatingMessage.value || !options.canModifyMessage()) return;
+    showDeleteConfirmDialog('selected-messages', '选中的 ' + selectedMessageCount.value + ' 条消息及其所有回复版本', '消息');
   };
 
   const confirmDelete = async () => {
-    const messageId = confirmDeleteMessage();
-    if (!messageId || isUpdatingMessage.value || !options.canModifyMessage()) return;
-    if (!messages.value.some(message => message.id === messageId)) return;
+    const target = confirmDeleteMessage();
+    if (!target || isUpdatingMessage.value || !options.canModifyMessage()) return;
+    const ids = messages.value.filter(message => selectedMessageIds.value.includes(message.id)).map(message => message.id);
+    if (!ids.length) return;
     isUpdatingMessage.value = true;
+    let deletedCount = 0;
     try {
-      if (!await deleteMessage(messageId)) throw new Error('无法删除消息，请重试');
-      const index = messages.value.findIndex(m => m.id === messageId);
-      if (index !== -1) messages.value.splice(index, 1);
-      showSuccess('删除成功', '消息及其所有回复版本已删除');
+      for (const messageId of ids) {
+        if (!await deleteMessage(messageId)) throw new Error('无法删除消息，请重试');
+        const index = messages.value.findIndex(message => message.id === messageId);
+        if (index !== -1) messages.value.splice(index, 1);
+        selectedMessageIds.value = selectedMessageIds.value.filter(id => id !== messageId);
+        deletedCount++;
+      }
+      isSelectingMessages.value = false;
+      showSuccess('删除成功', '已删除 ' + deletedCount + ' 条消息及其所有回复版本');
     } catch (error) {
-      showError('删除失败', error instanceof Error ? error.message : '无法删除消息，请重试');
+      showError('删除失败', '已删除 ' + deletedCount + ' 条，剩余消息仍保持选中。' + (error instanceof Error ? error.message : '请重试'));
     } finally {
       isUpdatingMessage.value = false;
     }
@@ -138,6 +171,12 @@ export function useChatMessageActions(options: UseChatMessageActionsOptions) {
     handleSaveEdit,
     handleSwitchVariant,
     handleDeleteMessage,
+    isSelectingMessages,
+    selectedMessageIds,
+    selectedMessageCount,
+    toggleMessageSelection,
+    cancelMessageSelection,
+    requestDeleteSelected,
     confirmDelete,
   };
 }

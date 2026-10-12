@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, Edit2, RefreshCw, Trash2 } from '@lucide/vue
 
 interface Props {
   message: Message;
+  selectionMode?: boolean;
+  selected?: boolean;
   index: number;
   totalMessages: number;
   displayCount: number;
@@ -36,6 +38,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
+  'toggleSelection': [messageId: string];
   'edit': [messageId: string];
   'delete': [messageId: string];
   'retry': [messageId: string];
@@ -105,11 +108,15 @@ const messageLabel = computed(() => {
 
 <template>
   <div
-    :class="['message-item', `message-${message.type}`]"
+    :class="['message-item', `message-${message.type}`, { 'message-selected': selected }]"
     @touchstart.passive="handleTouchStart"
     @touchend="handleTouchEnd"
     @touchcancel="handleTouchCancel"
   >
+    <label v-if="selectionMode" class="message-selection">
+      <input type="checkbox" :checked="selected" :disabled="actionsDisabled" @change="emit('toggleSelection', message.id)" />
+      选择消息
+    </label>
     <div class="message-content">
       <MarkdownRenderer
         v-if="enableMarkdown"
@@ -123,7 +130,7 @@ const messageLabel = computed(() => {
       <div v-if="showWordCount" class="message-word-count">{{ getWordCount(message.content) }} 字</div>
       <div v-if="showMessageIndex" class="message-index">#{{ totalMessages - displayCount + index + 1 }}</div>
     </div>
-    <div class="message-footer">
+    <div v-if="!selectionMode" class="message-footer">
       <button v-if="variantCount > 1" class="variant-btn" :disabled="variantSwitchDisabled" title="上一条回复" @click="switchVariant(-1)">
         <ChevronLeft :size="18" />
       </button>
@@ -151,6 +158,13 @@ const messageLabel = computed(() => {
 </style>
 
 <style scoped>
+.message-selected {
+  background: var(--accent-soft);
+  outline: 1px solid var(--accent-purple);
+  border-radius: 8px;
+}
+.message-selection { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+
 .message-item {
   display: flex;
   max-width: 100%;

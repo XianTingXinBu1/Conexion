@@ -276,6 +276,12 @@ export function useChatPageViewModel(props: ChatPageProps) {
     handleSaveEdit,
     handleSwitchVariant,
     handleDeleteMessage,
+    isSelectingMessages,
+    selectedMessageIds,
+    selectedMessageCount,
+    toggleMessageSelection,
+    cancelMessageSelection,
+    requestDeleteSelected,
 
     confirmDelete,
   } = useChatMessageActions({
@@ -300,7 +306,7 @@ export function useChatPageViewModel(props: ChatPageProps) {
   const canRetryMessage = (message: Message): boolean => {
     const lastMessage = messages.value[messages.value.length - 1];
     return !isSending.value && !isCompressing.value && !isUpdatingMessage.value
-      && !showEditModal.value && message.type === 'assistant'
+      && !showEditModal.value && !isSelectingMessages.value && message.type === 'assistant'
       && lastMessage?.id === message.id && messages.value.some(item => item.type === 'user');
   };
 
@@ -354,10 +360,10 @@ export function useChatPageViewModel(props: ChatPageProps) {
     isRequestActive,
     requestStatus,
     handleSendMessage: (content: string) => {
-      if (!isUpdatingMessage.value && !showEditModal.value) return handleSendMessage(content);
+      if (!isUpdatingMessage.value && !showEditModal.value && !isSelectingMessages.value) return handleSendMessage(content);
     },
     handleRetryMessage: (messageId: string) => {
-      if (!isUpdatingMessage.value && !showEditModal.value) return handleRetryMessage(messageId);
+      if (!isUpdatingMessage.value && !showEditModal.value && !isSelectingMessages.value) return handleRetryMessage(messageId);
     },
     handleCancelSend,
     canRetryMessage,
@@ -376,6 +382,12 @@ export function useChatPageViewModel(props: ChatPageProps) {
     lastSystemMessages,
     lastSystemPromptResult,
     handleDeleteMessage,
+    isSelectingMessages,
+    selectedMessageIds,
+    selectedMessageCount,
+    toggleMessageSelection,
+    cancelMessageSelection,
+    requestDeleteSelected,
 
     ConfirmDialogComponent,
     confirmDialogProps,

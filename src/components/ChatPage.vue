@@ -76,6 +76,12 @@ const {
   lastSystemMessages,
   lastSystemPromptResult,
   handleDeleteMessage,
+    isSelectingMessages,
+    selectedMessageIds,
+    selectedMessageCount,
+    toggleMessageSelection,
+    cancelMessageSelection,
+    requestDeleteSelected,
 
   ConfirmDialogComponent,
   confirmDialogProps,
@@ -135,8 +141,11 @@ const {
       </button>
       <template v-for="(message, index) in displayMessages" :key="message.id">
         <MessageItem
-          v-if="message.type !== 'assistant' || Boolean(message.content.trim())"
+          v-if="message.type !== 'assistant' || Boolean(message.content.trim()) || isSelectingMessages"
           :message="message"
+          :selection-mode="isSelectingMessages"
+          :selected="selectedMessageIds.includes(message.id)"
+          @toggle-selection="toggleMessageSelection"
           :user-name="userName"
           :ai-name="aiName"
           :index="index"
@@ -149,7 +158,7 @@ const {
           :can-retry="canRetryMessage(message)"
           :variant-count="getVariantCount(message)"
           :variant-index="getVariantIndex(message)"
-          :variant-switch-disabled="isSending || isCompressing || isUpdatingMessage || showEditModal"
+          :variant-switch-disabled="isSending || isCompressing || isUpdatingMessage || showEditModal || isSelectingMessages"
           :actions-disabled="isSending || isCompressing || isUpdatingMessage"
           @edit="handleEditMessage"
           @delete="handleDeleteMessage"
@@ -188,7 +197,12 @@ const {
       @compress="handleCompressConversation"
     />
 
-    <ChatInput
+    <div v-if="isSelectingMessages" class="message-selection-bar">
+      <span>已选 {{ selectedMessageCount }} 条消息</span>
+      <button :disabled="isUpdatingMessage" @click="cancelMessageSelection">取消</button>
+      <button :disabled="!selectedMessageCount || isUpdatingMessage" @click="requestDeleteSelected">{{ isUpdatingMessage ? '删除中…' : '删除选中消息' }}</button>
+    </div>
+    <ChatInput v-else
       :enter-to-send="enterToSend"
       :is-sending="isSending || isUpdatingMessage || showEditModal"
       :is-request-active="isRequestActive"
@@ -229,3 +243,21 @@ const {
     />
   </div>
 </template>
+
+<style scoped>
+.message-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 18px;
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.message-selection-bar span { margin-right: auto; font-size: 13px; color: var(--text-muted); }
+.message-selection-bar button { padding: 8px 12px; border-radius: 8px; border: none; background: var(--accent-soft); color: var(--text-main); cursor: pointer; }
+.message-selection-bar button:last-child { color: #dc3545; }
+.message-selection-bar button:disabled { opacity: 0.5; cursor: default; }
+</style>

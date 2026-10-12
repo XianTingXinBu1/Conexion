@@ -396,17 +396,19 @@ describe('ChatPage 发送链路', () => {
     expect(container.querySelectorAll('.message-item')).toHaveLength(2);
     messageMutationFails = true;
     await openDelete();
+    await fireEvent.click(getByRole('button', { name: '删除选中消息' }));
     await fireEvent.click(getByRole('button', { name: '确认删除' }));
-    await waitFor(() => expect((container.querySelector('button[title="删除"]') as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect((getByRole('button', { name: '删除选中消息' }) as HTMLButtonElement).disabled).toBe(false));
     expect(container.querySelectorAll('.message-item')).toHaveLength(2);
     messageMutationFails = false;
-    await openDelete();
+    await fireEvent.click(getByRole('button', { name: '删除选中消息' }));
     await fireEvent.click(getByRole('button', { name: '确认删除' }));
     await waitFor(() => {
       expect(container.querySelector('.message-assistant')).toBeNull();
       expect(storedMessages).toHaveLength(1);
     });
     await fireEvent.click(container.querySelector('.message-user button[title="删除"]')!);
+    await fireEvent.click(getByRole('button', { name: '删除选中消息' }));
     await fireEvent.click(getByRole('button', { name: '确认删除' }));
     await waitFor(() => {
       expect(container.querySelectorAll('.message-item')).toHaveLength(0);
@@ -429,6 +431,8 @@ describe('ChatPage 发送链路', () => {
     await fireEvent.click(getByRole('button', { name: '保存' }));
     await waitFor(() => expect(container.querySelector('.message-user')?.textContent).toContain('修改临时消息'));
     await fireEvent.click(container.querySelector('.message-user button[title="删除"]')!);
+    expect(container.querySelectorAll('input[type="checkbox"]:checked')).toHaveLength(2);
+    await fireEvent.click(getByRole('button', { name: '删除选中消息' }));
     await fireEvent.click(getByRole('button', { name: '确认删除' }));
     await waitFor(() => expect(container.querySelector('.message-user')).toBeNull());
     expect(conversationMutations).toHaveLength(0);

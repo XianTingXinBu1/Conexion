@@ -99,8 +99,8 @@ export function useConversationManager(
    * 编辑消息
    */
   const editMessage = async (messageId: string, newContent: string): Promise<boolean> => {
-    if (!currentConversationId.value) {
-      return false;
+    if (!currentConversationId.value || isTemporaryConversationId(currentConversationId.value)) {
+      return true;
     }
 
     const updated = await editConversationMessage(currentConversationId.value, messageId, newContent);
@@ -119,8 +119,8 @@ export function useConversationManager(
    * 删除消息
    */
   const deleteMessage = async (messageId: string): Promise<boolean> => {
-    if (!currentConversationId.value) {
-      return false;
+    if (!currentConversationId.value || isTemporaryConversationId(currentConversationId.value)) {
+      return true;
     }
 
     const updated = await deleteConversationMessage(currentConversationId.value, messageId);

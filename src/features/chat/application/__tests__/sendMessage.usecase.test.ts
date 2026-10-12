@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SendMessageUseCase, type SendMessageUseCaseDeps } from '../sendMessage.usecase';
+import { getActiveVariantIndex } from '../messageVariants';
 import type { Message } from '@/types';
 
 function createDeps(overrides: Partial<SendMessageUseCaseDeps> = {}) {
@@ -152,5 +153,118 @@ describe('SendMessageUseCase', () => {
 
     expect(messages[1]).toMatchObject({ type: 'assistant', content: '已停止生成' });
     expect(deps.onError).not.toHaveBeenCalledWith('send', expect.anything());
+  });
+});
+
+describe('SendMessageUseCase.regenerate', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  const seedConversation = (
+    messages: Message[],
+    requestMessages: Message[],
+  ): { user: Message; assistant: Message } => {
+    const user: Message = { id: 'm1', type: 'user', content: 'hello', timestamp: 1 };
+    const assistant: Message = { id: 'm2', type: 'assistant', content: 'first', timestamp: 2 };
+
+    messages.push(user, assistant);
+    requestMessages.push({ ...user }, { ...assistant });
+
+    return { user, assistant };
+  };
+
+  it('给同一条消息追加变体，不新增消息', async () => {
+    const { deps, messages, requestMessages } = createDeps();
+    seedConversation(messages, requestMessages);
+
+    const useCase = new SendMessageUseCase(deps);
+    await useCase.regenerate('m2');
+
+    expect(messages).toHaveLength(2);
+    expect(messages[1]).toMatchObject({ type: 'assistant', content: 'reply', activeVariantIndex: 1 });
+    expect(messages[1]!.variants).toEqual(['first', 'reply']);
+    expect(deps.saveConversation).toHaveBeenCalled();
+    expect(deps.onSuccess).toHaveBeenCalledWith('retry');
+  });
+
+  it('复现原回合请求：用户指令只出现一次', async () => {
+    const { deps, messages, requestMessages } = createDeps();
+    seedConversation(messages, requestMessages);
+
+    const useCase = new SendMessageUseCase(deps);
+    await useCase.regenerate('m2');
+
+    expect(deps.buildSystemMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ chatHistory: [], userInstruction: 'hello' }),
+    );
+  });
+
+  it('多次重试累积变体而不是互相覆盖', async () => {
+    const { deps, messages, requestMessages } = createDeps();
+    seedConversation(messages, requestMessages);
+
+    const useCase = new SendMessageUseCase(deps);
+    await useCase.regenerate('m2');
+    await useCase.regenerate('m2');
+
+    expect(messages[1]!.variants).toEqual(['first', 'reply', 'reply']);
+    expect(getActiveVariantIndex(messages[1]!)).toBe(2);
+  });
+
+  it('取消且没有内容时回滚空变体，保留原回复', async () => {
+    const { deps, messages, requestMessages } = createDeps({
+      sendStreamChatRequest: vi.fn(async (_messages, _onChunk, _onComplete, onError) => {
+        onError('请求已取消');
+      }),
+    });
+    seedConversation(messages, requestMessages);
+
+    const useCase = new SendMessageUseCase(deps);
+    await useCase.regenerate('m2');
+
+    expect(messages[1]).toMatchObject({ content: 'first' });
+    expect(messages[1]!.variants).toBeUndefined();
+    expect(deps.onError).not.toHaveBeenCalled();
+    expect(deps.saveConversation).toHaveBeenCalled();
+  });
+
+  it('取消但已有内容时把部分回复留作新变体', async () => {
+    const { deps, messages, requestMessages } = createDeps({
+      sendStreamChatRequest: vi.fn(async (_messages, onChunk, _onComplete, onError) => {
+        onChunk('半截');
+        await vi.advanceTimersByTimeAsync(60);
+        onError('请求已取消');
+      }),
+    });
+    seedConversation(messages, requestMessages);
+
+    const useCase = new SendMessageUseCase(deps);
+    await useCase.regenerate('m2');
+
+    expect(messages[1]!.variants).toEqual(['first', '半截']);
+    expect(messages[1]!.content).toBe('半截');
+  });
+
+  it('只接受最后一条 assistant 消息', async () => {
+    const { deps, messages, requestMessages } = createDeps();
+    const { assistant } = seedConversation(messages, requestMessages);
+    messages.push({ id: 'm3', type: 'user', content: 'next', timestamp: 3 });
+
+    const useCase = new SendMessageUseCase(deps);
+    await useCase.regenerate(assistant.id);
+
+    expect(deps.sendStreamChatRequest).not.toHaveBeenCalled();
+    expect(deps.onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('目标是用户消息时是空操作', async () => {
+    const { deps, messages, requestMessages } = createDeps();
+    const { user } = seedConversation(messages, requestMessages);
+
+    const useCase = new SendMessageUseCase(deps);
+    await useCase.regenerate(user.id);
+
+    expect(deps.sendStreamChatRequest).not.toHaveBeenCalled();
   });
 });

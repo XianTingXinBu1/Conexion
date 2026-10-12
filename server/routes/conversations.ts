@@ -9,10 +9,44 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function ensureOptionalStringArray(value: unknown, fieldName: string): string[] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new HttpError(400, `${fieldName} 必须是数组`);
+  }
+
+  return value.map((item, index) => {
+    if (typeof item !== 'string') {
+      throw new HttpError(400, `${fieldName}[${index}] 必须是字符串`);
+    }
+
+    return item;
+  });
+}
+
+function ensureOptionalIndex(value: unknown, fieldName: string): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new HttpError(400, `${fieldName} 必须是数字`);
+  }
+
+  return Math.max(0, Math.trunc(value));
+}
+
 function ensureMessage(value: unknown, fieldName: string): Message {
   if (!isObject(value)) {
     throw new HttpError(400, `${fieldName} 必须是对象`);
   }
+
+  // 重试变体必须一并保留：白名单漏掉它们，刷新后左右切换的历史就没了。
+  const variants = ensureOptionalStringArray(value.variants, `${fieldName}.variants`);
+  const activeVariantIndex = ensureOptionalIndex(value.activeVariantIndex, `${fieldName}.activeVariantIndex`);
 
   return {
     id: requireNonEmptyString(value.id, `${fieldName}.id`),
@@ -23,6 +57,8 @@ function ensureMessage(value: unknown, fieldName: string): Message {
     timestamp: typeof value.timestamp === 'number' && Number.isFinite(value.timestamp)
       ? value.timestamp
       : Date.now(),
+    ...(variants ? { variants } : {}),
+    ...(activeVariantIndex === undefined ? {} : { activeVariantIndex }),
   };
 }
 

@@ -491,4 +491,69 @@ describe('server api validation', () => {
       restoreDataDir();
     }
   });
+
+  it('preserves retry variants on message write and edit', async () => {
+    const restoreDataDir = await useTempDataDir();
+    const started = await startTestServer();
+    servers.push(started.server);
+
+    try {
+      const createResponse = await fetch(`${started.baseUrl}/api/conversations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstMessage: { id: 'msg-1', type: 'user', content: 'Hello', timestamp: 1 },
+          character: { id: 'char-1', name: 'Assistant', createdAt: 1 },
+        }),
+      });
+      const created = await createResponse.json();
+
+      const putResponse = await fetch(`${started.baseUrl}/api/conversations/${created.id}/messages`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { id: 'msg-1', type: 'user', content: 'Hello', timestamp: 1 },
+            {
+              id: 'msg-2',
+              type: 'assistant',
+              content: 'second',
+              timestamp: 2,
+              variants: ['first', 'second'],
+              activeVariantIndex: 1,
+            },
+          ],
+        }),
+      });
+
+      expect(putResponse.status).toBe(200);
+      const updated = await putResponse.json();
+      // 消息字段是白名单：漏掉变体的话刷新后左右切换的历史就没了
+      expect(updated.messages[1]).toMatchObject({
+        content: 'second',
+        variants: ['first', 'second'],
+        activeVariantIndex: 1,
+      });
+
+      const patchResponse = await fetch(
+        `${started.baseUrl}/api/conversations/${created.id}/messages/msg-2`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: 'second-edited' }),
+        },
+      );
+
+      expect(patchResponse.status).toBe(200);
+      const patched = await patchResponse.json();
+      // 编辑只改当前变体，另一个变体必须原样留着
+      expect(patched.messages[1]).toMatchObject({
+        content: 'second-edited',
+        variants: ['first', 'second-edited'],
+        activeVariantIndex: 1,
+      });
+    } finally {
+      restoreDataDir();
+    }
+  });
 });

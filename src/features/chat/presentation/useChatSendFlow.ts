@@ -94,27 +94,20 @@ export function useChatSendFlow(deps: SendFlowDeps) {
     deps.transport.cancelRequest();
   };
 
-  const handleSendMessage = async (content: string) => {
-    if (isSending.value || deps.compression.isCompressing.value) {
-      return;
-    }
-
-    isSending.value = true;
-
-    const useCase = new SendMessageUseCase({
-      getMessages: () => deps.state.messages.value,
-      getRequestMessages: () => deps.state.requestMessages.value,
-      getRegexRules: () => deps.state.regexRules.value,
-      getCurrentCharacter: () => deps.state.currentCharacter.value,
-      getSelectedUser: () => deps.state.selectedUser.value,
-      getKnowledgeBases: () => deps.state.knowledgeBases.value,
-      getPromptMergeMode: () => deps.state.promptMergeMode.value,
-      getCompressionMode: () => deps.compression.mode.value,
-      canUseConversationCompression: () => deps.compression.canUse.value,
-      isCompressionThresholdReached: (messages) => {
-        if (!messages) {
-          return deps.compression.thresholdReached.value;
-        }
+  const createUseCase = () => new SendMessageUseCase({
+    getMessages: () => deps.state.messages.value,
+    getRequestMessages: () => deps.state.requestMessages.value,
+    getRegexRules: () => deps.state.regexRules.value,
+    getCurrentCharacter: () => deps.state.currentCharacter.value,
+    getSelectedUser: () => deps.state.selectedUser.value,
+    getKnowledgeBases: () => deps.state.knowledgeBases.value,
+    getPromptMergeMode: () => deps.state.promptMergeMode.value,
+    getCompressionMode: () => deps.compression.mode.value,
+    canUseConversationCompression: () => deps.compression.canUse.value,
+    isCompressionThresholdReached: (messages) => {
+      if (!messages) {
+        return deps.compression.thresholdReached.value;
+      }
 
       const activeMessages = getEffectiveChatHistory(messages, deps.compression.currentCompression.value);
       const lastMessage = activeMessages[activeMessages.length - 1];
@@ -135,34 +128,65 @@ export function useChatSendFlow(deps: SendFlowDeps) {
         deps.compression.thresholdPercent.value,
       );
     },
-      compressConversation: deps.compression.compress,
-      getCompressionSummary: () => deps.compression.summary.value,
-      getPersistedConversationId: () => deps.session.persistedConversationId.value,
-      resetUsage: deps.transport.resetUsage,
-      loadRegexRules: deps.transport.loadRegexRules,
-      createNewConversation: deps.session.createNewConversation,
-      saveConversation: deps.session.saveConversation,
-      onStreamFlush: deps.uiEffects.onStreamFlush,
-      onMessageSend: deps.uiEffects.onMessageSend,
-      sendStreamChatRequest: deps.transport.sendStreamChatRequest,
-      buildSystemMessages: deps.transport.buildSystemMessages,
-      onSuccess: (kind) => {
-        const notificationMsg = getNotificationMessage(
-          kind === 'compression' ? 'CHAT_COMPRESSION_SUCCESS' : 'CHAT_SEND_SUCCESS'
-        );
-        deps.uiEffects.showSuccess(notificationMsg.title, notificationMsg.message);
-      },
-      onError: (kind, error) => {
-        const notificationMsg = getNotificationMessage(
-          kind === 'compression' ? 'CHAT_COMPRESSION_FAILED' : 'CHAT_SEND_FAILED',
-          { error },
-        );
-        deps.uiEffects.showError(notificationMsg.title, notificationMsg.message);
-      },
-    });
+    compressConversation: deps.compression.compress,
+    getCompressionSummary: () => deps.compression.summary.value,
+    getPersistedConversationId: () => deps.session.persistedConversationId.value,
+    resetUsage: deps.transport.resetUsage,
+    loadRegexRules: deps.transport.loadRegexRules,
+    createNewConversation: deps.session.createNewConversation,
+    saveConversation: deps.session.saveConversation,
+    onStreamFlush: deps.uiEffects.onStreamFlush,
+    onMessageSend: deps.uiEffects.onMessageSend,
+    sendStreamChatRequest: deps.transport.sendStreamChatRequest,
+    buildSystemMessages: deps.transport.buildSystemMessages,
+    onSuccess: (kind) => {
+      const notificationMsg = getNotificationMessage(
+        kind === 'compression'
+          ? 'CHAT_COMPRESSION_SUCCESS'
+          : kind === 'retry'
+            ? 'CHAT_RETRY_SUCCESS'
+            : 'CHAT_SEND_SUCCESS'
+      );
+      deps.uiEffects.showSuccess(notificationMsg.title, notificationMsg.message);
+    },
+    onError: (kind, error) => {
+      const notificationMsg = getNotificationMessage(
+        kind === 'compression' ? 'CHAT_COMPRESSION_FAILED' : 'CHAT_SEND_FAILED',
+        { error },
+      );
+      deps.uiEffects.showError(notificationMsg.title, notificationMsg.message);
+    },
+  });
+
+  const handleSendMessage = async (content: string) => {
+    if (isSending.value || deps.compression.isCompressing.value) {
+      return;
+    }
+
+    isSending.value = true;
 
     try {
-      await useCase.execute(content);
+      await createUseCase().execute(content);
+    } finally {
+      isSending.value = false;
+    }
+  };
+
+  /**
+   * 重试最后一条 AI 回复：给同一条消息追加变体，不新增消息。
+   *
+   * 只有最后一条会被 usecase 接受；非最后一条是空操作，
+   * 因此 UI 只需要在末尾那条上给入口。
+   */
+  const handleRetryMessage = async (messageId: string) => {
+    if (isSending.value || deps.compression.isCompressing.value) {
+      return;
+    }
+
+    isSending.value = true;
+
+    try {
+      await createUseCase().regenerate(messageId);
     } finally {
       isSending.value = false;
     }
@@ -171,6 +195,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
   return {
     isSending,
     handleSendMessage,
+    handleRetryMessage,
     handleCancelSend,
   };
 }

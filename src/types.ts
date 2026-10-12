@@ -14,6 +14,15 @@ export interface Message {
   type: MessageType;
   content: string;
   timestamp: number;
+  /**
+   * AI 回复的重试变体。
+   *
+   * 首个变体是首次回复；`content` 始终等于 `variants[activeVariantIndex]`。
+   * 只有一条回复时不写该字段——旧数据的单条 `content` 即视为唯一变体。
+   */
+  variants?: string[];
+  /** 当前展示的变体下标，缺省为 0。 */
+  activeVariantIndex?: number;
 }
 
 /**

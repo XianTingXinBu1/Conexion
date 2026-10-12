@@ -6,6 +6,7 @@ import { type NotificationMessage } from './types';
 export type ChatMessageKey =
   | 'CHAT_SEND_SUCCESS'
   | 'CHAT_SEND_FAILED'
+  | 'CHAT_RETRY_SUCCESS'
   | 'CHAT_COMPRESSION_SUCCESS'
   | 'CHAT_COMPRESSION_FAILED'
   | 'CHAT_COMPRESSION_THRESHOLD_REACHED'
@@ -32,6 +33,15 @@ export const CHAT_MESSAGES: Record<ChatMessageKey, (params?: Record<string, stri
     type: 'error',
     title: '发送失败',
     message: String(params?.error || '发送失败'),
+  }),
+
+  /**
+   * 重新生成成功
+   */
+  CHAT_RETRY_SUCCESS: () => ({
+    type: 'success',
+    title: '已重新生成',
+    message: '可左右切换查看之前的回复',
   }),
 
   CHAT_COMPRESSION_SUCCESS: () => ({

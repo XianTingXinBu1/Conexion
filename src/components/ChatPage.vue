@@ -25,6 +25,8 @@ const {
   theme,
   chatTitle,
   chatSubtitle,
+  userName,
+  aiName,
   compressionSummary,
   canUseConversationCompression,
   usagePercent,
@@ -56,8 +58,15 @@ const {
   isRequestActive,
   requestStatus,
   handleSendMessage,
+  handleRetryMessage,
   handleCancelSend,
+  canRetryMessage,
+  getVariantCount,
+  getVariantIndex,
+  handleSwitchVariant,
   openPromptAssistant,
+  isUpdatingMessage,
+  editError,
   showEditModal,
   editingMessageId,
   editingMessageContent,
@@ -67,6 +76,7 @@ const {
   lastSystemMessages,
   lastSystemPromptResult,
   handleDeleteMessage,
+
   ConfirmDialogComponent,
   confirmDialogProps,
   confirmDelete,
@@ -123,20 +133,30 @@ const {
       >
         加载更多历史消息 ({{ chatMessageCount - loadedCount }} 条未加载)
       </button>
-      <MessageItem
-        v-for="(message, index) in displayMessages"
-        :key="message.id"
-        :message="message"
-        :index="index"
-        :total-messages="chatMessageCount"
-        :display-count="displayMessages.length"
-        :theme="theme"
-        :enable-markdown="enableMarkdown"
-        :show-word-count="showWordCount"
-        :show-message-index="showMessageIndex"
-        @edit="handleEditMessage"
-        @delete="handleDeleteMessage"
-      />
+      <template v-for="(message, index) in displayMessages" :key="message.id">
+        <MessageItem
+          v-if="message.type !== 'assistant' || Boolean(message.content.trim())"
+          :message="message"
+          :user-name="userName"
+          :ai-name="aiName"
+          :index="index"
+          :total-messages="chatMessageCount"
+          :display-count="displayMessages.length"
+          :theme="theme"
+          :enable-markdown="enableMarkdown"
+          :show-word-count="showWordCount"
+          :show-message-index="showMessageIndex"
+          :can-retry="canRetryMessage(message)"
+          :variant-count="getVariantCount(message)"
+          :variant-index="getVariantIndex(message)"
+          :variant-switch-disabled="isSending || isCompressing || isUpdatingMessage || showEditModal"
+          :actions-disabled="isSending || isCompressing || isUpdatingMessage"
+          @edit="handleEditMessage"
+          @delete="handleDeleteMessage"
+          @retry="handleRetryMessage"
+          @switch-variant="handleSwitchVariant"
+        />
+      </template>
     </div>
 
     <!-- Token 使用详情侧栏 -->
@@ -170,7 +190,7 @@ const {
 
     <ChatInput
       :enter-to-send="enterToSend"
-      :is-sending="isSending"
+      :is-sending="isSending || isUpdatingMessage || showEditModal"
       :is-request-active="isRequestActive"
       :request-status="requestStatus"
       @send="handleSendMessage"
@@ -184,6 +204,8 @@ const {
       :show="showEditModal"
       :message-id="editingMessageId"
       :content="editingMessageContent"
+      :is-saving="isUpdatingMessage"
+      :error="editError"
       @update:show="showEditModal = false"
       @save="handleSaveEdit"
     />

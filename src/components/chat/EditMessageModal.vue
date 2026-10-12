@@ -7,6 +7,8 @@ interface Props {
   show: boolean;
   messageId: string;
   content: string;
+  isSaving?: boolean;
+  error?: string;
 }
 
 const props = defineProps<Props>();
@@ -18,30 +20,31 @@ const emit = defineEmits<{
 }>();
 
 const editContent = ref(props.content);
-const textareaRef = ref<HTMLTextAreaElement>();
+const textareaRef = ref<InstanceType<typeof FormTextarea>>();
 
 const handleClose = () => {
+  if (props.isSaving) return;
   emit('update:show', false);
   emit('close');
 };
 
 const handleSave = () => {
+  if (props.isSaving || !editContent.value.trim()) return;
   emit('save', props.messageId, editContent.value);
-  emit('update:show', false);
 };
 
 const handleCancel = () => {
   handleClose();
 };
 
-watch(() => props.show, (newShow) => {
+watch(() => [props.show, props.messageId] as const, ([newShow]) => {
   if (newShow) {
     editContent.value = props.content;
     nextTick(() => {
-      textareaRef.value?.focus();
+      textareaRef.value?.$el?.focus();
     });
   }
-});
+}, { immediate: true });
 </script>
 
 <template>
@@ -56,17 +59,23 @@ watch(() => props.show, (newShow) => {
         ref="textareaRef"
         v-model="editContent"
         placeholder="输入消息内容..."
+        aria-label="消息内容"
+        :disabled="isSaving"
+        :error="Boolean(error)"
+        @keydown.ctrl.enter.prevent="handleSave"
+        @keydown.meta.enter.prevent="handleSave"
         :rows="8"
         resize="vertical"
       />
+      <p v-if="error" class="edit-error" role="alert">{{ error }}</p>
     </div>
 
     <template #footer>
-      <button class="btn btn-secondary" @click="handleCancel">
+      <button class="btn btn-secondary" :disabled="isSaving" @click="handleCancel">
         取消
       </button>
-      <button class="btn btn-primary" @click="handleSave">
-        保存
+      <button class="btn btn-primary" :disabled="isSaving || !editContent.trim()" @click="handleSave">
+        {{ isSaving ? '保存中…' : '保存' }}
       </button>
     </template>
   </Modal>
@@ -86,6 +95,17 @@ watch(() => props.show, (newShow) => {
   transition: all 0.2s ease;
   border: none;
   flex: 1;
+}
+
+.edit-error {
+  color: #ef4444;
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .btn-primary {

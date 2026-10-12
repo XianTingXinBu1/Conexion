@@ -146,12 +146,23 @@ export class ConversationRepository {
 
       const originalMessage = conversation.messages[messageIndex]!;
       const nextMessages = [...conversation.messages];
-      nextMessages[messageIndex] = {
-        id: originalMessage.id,
-        type: originalMessage.type,
-        content: newContent,
-        timestamp: originalMessage.timestamp,
-      };
+
+      // 带变体的消息只改当前那一条，否则切回去会看到编辑前的内容。
+      const nextMessage: Message = { ...originalMessage, content: newContent };
+      const variants = originalMessage.variants;
+
+      if (variants && variants.length > 0) {
+        const activeVariantIndex = Math.min(
+          variants.length - 1,
+          Math.max(0, originalMessage.activeVariantIndex ?? 0),
+        );
+        const nextVariants = [...variants];
+        nextVariants[activeVariantIndex] = newContent;
+        nextMessage.variants = nextVariants;
+        nextMessage.activeVariantIndex = activeVariantIndex;
+      }
+
+      nextMessages[messageIndex] = nextMessage;
 
       return {
         ...conversation,

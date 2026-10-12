@@ -19,7 +19,9 @@ import { useChatCompressionController } from '@/modules/conversation-compression
 import { useChatPromptController } from './useChatPromptController';
 import { useChatLifecycleController } from './useChatLifecycleController';
 import { buildGreetingMessage } from '../application/buildGreetingMessage.usecase';
+import { getActiveVariantIndex, getMessageVariants } from '../application/messageVariants';
 import type { ChatPageProps } from './chatPageTypes';
+import type { Message } from '@/types';
 
 export function useChatPageViewModel(props: ChatPageProps) {
   const {
@@ -220,6 +222,7 @@ export function useChatPageViewModel(props: ChatPageProps) {
   const {
     isSending,
     handleSendMessage,
+    handleRetryMessage,
     handleCancelSend,
   } = useChatSendFlow({
     state: {
@@ -264,22 +267,46 @@ export function useChatPageViewModel(props: ChatPageProps) {
   });
 
   const {
+    isUpdatingMessage,
+    editError,
     showEditModal,
     editingMessageId,
     editingMessageContent,
     handleEditMessage,
     handleSaveEdit,
+    handleSwitchVariant,
     handleDeleteMessage,
+
     confirmDelete,
   } = useChatMessageActions({
     messages,
     editMessage,
     deleteMessage,
+    saveConversation: () => saveConversation(),
+    canSwitchVariant: () => !isSending.value && !isCompressing.value,
+    canModifyMessage: () => !isSending.value && !isCompressing.value,
     showDeleteConfirmDialog,
     confirmDeleteMessage,
     showSuccess,
     showError,
   });
+
+  /**
+   * 只有最后一条 AI 回复能重试。
+   *
+   * 判定用完整的 `messages` 而不是被历史截断的 `displayMessages`，
+   * 否则「加载更多」尚未展开时会把倒数第 N 条误判成末尾。
+   */
+  const canRetryMessage = (message: Message): boolean => {
+    const lastMessage = messages.value[messages.value.length - 1];
+    return !isSending.value && !isCompressing.value && !isUpdatingMessage.value
+      && !showEditModal.value && message.type === 'assistant'
+      && lastMessage?.id === message.id && messages.value.some(item => item.type === 'user');
+  };
+
+  const getVariantCount = (message: Message): number => getMessageVariants(message).length;
+
+  const getVariantIndex = (message: Message): number => getActiveVariantIndex(message);
 
   return {
     router,
@@ -292,6 +319,9 @@ export function useChatPageViewModel(props: ChatPageProps) {
     theme,
     chatTitle,
     chatSubtitle,
+    userName: computed(() => selectedUser.value?.name?.trim() || '用户'),
+    aiName: computed(() => currentCharacter.value?.name?.trim()
+      || currentConversation.value?.characterName?.trim() || 'AI'),
     compressionSummary,
     canUseConversationCompression,
     usagePercent,
@@ -319,14 +349,24 @@ export function useChatPageViewModel(props: ChatPageProps) {
     currentApiPreset,
     currentPromptPreset,
     usage,
-    contextTokenBaseline,
     responseMetrics,
     isSending,
     isRequestActive,
     requestStatus,
-    handleSendMessage,
+    handleSendMessage: (content: string) => {
+      if (!isUpdatingMessage.value && !showEditModal.value) return handleSendMessage(content);
+    },
+    handleRetryMessage: (messageId: string) => {
+      if (!isUpdatingMessage.value && !showEditModal.value) return handleRetryMessage(messageId);
+    },
     handleCancelSend,
+    canRetryMessage,
+    getVariantCount,
+    getVariantIndex,
+    handleSwitchVariant,
     openPromptAssistant,
+    isUpdatingMessage,
+    editError,
     showEditModal,
     editingMessageId,
     editingMessageContent,
@@ -336,6 +376,7 @@ export function useChatPageViewModel(props: ChatPageProps) {
     lastSystemMessages,
     lastSystemPromptResult,
     handleDeleteMessage,
+
     ConfirmDialogComponent,
     confirmDialogProps,
     confirmDelete,

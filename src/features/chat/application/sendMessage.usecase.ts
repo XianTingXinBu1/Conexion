@@ -3,6 +3,7 @@ import type { MacroContext, MergeMode } from '@/modules/system-prompt';
 import { REQUEST_CANCELLED_MESSAGE } from '@/api/errors';
 import { processChatContent } from './chatContentPipeline';
 import { StreamMessageAssembler } from './streamMessageAssembler';
+import { applyVariantContent, beginNewVariant, revertLastVariant } from './messageVariants';
 
 export interface SendMessageUseCaseDeps {
   getMessages: () => Message[];
@@ -40,7 +41,7 @@ export interface SendMessageUseCaseDeps {
     includeUserInstructionMessage?: boolean;
     compressionSummary?: string;
   }) => ChatMessage[];
-  onSuccess: (kind: 'send' | 'compression') => void;
+  onSuccess: (kind: 'send' | 'retry' | 'compression') => void;
   onError: (kind: 'send' | 'compression', error: string) => void;
 }
 
@@ -132,18 +133,7 @@ export class SendMessageUseCase {
     let isCancelled = false;
     let hasCompleted = false;
 
-    const streamAssembler = new StreamMessageAssembler({
-      flushIntervalMs: this.flushIntervalMs,
-      getRegexRules: this.deps.getRegexRules,
-      macroContext: this.macroContext,
-      onFlush: (processedAssistantContent) => {
-        const msg = this.findMessage(assistantMessageId);
-        if (!msg) return;
-
-        msg.content = processedAssistantContent;
-        this.deps.onStreamFlush();
-      },
-    });
+    const streamAssembler = this.createStreamAssembler(assistantMessageId);
 
     const finalizeSend = async () => {
       streamAssembler.finalize();
@@ -173,12 +163,12 @@ export class SendMessageUseCase {
 
           if (isCancelled) {
             if (!msg.content.trim()) {
-              msg.content = '已停止生成';
+              applyVariantContent(msg, '已停止生成');
             }
             return;
           }
 
-          msg.content = `错误: ${error}`;
+          applyVariantContent(msg, `错误: ${error}`);
           this.deps.onError('send', error);
         },
       );
@@ -194,16 +184,161 @@ export class SendMessageUseCase {
       const errorMessage = err instanceof Error ? err.message : '发送失败';
       if (errorMessage === REQUEST_CANCELLED_MESSAGE) {
         if (!msg.content.trim()) {
-          msg.content = '已停止生成';
+          applyVariantContent(msg, '已停止生成');
         }
         await this.deps.saveConversation();
         return;
       }
 
-      msg.content = `错误: ${errorMessage}`;
+      applyVariantContent(msg, `错误: ${errorMessage}`);
       await this.deps.saveConversation();
       this.deps.onError('send', errorMessage);
     }
+  }
+
+  /**
+   * 重试最后一条 AI 回复：不新增消息，而是给同一条消息追加一个变体。
+   *
+   * 只允许最后一条：改历史回复会让它后面的对话建立在旧版本上，
+   * 展示与上下文会不一致。
+   */
+  async regenerate(messageId: string): Promise<void> {
+    const messages = this.deps.getMessages();
+    const target = messages[messages.length - 1];
+
+    if (!target || target.id !== messageId || target.type !== 'assistant') {
+      return;
+    }
+
+    // 复现原回合的请求：历史停在最后一条用户消息之前，该用户指令单独传。
+    const history = this.deps.getRequestMessages();
+    const replyIndex = history.findIndex(message => message.id === messageId);
+    const beforeReply = replyIndex === -1 ? history : history.slice(0, replyIndex);
+
+    let lastUserIndex = -1;
+    for (let index = beforeReply.length - 1; index >= 0; index -= 1) {
+      if (beforeReply[index]?.type === 'user') {
+        lastUserIndex = index;
+        break;
+      }
+    }
+
+    const userMessage = beforeReply[lastUserIndex];
+    if (!userMessage) {
+      return;
+    }
+
+    this.macroContext = {
+      aiCharacter: this.deps.getCurrentCharacter(),
+      userCharacter: this.deps.getSelectedUser(),
+      now: new Date(),
+    };
+
+    this.deps.resetUsage();
+    await this.deps.loadRegexRules();
+
+    const previousVariantIndex = beginNewVariant(target);
+    this.deps.onMessageSend();
+
+    const requestMessages = this.deps.buildSystemMessages({
+      aiCharacter: this.deps.getCurrentCharacter(),
+      userCharacter: this.deps.getSelectedUser(),
+      knowledgeBases: this.deps.getKnowledgeBases(),
+      chatHistory: beforeReply.slice(0, lastUserIndex),
+      userInstruction: userMessage.content,
+      mergeMode: this.deps.getPromptMergeMode(),
+      includeUserInstructionMessage: true,
+      compressionSummary: this.deps.getCompressionSummary(),
+    });
+
+    const streamAssembler = this.createStreamAssembler(messageId);
+
+    /** 一个字都没生成时把空槽位丢掉，不留下空回复（守卫在纯函数里）。 */
+    const discardEmptyVariant = () => {
+      const msg = this.findMessage(messageId);
+      if (!msg) {
+        return;
+      }
+
+      revertLastVariant(msg, previousVariantIndex);
+    };
+
+    let isCancelled = false;
+    let hasCompleted = false;
+
+    try {
+      await this.deps.sendStreamChatRequest(
+        requestMessages,
+        (chunk: string) => {
+          streamAssembler.append(chunk);
+        },
+        async () => {
+          hasCompleted = true;
+          streamAssembler.finalize();
+          discardEmptyVariant();
+          await this.deps.saveConversation();
+          this.deps.onSuccess('retry');
+        },
+        async (error: string) => {
+          isCancelled = error === REQUEST_CANCELLED_MESSAGE;
+          streamAssembler.finalize();
+
+          if (isCancelled) {
+            discardEmptyVariant();
+            await this.deps.saveConversation();
+            return;
+          }
+
+          const msg = this.findMessage(messageId);
+          if (msg) {
+            applyVariantContent(msg, `错误: ${error}`);
+          }
+          await this.deps.saveConversation();
+          this.deps.onError('send', error);
+        },
+      );
+    } catch (err) {
+      if (hasCompleted || isCancelled) {
+        return;
+      }
+
+      streamAssembler.clear();
+      const errorMessage = err instanceof Error ? err.message : '重试失败';
+
+      if (errorMessage === REQUEST_CANCELLED_MESSAGE) {
+        discardEmptyVariant();
+        await this.deps.saveConversation();
+        return;
+      }
+
+      const msg = this.findMessage(messageId);
+      if (msg) {
+        applyVariantContent(msg, `错误: ${errorMessage}`);
+      }
+      await this.deps.saveConversation();
+      this.deps.onError('send', errorMessage);
+    }
+  }
+
+  /**
+   * 流式装配器：把上游增量经 regex + 宏管线后写回目标消息。
+   *
+   * 写回统一走 `applyVariantContent`，因此带变体的消息会把内容同步到
+   * 当前变体，而单条回复的消息行为与改写前完全一致。
+   */
+  private createStreamAssembler(assistantMessageId: string): StreamMessageAssembler {
+    return new StreamMessageAssembler({
+      flushIntervalMs: this.flushIntervalMs,
+      getRegexRules: this.deps.getRegexRules,
+      macroContext: this.macroContext,
+      onFlush: (processedAssistantContent) => {
+        const msg = this.findMessage(assistantMessageId);
+        if (!msg) return;
+
+        applyVariantContent(msg, processedAssistantContent);
+        this.deps.onStreamFlush();
+      },
+    });
   }
 
   private shouldAutoCompress(messages?: Message[]): boolean {

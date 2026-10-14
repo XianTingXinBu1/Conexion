@@ -2,6 +2,7 @@ import type { AICharacter, ChatMessage, KnowledgeBase, Message, PromptPreset, Us
 import { countMessagesTokens } from '@/utils/tokenCounter';
 import type { MergeMode, SystemPromptResult } from '@/modules/system-prompt';
 import { buildSystemPrompt } from '@/modules/system-prompt';
+import { fillItemContent } from '@/modules/system-prompt/core/content-filler';
 
 export interface BuildSystemMessagesContext {
   preset: PromptPreset | null;
@@ -38,6 +39,7 @@ function buildFallbackMessages(
   userInstruction = '',
   compressionSummary?: string,
   includeUserInstructionMessage = true,
+  knowledgeBases: KnowledgeBase[] = [],
 ): ChatMessage[] {
   const messages: ChatMessage[] = [];
 
@@ -68,6 +70,14 @@ function buildFallbackMessages(
     }
   }
 
+  const knowledge = fillItemContent(
+    { id: 'knowledge-base', name: '知识库', description: '', enabled: true, prompt: '', roleType: 'system' },
+    { aiCharacter, knowledgeBases, chatHistory, userInstruction },
+  );
+  if (knowledge.content) {
+    messages.push({ role: 'system', content: knowledge.content });
+  }
+
   messages.push(...toChatHistoryMessages(chatHistory));
 
   if (includeUserInstructionMessage && userInstruction.trim()) {
@@ -90,6 +100,7 @@ export function buildSystemMessagesUseCase(context: BuildSystemMessagesContext):
       context.userInstruction,
       context.compressionSummary,
       includeUserInstructionMessage,
+      context.knowledgeBases,
     );
 
     return {
@@ -105,7 +116,7 @@ export function buildSystemMessagesUseCase(context: BuildSystemMessagesContext):
     preset: context.preset,
     aiCharacter: context.aiCharacter,
     userCharacter: context.userCharacter,
-    knowledgeBases: context.knowledgeBases.filter(kb => kb.globallyEnabled),
+    knowledgeBases: context.knowledgeBases,
     chatHistory: context.chatHistory,
     userInstruction: includeUserInstructionMessage ? context.userInstruction : '',
     mergeMode: context.mergeMode,

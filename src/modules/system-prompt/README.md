@@ -68,7 +68,7 @@ console.log(result.metadata)
 |---------|-----------|---------|------|
 | 角色设定 / `character-setting` | `character` | `aiCharacter` | AI 角色的人设和性格 |
 | 用户设定 / `user-setting` | `user` | `userCharacter` | 用户身份信息 |
-| 知识库 / `knowledge-base` | `knowledge` | `knowledgeBases` | 全局启用知识库中的已启用条目 |
+| 知识库 / `knowledge-base` | `knowledge` | `knowledgeBases` | 全局启用或当前角色绑定的知识库中的已启用条目 |
 | 压缩摘要 / `compression-summary` | `compression-summary` | `compressionSummary` | 已压缩历史上下文摘要 |
 | 聊天历史 / `chat-history` | `chat-history` | `chatHistory` | 对话历史记录 |
 | 用户指令 / `user-instruction` | `user-instruction` | `userInstruction` | 当前用户输入 |
@@ -227,7 +227,7 @@ src/features/chat/presentation/useChatStats.ts
 ## 注意事项
 
 - token 估算基于 gpt-tokenizer（cl100k），与上游真实分词器可能有细微差异，但不再按字符数线性折算（旧算法对中文会低估 3~4 倍）。
-- 知识库只收集全局启用知识库中的已启用条目。
+- 知识库收集全局启用或当前角色绑定的知识库中的已启用条目；按知识库 ID 去重，跨库按优先级升序排序（数字越小越靠前，缺省 50），同优先级保留原顺序。
 - 聊天历史条目会拆为多个 message，并保留 user / assistant 角色。
 - 用户指令条目会把当前输入放到预设指定的位置。
 - `insertPosition` 数字越小越靠前，缺省值靠后。

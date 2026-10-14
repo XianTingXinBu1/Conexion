@@ -33,10 +33,12 @@ src/modules/chat-prompt/
 - **单一构建路径**：真实发送与 Prompt 预览都走 `buildSystemMessagesUseCase`，
   不要再开第二条构建逻辑，否则预览与实际发送会分叉。
 - **fallback**：`preset` 为 `null` 时返回 `usedFallback: true` 的兜底消息
-  （压缩摘要 → 角色 `name` / `description` / `personality` → 历史 → 用户输入），
+  （压缩摘要 → 角色 `name` / `description` / `personality` → 知识库 → 历史 → 用户输入），
   保证「没有可用预设也能发消息」。
-- **知识库过滤**：只把 `globallyEnabled` 的知识库交给 `buildSystemPrompt`，
-  条目级启用状态由 system-prompt 负责。
+- **知识库选择**：把完整知识库列表交给 system-prompt，由它统一选择全局启用的知识库
+  与当前角色绑定的知识库（绑定不要求全局启用），按知识库 ID 去重。仅注入已启用条目，
+  跨知识库按优先级升序排序，同优先级保留原顺序，旧条目缺省优先级为 50。
+  无预设的 fallback 复用同一填充逻辑；有预设时仍由知识库提示词条目的启用状态控制注入。
 - **压缩摘要透传**：`compressionSummary` 原样交给 system-prompt，
   本层不做格式化（格式化在 `conversation-compression` 的 `formatCompressionSummaryForPrompt`）。
 - **`includeUserInstructionMessage`**：Prompt 预览传 `false`，

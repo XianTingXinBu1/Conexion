@@ -242,7 +242,7 @@ const preset = {
 
 1. 是否存在名为“知识库”或 id 为 `knowledge-base` 的启用条目。
 2. `knowledgeBases` 是否传入。
-3. 对应知识库是否 `globallyEnabled=true`。
+3. 对应知识库是否 `globallyEnabled=true`，或其 ID 是否等于当前 AI 角色的 `knowledgeBaseId`。
 4. 知识库条目是否 `enabled=true`。
 5. 条目内容是否为空。
 

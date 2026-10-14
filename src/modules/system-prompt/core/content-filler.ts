@@ -98,24 +98,26 @@ const FILLER_STRATEGIES: Record<ContentPlaceholder, ContentFillerStrategy> = {
       },
     };
   },
-  knowledge: ({ knowledgeBases }) => {
+  knowledge: ({ knowledgeBases, aiCharacter }) => {
     if (!knowledgeBases?.length) return null;
+    const contextCharacterKnowledgeBaseId = aiCharacter?.knowledgeBaseId;
 
-    const entries: string[] = [];
-    for (const kb of knowledgeBases) {
-      if (!kb.globallyEnabled) continue;
-      for (const entry of kb.entries) {
-        if (entry.enabled) {
-          // 知识库正文属于注入数据：按原样写入，不参与宏展开。
-          entries.push(
-            fillSlots(KNOWLEDGE_ENTRY_TEMPLATE, {
-              name: entry.name,
-              content: entry.content,
-            })
-          );
-        }
-      }
-    }
+    const seenKnowledgeBaseIds = new Set<string>();
+    const activeEntries = knowledgeBases.flatMap(kb => {
+      if (!kb.globallyEnabled && kb.id !== contextCharacterKnowledgeBaseId) return [];
+      if (seenKnowledgeBaseIds.has(kb.id)) return [];
+      seenKnowledgeBaseIds.add(kb.id);
+      return kb.entries.filter(entry => entry.enabled);
+    });
+    // 跨知识库统一排序；同优先级保留原顺序，旧数据缺省为 50。
+    activeEntries.sort((a, b) => (a.priority ?? 50) - (b.priority ?? 50));
+    const entries = activeEntries.map(entry =>
+      // 知识库正文属于注入数据：按原样写入，不参与宏展开。
+      fillSlots(KNOWLEDGE_ENTRY_TEMPLATE, {
+        name: entry.name,
+        content: entry.content,
+      })
+    );
 
     if (!entries.length) return null;
     return {

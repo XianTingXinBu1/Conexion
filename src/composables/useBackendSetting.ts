@@ -1,4 +1,4 @@
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, nextTick } from 'vue';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
 
 /**
@@ -9,13 +9,29 @@ export function useBackendSetting<T>(key: string, defaultValue: T) {
   const value = ref<T>(defaultValue);
   const isLoading = ref(false);
 
+  /**
+   * 标记「当前这次赋值来自后端」。
+   *
+   * watch 是在微任务里触发的，而赋值后函数可能马上就返回了，
+   * 拿 isLoading 当标志并不可靠，所以显式等一次 nextTick：
+   * 让这次远程赋值引起的 watch 回调先跑完（被跳过），再清除标志。
+   */
+  let applyingRemoteValue = false;
+
+  const applyRemoteValue = async (next: T) => {
+    applyingRemoteValue = true;
+    value.value = next;
+    await nextTick();
+    applyingRemoteValue = false;
+  };
+
   const loadValue = async () => {
     isLoading.value = true;
     try {
-      value.value = await getSetting(key, defaultValue);
+      await applyRemoteValue(await getSetting(key, defaultValue));
     } catch (e) {
       console.warn(`Failed to load setting ${key}:`, e);
-      value.value = defaultValue;
+      await applyRemoteValue(defaultValue);
     } finally {
       isLoading.value = false;
     }
@@ -35,6 +51,9 @@ export function useBackendSetting<T>(key: string, defaultValue: T) {
   };
 
   watch(value, (newValue) => {
+    // 读回来的值不再回写：否则每次打开设置页都会把后端已有的值原样 PUT 回去。
+    if (applyingRemoteValue) return;
+
     void saveValue(newValue);
   }, { deep: true });
 

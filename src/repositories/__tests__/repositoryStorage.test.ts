@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AICharacter, KnowledgeBase, Preset, PromptPreset, RegexRule, UserCharacter } from '@/types';
-import { DEFAULT_AI_CHARACTERS, DEFAULT_PROMPT_PRESETS, DEFAULT_REGEX_SCRIPTS, DEFAULT_USER_CHARACTER } from '@/constants';
+import { DEFAULT_AI_CHARACTERS, DEFAULT_PROMPT_PRESETS, DEFAULT_USER_CHARACTER } from '@/constants';
 
 const clearRegexCacheMock = vi.fn();
 const fetchMock = vi.fn<typeof fetch>();
@@ -71,14 +71,14 @@ describe('repository storage adapters', () => {
     }));
   });
 
-  it('loads regex defaults and clears regex cache before reading', async () => {
+  it('preserves an empty regex list and clears regex cache before reading', async () => {
     fetchMock.mockResolvedValue(mockJsonResponse([]));
 
     const repository = await import('../regexRuleRepository');
     const rules = await repository.loadRegexRules();
 
     expect(clearRegexCacheMock).toHaveBeenCalledTimes(1);
-    expect(rules).toEqual([...DEFAULT_REGEX_SCRIPTS]);
+    expect(rules).toEqual([]);
   });
 
   it('loads and saves knowledge bases through backend API', async () => {

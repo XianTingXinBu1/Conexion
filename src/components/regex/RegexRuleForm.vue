@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { User, Bot } from '@lucide/vue';
 import type { RegexRule, RegexScope, RegexApplyTo } from '@/types';
+import { validateRegex } from '@/utils/regexEngine';
 
 interface Props {
   modelValue: Partial<RegexRule>;
@@ -57,6 +58,13 @@ const applyToOptions = [
 // 写死在脚本里而不是模板里：模板文本会解析 {{...}}，需要避免被当成插值。
 const applyToHint = '宏作用于聊天内容（用户输入 / AI 输出）。宏作用前：规则看到的是 {{char}} 原文；宏作用后：看到的是替换后的角色名。代码块与行内代码里的宏不展开。';
 
+const testText = ref('');
+const validationError = computed(() => validateRegex(props.modelValue.pattern ?? '', props.modelValue.flags));
+const testResult = computed(() => {
+  if (validationError.value) return '';
+  return testText.value.replace(new RegExp(props.modelValue.pattern ?? '', props.modelValue.flags), props.modelValue.replacement ?? '');
+});
+
 const localValue = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val),
@@ -110,6 +118,14 @@ const updateField = <K extends keyof RegexRule>(field: K, value: RegexRule[K]) =
           @input="updateField('replacement', ($event.target as HTMLInputElement).value)"
         />
       </div>
+      <p v-if="validationError && localValue.pattern" role="alert" class="regex-error">{{ validationError }}</p>
+      <div class="form-group">
+        <label class="form-label">测试文本</label>
+        <textarea v-model="testText" class="form-input" rows="3" placeholder="输入文本，预览当前规则的替换结果" />
+        <span class="form-label">替换结果</span>
+        <pre class="regex-preview">{{ validationError ? '请先修正表达式或标志' : testResult }}</pre>
+        <p class="apply-hint">仅测试当前表达式的替换，不执行宏或其他规则。</p>
+      </div>
       <div class="form-group">
         <label class="form-label">作用域</label>
         <div class="scope-options">
@@ -151,6 +167,8 @@ const updateField = <K extends keyof RegexRule>(field: K, value: RegexRule[K]) =
 </template>
 
 <style scoped>
+.regex-error { color: #ef4444; font-size: 12px; }
+.regex-preview { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; padding: 10px; background: var(--bg-secondary); border-radius: 8px; min-height: 40px; }
 .regex-rule-form-wrapper {
   position: relative;
   max-height: 50vh;

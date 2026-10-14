@@ -6,6 +6,16 @@ import type { RegexRule } from '@/types';
  */
 const regexCache = new Map<string, RegExp>();
 
+export function validateRegex(pattern: string, flags = ''): string {
+  if (!pattern.trim()) return '请输入正则表达式';
+  try {
+    new RegExp(pattern, flags);
+    return '';
+  } catch (error) {
+    return `正则表达式或标志无效：${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
 /**
  * 从缓存获取或创建 RegExp 对象
  */

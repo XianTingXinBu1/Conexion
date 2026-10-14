@@ -12,7 +12,7 @@ function requestRegexRules<T>(options: RequestInit = {}): Promise<T> {
 export async function loadRegexRules(): Promise<RegexRule[]> {
   clearRegexCache();
   const stored = await requestRegexRules<RegexRule[]>();
-  return Array.isArray(stored) && stored.length > 0 ? stored : [...DEFAULT_REGEX_SCRIPTS].map(rule => ({ ...rule }));
+  return Array.isArray(stored) ? stored : [...DEFAULT_REGEX_SCRIPTS].map(rule => ({ ...rule }));
 }
 
 export async function saveRegexRules(rules: RegexRule[]): Promise<void> {

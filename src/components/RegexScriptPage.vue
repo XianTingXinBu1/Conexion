@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { RegexRule } from '@/types';
+import { validateRegex } from '@/utils/regexEngine';
 import { Plus, Hash } from '@lucide/vue';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
@@ -11,8 +12,14 @@ import { FormActions } from './form';
 
 // 使用 composables
 const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete, ConfirmDialog } = useConfirmDialog();
-const { showSuccess, showInfo } = useNotifications();
-const { rules, addRule, updateRule, deleteRule, toggleEnabled } = useRegexRules();
+const { showSuccess, showInfo, showError } = useNotifications();
+const { rules, addRule, updateRule, deleteRule, toggleEnabled, isSaving, isLoading, error } = useRegexRules();
+const busy = computed(() => isSaving.value || isLoading.value);
+const runOperation = async (operation: () => Promise<void>) => {
+  if (busy.value) return;
+  try { await operation(); }
+  catch (err) { showError('操作失败', err instanceof Error ? err.message : '请重试'); }
+};
 
 // 模态框状态
 const showNewModal = ref(false);
@@ -41,10 +48,10 @@ const openNewModal = () => {
 };
 
 // 添加新规则
-const handleAddRule = () => {
+const handleAddRule = () => runOperation(async () => {
   if (!newRuleForm.value.name?.trim() || !newRuleForm.value.pattern?.trim()) return;
 
-  addRule({
+  await addRule({
     name: newRuleForm.value.name.trim(),
     enabled: newRuleForm.value.enabled ?? true,
     pattern: newRuleForm.value.pattern.trim(),
@@ -57,7 +64,7 @@ const handleAddRule = () => {
   const msg = getNotificationMessage('REGEX_RULE_ADD_SUCCESS', { name: newRuleForm.value.name });
   showSuccess(msg.title, msg.message);
   showNewModal.value = false;
-};
+});
 
 // 打开编辑模态框
 const openEditModal = (rule: RegexRule) => {
@@ -67,10 +74,10 @@ const openEditModal = (rule: RegexRule) => {
 };
 
 // 保存编辑
-const handleSaveEdit = () => {
+const handleSaveEdit = () => runOperation(async () => {
   if (!editingRuleId.value || !editRuleForm.value.name?.trim() || !editRuleForm.value.pattern?.trim()) return;
 
-  const success = updateRule(editingRuleId.value, {
+  const success = await updateRule(editingRuleId.value, {
     name: editRuleForm.value.name.trim(),
     pattern: editRuleForm.value.pattern.trim(),
     enabled: editRuleForm.value.enabled,
@@ -86,7 +93,7 @@ const handleSaveEdit = () => {
   }
   showEditModal.value = false;
   editingRuleId.value = null;
-};
+});
 
 // 删除规则
 const handleDeleteRule = (id: string) => {
@@ -97,24 +104,24 @@ const handleDeleteRule = (id: string) => {
 };
 
 // 确认删除
-const handleConfirmDelete = () => {
+const handleConfirmDelete = () => runOperation(async () => {
   const id = confirmDelete();
   if (!id) return;
 
-  const success = deleteRule(id);
+  const success = await deleteRule(id);
   if (success) {
     const msg = getNotificationMessage('REGEX_RULE_DELETE_SUCCESS');
     showInfo(msg.title, msg.message);
   }
-};
+});
 
 // 切换启用状态
-const handleToggleEnabled = (id: string) => {
+const handleToggleEnabled = (id: string) => runOperation(async () => {
   const rule = rules.value.find(r => r.id === id);
   if (!rule) return;
 
   const newEnabled = !rule.enabled;
-  toggleEnabled(id);
+  await toggleEnabled(id);
 
   if (newEnabled) {
     const msg = getNotificationMessage('REGEX_RULE_ENABLE_SUCCESS', { name: rule.name });
@@ -123,17 +130,17 @@ const handleToggleEnabled = (id: string) => {
     const msg = getNotificationMessage('REGEX_RULE_DISABLE_SUCCESS', { name: rule.name });
     showInfo(msg.title, msg.message);
   }
-};
+});
 
 // 计算表单操作按钮
 const newFormActions = computed(() => [
-  { type: 'secondary' as const, label: '取消' },
-  { type: 'primary' as const, label: '添加', disabled: !newRuleForm.value.name?.trim() || !newRuleForm.value.pattern?.trim() },
+  { type: 'secondary' as const, label: '取消', disabled: busy.value },
+  { type: 'primary' as const, label: '添加', loading: isSaving.value, disabled: busy.value || !newRuleForm.value.name?.trim() || !!validateRegex(newRuleForm.value.pattern ?? '', newRuleForm.value.flags) },
 ]);
 
 const editFormActions = computed(() => [
-  { type: 'secondary' as const, label: '取消' },
-  { type: 'primary' as const, label: '保存', disabled: !editRuleForm.value.name?.trim() || !editRuleForm.value.pattern?.trim() },
+  { type: 'secondary' as const, label: '取消', disabled: busy.value },
+  { type: 'primary' as const, label: '保存', loading: isSaving.value, disabled: busy.value || !editRuleForm.value.name?.trim() || !!validateRegex(editRuleForm.value.pattern ?? '', editRuleForm.value.flags) },
 ]);
 
 const formActionsAlign = 'space-between' as const;
@@ -152,6 +159,8 @@ const formActionsAlign = 'space-between' as const;
 
     <!-- 内容滚动区域 -->
     <div class="content-scroll">
+      <p v-if="error" role="alert">{{ error }}</p>
+      <p v-if="isLoading">正在加载规则…</p>
       <!-- 规则列表 -->
       <div class="section">
         <div class="section-title">
@@ -170,6 +179,7 @@ const formActionsAlign = 'space-between' as const;
             v-for="rule in rules"
             :key="rule.id"
             :rule="rule"
+            :busy="busy"
             @toggle="handleToggleEnabled"
             @edit="openEditModal"
             @delete="handleDeleteRule"

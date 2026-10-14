@@ -4,6 +4,7 @@ import type { RegexRule, RegexScope, RegexApplyTo } from '@/types';
 
 interface Props {
   rule: RegexRule;
+  busy?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -40,6 +41,7 @@ const getApplyToLabel = (applyTo: RegexApplyTo) => {
       <div class="rule-info">
         <button
           :class="['toggle-btn', { 'active': rule.enabled }]"
+          :disabled="busy"
           @click="emit('toggle', rule.id)"
         >
           <ToggleRight v-if="rule.enabled" :size="18" />
@@ -48,10 +50,10 @@ const getApplyToLabel = (applyTo: RegexApplyTo) => {
         <div class="rule-name">{{ rule.name }}</div>
       </div>
       <div class="rule-actions">
-        <button class="action-btn" @click="emit('edit', rule)">
+        <button class="action-btn" :disabled="busy" @click="emit('edit', rule)">
           <Edit2 :size="16" />
         </button>
-        <button class="action-btn delete" @click="emit('delete', rule.id)">
+        <button class="action-btn delete" :disabled="busy" @click="emit('delete', rule.id)">
           <Trash2 :size="16" />
         </button>
       </div>

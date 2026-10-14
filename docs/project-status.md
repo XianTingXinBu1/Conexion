@@ -6,9 +6,11 @@
 「已完成清单 / 边界规则 / 待办优先级 / 验证命令」上互相重复，且各有一套
 冲突的优先级编号。
 
-> 文档同步状态：最后校对 2026-10-12（校正质量基线数字、补记角色卡编辑器 /
-> 开场白 / 返回键接管 / 聊天内容处理管线，为 chat-prompt 与
-> conversation-compression 补上 module README，并补上 ApiPresetPage 页面级测试）。
+> 文档同步状态：最后校对 2026-10-14（补齐 9 个路由页 + `AppProvider.vue`
+> 的页面级单测并校正质量基线，`src/components` 语句覆盖率 26.7% → 81.2%；此前
+> 2026-10-12 校正质量基线数字、补记角色卡编辑器 / 开场白 / 返回键接管 /
+> 聊天内容处理管线，为 chat-prompt 与 conversation-compression 补上 module README，
+> 并补上 ApiPresetPage 页面级测试）。
 
 相关文档：
 
@@ -38,8 +40,8 @@ src/modules/<name>/README.md    各 module 的独立说明（8 个 module 已全
 质量基线：
 
 ```bash
-npx vitest run                 # 47 文件 / 305 测试
-npm run check:architecture     # 179 文件扫描
+npx vitest run                 # 60 文件 / 386 测试
+npm run check:architecture     # 180 文件扫描
 npx vue-tsc -b                 # 类型检查
 npm run build                  # 构建
 npm run e2e                    # E2E（需服务在线）
@@ -96,6 +98,14 @@ npm run health-check           # 提交前的完整检查（6 项，约 65s）
   随回复版本切换；API 预设中的「显示思考内容」开关默认开启，仅控制展示。
   当前不解析正文中的 `<think>` 标签，也未进行真实上游模型联调。
 - 首个非聊天页的页面级测试：`ApiPresetPage.test.ts`（保存 / 切换预设 / 测试连接 / 获取模型列表）
+- 页面级测试补齐：9 个路由页 + `AppProvider.vue` 均有页面级单测。新增
+  `KnowledgeBasePage`（10 用例）/ `PromptPresetPage`（13）/ `ConversationListPage`（9）/
+  `RoleManagementPage`（12）/ `SettingsPage`（7）/ `MainPage`（4）/ `AppProvider`（4），
+  均只在 fetch 边界打桩，穿过 页面 → composable → repository 的真实链路。
+  `src/components` 语句覆盖率 26.7% → 81.2%。
+- 连同页面测试修掉的真实缺陷：知识库重命名重复提示、知识库全局启用开关文案颠倒、
+  提示词预设切换时「标题已换、条目还是旧的」中间态；以及两处「读设置会回写设置」
+  （`useBackendSetting` / `useTheme` 在冷启动时把后端已有值原样 PUT 回去）。
 - 本次提交检查：全量单测 305 项及构建、架构边界检查通过；上下文统计、回复版本、
   删除多选的独立提交快照均通过构建和全量单测。返回保护、聊天布局滚动及新建会话
   E2E 已通过；全量 E2E 运行中 ChromeDriver 提前退出，未完成全部用例。
@@ -220,9 +230,13 @@ E2E 在健康检查中标记为**非关键项**（`critical: false`），失败�
    `CharacterEditor.vue` 487、`KnowledgeBaseDetailView.vue` 471、
    `ConversationListPage.vue` 433、`PromptPresetPage.vue` 398。
    聊天页主体已经瘦下来（`ChatPage.vue` 204 行），厚度转移到了聊天侧的大组件上。
-4. **页面级测试仍然偏少**。页面级单测只有 `ChatPage.sendFlow.test.ts`（成功 / 取消 /
-   失败 / 预设加载期取消 / 重试与版本切换 / 重试期间切换保护 / 重试取消恢复）与 `ApiPresetPage.test.ts`（保存 / 切换预设 / 测试连接 /
-   获取模型列表），其余页面仍无页面级测试；E2E 目前 8 个文件 / 14 个用例（含聊天布局 / 条件跟随滚动 /
+4. **页面级测试已补齐，但两页仍偏薄**。9 个路由页与 `AppProvider.vue` 都有页面级
+   单测了，其中 `SettingsPage` 97.2% / `ConversationListPage` 91.1% /
+   `PromptPresetPage` 90.1% / `RoleManagementPage` 87.0% / `ChatPage` 87.0% /
+   `KnowledgeBasePage` 86.2% / `MainPage` 68.1% 语句覆盖；仍偏薄的是
+   `ApiPresetPage.vue`（56.6%）与 `RegexScriptPage.vue`（49.5%），
+   聊天侧大组件（`PromptPreviewModal.vue`、`TokenDetailsPanel.vue`）与
+   `FormSlider.vue` 还是空白。E2E 目前 8 个文件 / 14 个用例（含聊天布局 / 条件跟随滚动 /
    新建角色弹窗与编辑器返回键），覆盖冒烟、
    两处渲染与两处交互，还没形成页面回归网。
 5. **横切 UI 尚未完全收口**。`ConfirmDialog`（10 处）与 `Modal`（8 个文件）已是事实上
@@ -308,16 +322,24 @@ E2E 在健康检查中标记为**非关键项**（`critical: false`），失败�
 
 **单一优先级列表**（三份旧文档中的 P0–P4 / P1–P5 / 四阶段已合并到此处）：
 
-### P1：补页面级测试（进行中）
+### P1：补页面级测试（已完成）
 
 理由：单测层面的页面级链路很少，任何页面重构都缺乏安全网。工具链
 （`@testing-library/vue` + happy-dom）与 E2E 骨架（Selenium）均已就绪，可直接复用。
 
-已完成：`src/components/__tests__/ApiPresetPage.test.ts`——保存 / 切换预设 /
-测试连接（含成功、失败与「测试中」窗口）/ 获取模型列表，5 个用例，只在 fetch
-边界打桩。
+已完成：`ApiPresetPage.test.ts`（保存 / 切换预设 / 测试连接（含成功、失败与
+「测试中」窗口）/ 获取模型列表，5 个用例，只在 fetch 边界打桩）；本轮又补上
+`ChatPage`（原有 `.sendFlow`）之外的 6 个页面 + `AppProvider`：
+`KnowledgeBasePage`（列表 / 全局启用 / 增删改条目 / 拖拽排序 / 角色引用清理 /
+重命名）、`PromptPresetPage`（条目增删改 / 启用 / 排序、预设增删改切换）、
+`ConversationListPage`（排序 / 搜索 / 跳转 / 重命名 / 删除 / 角色选择器）、
+`RoleManagementPage`（选中 / 新建 / 编辑 / 删除 / 导入导出 / 知识库绑定与标签切分）、
+`SettingsPage`（读写各项设置 / 数据占用 / 恢复默认 / 删除数据 / 注入调试上下文）、
+`MainPage`（入口渲染与跳转 / 主题切换）。
 
-待补：Prompt 预设编辑，知识库条目启用与排序。
+仍待补：`ApiPresetPage`（连接测试与错误分支）与 `RegexScriptPage`
+（规则增删改与作用域）补到 80% 以上；聊天侧大组件
+（`PromptPreviewModal.vue`、`TokenDetailsPanel.vue`）的交互测试。
 
 注意：涉及 DOM 清理 / XSS 的断言不要写在 happy-dom 单测里，理由见「需要注意的
 行为边界」。

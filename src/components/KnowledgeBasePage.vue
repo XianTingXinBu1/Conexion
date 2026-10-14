@@ -55,8 +55,11 @@ const handleSelectKb = (id: string) => {
 const handleToggleGlobalEnabled = (id: string) => {
   const kb = knowledgeBases.value.find(kb => kb.id === id);
   if (kb) {
+    // 先记下切换前的状态：toggleGlobalEnabled 会同步翻转 globallyEnabled，
+    // 翻转后再读会让提示文案正好反过来
+    const wasEnabled = kb.globallyEnabled;
     toggleGlobalEnabled(id);
-    if (kb.globallyEnabled) {
+    if (wasEnabled) {
       const msg = getNotificationMessage('KNOWLEDGE_BASE_DISABLE_SUCCESS', { name: kb.name });
       showInfo(msg.title, msg.message);
     } else {

@@ -179,10 +179,9 @@ const handleDeleteKb = () => {
 };
 
 // 保存知识库
+// 成功提示由页面层（handleUpdateBase）统一给出，这里不再重复提示
 const handleSaveKb = (data: { name: string; description: string }) => {
   emit('updateBase', data);
-  const msg = getNotificationMessage('KNOWLEDGE_BASE_UPDATE_SUCCESS', { name: data.name });
-  showSuccess(msg.title, msg.message);
   showKbFormModal.value = false;
 };
 

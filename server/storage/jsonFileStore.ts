@@ -26,7 +26,7 @@ export class JsonFileStore<T> implements JsonDataStore<T> {
   }
 
   async write(data: T): Promise<void> {
-    this.pendingWrite = this.pendingWrite.then(() => this.writeImmediately(data));
+    this.pendingWrite = this.pendingWrite.catch(() => {}).then(() => this.writeImmediately(data));
     return this.pendingWrite;
   }
 

@@ -4,6 +4,13 @@ import type { AppStorage } from '../storage/appStorage';
 
 export class SettingsRepository {
   private readonly storage: AppStorage;
+  private pendingMutation: Promise<unknown> = Promise.resolve();
+
+  private mutate<T>(operation: () => Promise<T>): Promise<T> {
+    const next = this.pendingMutation.catch(() => {}).then(operation);
+    this.pendingMutation = next;
+    return next;
+  }
 
   constructor(storage: AppStorage) {
     this.storage = storage;
@@ -20,19 +27,23 @@ export class SettingsRepository {
   }
 
   async set<T>(key: string, value: T): Promise<T> {
-    const settings = await this.getAll();
-    settings[key] = value;
-    await this.storage.settings.write(settings);
-    return value;
+    return this.mutate(async () => {
+      const settings = await this.getAll();
+      settings[key] = value;
+      await this.storage.settings.write(settings);
+      return value;
+    });
   }
 
   async replaceAll(settings: Record<string, unknown>): Promise<Record<string, unknown>> {
-    await this.storage.settings.write({ ...settings });
-    return this.getAll();
+    return this.mutate(async () => {
+      await this.storage.settings.write({ ...settings });
+      return this.getAll();
+    });
   }
 
   async clear(): Promise<void> {
-    await Promise.all([
+    await this.mutate(() => Promise.all([
       this.storage.conversations.write([]),
       this.storage.userCharacters.write([]),
       this.storage.aiCharacters.write([]),
@@ -41,20 +52,18 @@ export class SettingsRepository {
       this.storage.promptPresets.write([]),
       this.storage.regexRules.write([]),
       this.storage.settings.write({}),
-    ]);
+    ]));
   }
 
   async listRegexRules(): Promise<RegexRule[]> {
     const rules = await this.storage.regexRules.read();
-    return Array.isArray(rules) && rules.length > 0
+    return Array.isArray(rules)
       ? rules.map(rule => ({ ...rule }))
       : [...DEFAULT_REGEX_SCRIPTS].map(rule => ({ ...rule }));
   }
 
   async replaceRegexRules(rules: RegexRule[]): Promise<RegexRule[]> {
-    const nextRules = rules.length > 0
-      ? rules.map(rule => ({ ...rule }))
-      : [...DEFAULT_REGEX_SCRIPTS].map(rule => ({ ...rule }));
+    const nextRules = rules.map(rule => ({ ...rule }));
     await this.storage.regexRules.write(nextRules);
     return nextRules.map(rule => ({ ...rule }));
   }

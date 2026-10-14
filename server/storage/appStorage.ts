@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { DEFAULT_REGEX_SCRIPTS } from '../../src/constants';
 import type { AICharacter, Conversation, KnowledgeBase, Preset, PromptPreset, RegexRule, UserCharacter } from '../../src/types';
 import { getServerConfig, type ServerConfig } from '../config';
 import { JsonFileStore } from './jsonFileStore';
@@ -43,7 +44,7 @@ export function createAppStorage(config: ServerConfig = getServerConfig()): AppS
     ),
     regexRules: new JsonFileStore<RegexRule[]>(
       join(config.dataDir, 'regex-rules.json'),
-      () => [],
+      () => DEFAULT_REGEX_SCRIPTS.map(rule => ({ ...rule })),
     ),
     settings: new JsonFileStore<Record<string, unknown>>(
       join(config.dataDir, 'settings.json'),

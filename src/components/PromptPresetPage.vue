@@ -120,8 +120,10 @@ const loadCurrentPresetItems = () => {
 // 切换预设
 const selectPreset = async (id: string) => {
   selectedPresetId.value = id;
-  await saveSelectedPreset();
+  // 先换列表再落库：标题读的是 selectedPresetId，若等设置写完再刷新条目，
+  // 保存耗时期间会显示「新预设名 + 旧预设条目」这种不一致的中间态。
   loadCurrentPresetItems();
+  await saveSelectedPreset();
 };
 
 // 打开预设菜单

@@ -58,6 +58,8 @@ const {
   isRequestActive,
   requestStatus,
   handleSendMessage,
+  draft,
+  draftError,
   handleRetryMessage,
   handleCancelSend,
   canRetryMessage,
@@ -204,9 +206,11 @@ const {
       <button :disabled="isUpdatingMessage" @click="cancelMessageSelection">取消</button>
       <button :disabled="!selectedMessageCount || isUpdatingMessage" @click="requestDeleteSelected">{{ isUpdatingMessage ? '删除中…' : '删除选中消息' }}</button>
     </div>
-    <ChatInput v-else
+    <p v-if="draftError" role="alert" class="draft-error">{{ draftError }}</p>
+    <ChatInput v-if="!isSelectingMessages"
+      v-model="draft"
       :enter-to-send="enterToSend"
-      :is-sending="isSending || isUpdatingMessage || showEditModal"
+      :is-sending="isSending || isCompressing || isUpdatingMessage || showEditModal"
       :is-request-active="isRequestActive"
       :request-status="requestStatus"
       @send="handleSendMessage"
@@ -247,6 +251,7 @@ const {
 </template>
 
 <style scoped>
+.draft-error { margin: 0; padding: 6px 20px; color: var(--text-muted); font-size: 12px; }
 .message-selection-bar {
   display: flex;
   align-items: center;

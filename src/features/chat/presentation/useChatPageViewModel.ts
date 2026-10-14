@@ -13,6 +13,7 @@ import { useChatViewport } from './useChatViewport';
 import { useChatScrollPolicy } from './useChatScrollPolicy';
 import { useChatMessageActions } from './useChatMessageActions';
 import { useChatSendFlow } from './useChatSendFlow';
+import { useChatDraft } from './useChatDraft';
 import { useChatSessionMeta } from './useChatSessionMeta';
 import { useChatSessionFacade } from './useChatSessionFacade';
 import { useChatCompressionController } from '@/modules/conversation-compression/presentation';
@@ -51,6 +52,14 @@ export function useChatPageViewModel(props: ChatPageProps) {
     editMessage,
     deleteMessage,
   } = session;
+
+  const draftKey = computed(() => {
+    const id = persistedConversationId.value ?? props.conversationId;
+    if (id && !id.startsWith('temp-')) return `conversation:${id}`;
+    const characterId = props.characterId ?? props.character?.id;
+    return characterId ? `character:${characterId}` : null;
+  });
+  const { draft, draftError, saveDraft } = useChatDraft(draftKey);
 
   const {
     confirmDialogProps,
@@ -359,8 +368,15 @@ export function useChatPageViewModel(props: ChatPageProps) {
     isSending,
     isRequestActive,
     requestStatus,
-    handleSendMessage: (content: string) => {
-      if (!isUpdatingMessage.value && !showEditModal.value && !isSelectingMessages.value) return handleSendMessage(content);
+    draft,
+    draftError,
+    handleSendMessage: (content: string, onAccepted?: () => void) => {
+      if (!isUpdatingMessage.value && !showEditModal.value && !isSelectingMessages.value) {
+        return handleSendMessage(content, () => {
+          onAccepted?.();
+          void saveDraft();
+        });
+      }
     },
     handleRetryMessage: (messageId: string) => {
       if (!isUpdatingMessage.value && !showEditModal.value && !isSelectingMessages.value) return handleRetryMessage(messageId);

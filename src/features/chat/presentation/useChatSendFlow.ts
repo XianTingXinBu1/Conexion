@@ -95,7 +95,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
     deps.transport.cancelRequest();
   };
 
-  const createUseCase = () => new SendMessageUseCase({
+  const createUseCase = (onAccepted?: () => void) => new SendMessageUseCase({
     getMessages: () => deps.state.messages.value,
     getRequestMessages: () => deps.state.requestMessages.value,
     getRegexRules: () => deps.state.regexRules.value,
@@ -137,7 +137,10 @@ export function useChatSendFlow(deps: SendFlowDeps) {
     createNewConversation: deps.session.createNewConversation,
     saveConversation: deps.session.saveConversation,
     onStreamFlush: deps.uiEffects.onStreamFlush,
-    onMessageSend: deps.uiEffects.onMessageSend,
+    onMessageSend: () => {
+      onAccepted?.();
+      deps.uiEffects.onMessageSend();
+    },
     sendStreamChatRequest: deps.transport.sendStreamChatRequest,
     buildSystemMessages: deps.transport.buildSystemMessages,
     onSuccess: (kind) => {
@@ -159,7 +162,7 @@ export function useChatSendFlow(deps: SendFlowDeps) {
     },
   });
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, onAccepted?: () => void) => {
     if (isSending.value || deps.compression.isCompressing.value) {
       return;
     }
@@ -167,7 +170,12 @@ export function useChatSendFlow(deps: SendFlowDeps) {
     isSending.value = true;
 
     try {
-      await createUseCase().execute(content);
+      await createUseCase(onAccepted).execute(content);
+    } catch (error) {
+      const msg = getNotificationMessage('CHAT_SEND_FAILED', {
+        error: error instanceof Error ? error.message : '发送失败',
+      });
+      deps.uiEffects.showError(msg.title, msg.message);
     } finally {
       isSending.value = false;
     }

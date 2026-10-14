@@ -59,6 +59,19 @@ describe('SendMessageUseCase', () => {
     expect(deps.onSuccess).toHaveBeenCalledWith('send');
   });
 
+  it.each([false, true])('keeps input unaccepted and rolls back user insertion on persistence failure (existing: %s)', async existing => {
+    const fail = vi.fn(async () => { throw new Error('保存失败'); });
+    const { deps, messages } = createDeps({
+      getPersistedConversationId: () => existing ? 'conv-one' : undefined,
+      createNewConversation: fail,
+      saveConversation: fail,
+    });
+    await expect(new SendMessageUseCase(deps).execute('原文')).rejects.toThrow('保存失败');
+    expect(messages).toEqual([]);
+    expect(deps.onMessageSend).not.toHaveBeenCalled();
+    expect(deps.sendStreamChatRequest).not.toHaveBeenCalled();
+  });
+
   it('reports compression failure and does not send message', async () => {
     const { deps, messages } = createDeps({
       getCompressionMode: () => 'auto',

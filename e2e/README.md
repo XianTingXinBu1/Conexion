@@ -96,6 +96,7 @@ export default {
 ## 现有用例
 
 - `smoke.mjs` — 应用能加载
+- `chat-input.mjs` — 输入法与 Shift+Enter 保护、发送保存确认后清空、生成中编辑草稿与停止按钮
 - `new-conversation.mjs` — 新建角色会话等待弹窗历史回收再跳转，开场白与返回列表验证
 - `chat-layout-scroll.mjs` — 消息下方操作 / 两端版本箭头；底部跟随输出、上翻停止、
   聚焦与发送不强制滚动、回到底部恢复与延迟帧取消

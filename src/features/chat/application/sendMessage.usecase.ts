@@ -103,10 +103,18 @@ export class SendMessageUseCase {
     const chatHistoryBeforeSend = [...this.deps.getRequestMessages()];
     this.deps.getMessages().push(userMessage);
 
-    if (!this.deps.getPersistedConversationId()) {
-      await this.deps.createNewConversation(userMessage);
-    } else {
-      await this.deps.saveConversation();
+    try {
+      if (!this.deps.getPersistedConversationId()) {
+        await this.deps.createNewConversation(userMessage);
+      } else {
+        await this.deps.saveConversation();
+      }
+    } catch (error) {
+      // 尚未发给上游，保存失败时撤回本地插入，重试不会重复用户消息。
+      const messages = this.deps.getMessages();
+      const index = messages.findIndex(message => message === userMessage || message.id === userMessage.id);
+      if (index !== -1) messages.splice(index, 1);
+      throw error;
     }
 
     await this.deps.onMessageSend();

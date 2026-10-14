@@ -280,8 +280,10 @@ beforeEach(() => {
   fetchMock.mockClear();
 });
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  // 草稿在离开页面时异步保存，等待请求启动后再恢复 fetch。
+  await new Promise(resolve => setTimeout(resolve, 0));
   vi.unstubAllGlobals();
 });
 

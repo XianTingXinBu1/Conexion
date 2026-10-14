@@ -17,13 +17,14 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  send: [message: string];
+  send: [message: string, onAccepted: () => void];
   cancel: [];
   focus: [];
   showPromptAssistant: [];
 }>();
 
-const messageInput = ref('');
+const messageInput = defineModel<string>({ default: '' });
+const isComposing = ref(false);
 const messageInputRef = ref<HTMLTextAreaElement>();
 const isToolbarExpanded = ref(false);
 
@@ -38,11 +39,14 @@ const adjustTextareaHeight = () => {
 
 const sendMessage = () => {
   const content = messageInput.value.trim();
-  if (!content || props.isRequestActive) return;
+  if (!content || props.isRequestActive || props.isSending || isComposing.value) return;
 
-  emit('send', content);
-  messageInput.value = '';
-  adjustTextareaHeight();
+  const originalInput = messageInput.value;
+  emit('send', content, () => {
+    // 保存期间用户可能继续写下一条，不覆盖新的草稿。
+    if (messageInput.value === originalInput) messageInput.value = '';
+    adjustTextareaHeight();
+  });
 };
 
 const cancelMessage = () => {
@@ -54,16 +58,10 @@ const cancelMessage = () => {
 };
 
 const handleEnterKey = (event: KeyboardEvent) => {
-  if (props.enterToSend) {
-    event.preventDefault();
-
-    if (props.isRequestActive) {
-      cancelMessage();
-      return;
-    }
-
-    sendMessage();
-  }
+  if (isComposing.value || event.isComposing || event.keyCode === 229 || event.shiftKey || !props.enterToSend) return;
+  event.preventDefault();
+  // 生成期间 Enter 不发送也不停止，停止由专用按钮控制。
+  if (!props.isRequestActive && !props.isSending) sendMessage();
 };
 
 const toggleToolbar = () => {
@@ -116,8 +114,9 @@ defineExpose({
         ref="messageInputRef"
         v-model="messageInput"
         class="message-input"
-        :placeholder="isRequestActive ? '正在生成，可点击停止...' : '输入消息...'"
-        :disabled="isRequestActive"
+        :placeholder="isRequestActive ? '正在生成，可以先写下一条...' : '输入消息...'"
+        @compositionstart="isComposing = true"
+        @compositionend="isComposing = false"
         @keydown.enter="handleEnterKey"
         @pointerdown="emit('focus')"
         @focus="emit('focus')"
@@ -136,7 +135,7 @@ defineExpose({
         v-else
         class="send-btn"
         @click="sendMessage"
-        :disabled="!messageInput.trim()"
+        :disabled="!messageInput.trim() || isSending || isComposing"
         :title="requestStatus === 'cancelled' ? '重新输入后发送' : '发送'"
       >
         <Send :size="18" />

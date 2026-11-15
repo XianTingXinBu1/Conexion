@@ -166,7 +166,7 @@ Layering details live in `docs/chat-architecture.md`.
 | `npm run build` | Type-check and build the frontend |
 | `npm run preview` | Preview the build output |
 | `npm run test:run` | Vitest unit tests (`test` runs in watch mode) |
-| `npm run test:coverage` | Unit tests with coverage |
+| `npm run test:coverage` | Unit tests with coverage and threshold check |
 | `npm run check:architecture` | Architecture boundary check |
 | `npm run e2e` | Selenium end-to-end tests, backend + frontend must be running (see `e2e/README.md`) |
 | `npm run health-check` | Full health check (types / deps / architecture / tests / build / E2E) |
@@ -180,6 +180,22 @@ Verification scope by change type:
 | Chat module | `test:run` + `check:architecture` |
 | Rendering / macros / routing (browser behavior) | additionally run `e2e` |
 | Before committing | `health-check` |
+
+### CI
+
+GitHub Actions runs on `push` to `main` and on `pull_request`:
+
+```txt
+npm ci -> vue-tsc -b --noEmit -> check:architecture -> test:coverage -> build
+```
+
+E2E is deliberately excluded: it relies on the system Chromium plus a matching chromedriver,
+which is not worth maintaining on a runner — it finishes in about four minutes locally.
+
+Coverage thresholds live in `vitest.config.ts` and are only enforced in `--coverage` mode; the
+bounds sit slightly below the current measured values so that "new code without tests" fails
+rather than small statistical jitter. `test-check` inside `health-check` runs with `--coverage`,
+so the thresholds are a hard gate locally too.
 
 ## Docs
 

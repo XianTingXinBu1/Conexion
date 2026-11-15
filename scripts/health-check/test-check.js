@@ -1,5 +1,8 @@
 /**
  * 测试检查
+ *
+ * 带 --coverage 执行：覆盖率门槛（vitest.config.ts 的 coverage.thresholds）只在
+ * --coverage 模式下校验，不带它等于没有闸。代价是比裸跑多约 4s。
  */
 
 export async function runTestCheck(options = {}) {
@@ -26,8 +29,8 @@ export async function runTestCheck(options = {}) {
 
     // Termux 友好：直接用 node 跑 vitest 入口，避开 .bin shebang
     const command = existsSync(vitestCli)
-      ? `node "${vitestCli}" run`
-      : 'npx vitest run';
+      ? `node "${vitestCli}" run --coverage`
+      : 'npx vitest run --coverage';
 
     execSync(command, {
       stdio: 'pipe',
@@ -57,7 +60,9 @@ export async function runTestCheck(options = {}) {
       name: '单元测试检查',
       status: 'fail',
       duration: Date.now() - startTime,
-      message: '测试失败',
+      message: output.includes('ERROR: Coverage')
+        ? '测试通过但覆盖率未达门槛'
+        : '测试失败',
       details: output,
     };
   }

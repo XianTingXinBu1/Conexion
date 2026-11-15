@@ -1,17 +1,23 @@
 # E2E 测试
 
-基于 Selenium + Termux 系统 Chromium 的端到端测试。
+基于 Selenium + 系统 Chromium 的端到端测试。
 
-## 为什么不用 Playwright / Cypress
+## 为什么用 Selenium 而不是 Playwright / Cypress
 
-Termux (Android/aarch64) 上 Playwright 自带的浏览器二进制无法运行。
-本项目复用系统已安装的 Chromium + ChromeDriver，通过 Selenium 驱动。
+这个项目最初在 Termux (Android/aarch64) 上开发，Playwright 自带的浏览器二进制在那里无法运行，
+于是改成复用系统已安装的 Chromium + ChromeDriver。现在主开发环境是 Arch Linux 桌面（Chromium 与
+chromedriver 都在 `/usr/bin`），这套方案继续留用的理由是：不用额外下载浏览器、驱动与浏览器版本
+天然一致、同一套用例在 Arch / Debian / Termux 上都能跑。没有迁移到 Playwright 的计划。
 
 ## 前置条件
 
-**Termux**：`pkg install chromium`（含 chromedriver）
+系统 Chromium + 匹配版本的 ChromeDriver：
+
+**Arch Linux**：`pacman -S chromium`（`/usr/bin/chromedriver` 随 chromium 包一并提供）
 
 **Debian / Ubuntu**：`apt-get install chromium chromium-driver`（提供 `/usr/bin/chromium`）
+
+**Termux**：`pkg install chromium`（含 chromedriver，在 `$PREFIX/bin`）
 
 驱动路径按 `chromedriver-path.mjs` 里的候选列表自动探测（Termux `$PREFIX/bin` →
 `/usr/bin` → `/usr/local/bin`），也可用环境变量指定：
@@ -53,8 +59,9 @@ node scripts/health-check/health-check.js --skip-e2e   # 单独跳过 E2E
 
 ## 注意
 
-- Termux 上 npm `.bin` 的脚本 shebang 指向 `/usr/bin/env`（不存在），
-  因此 E2E 一律用 `node xxx.mjs` 直接执行，不依赖 `.bin`。
+- E2E 一律用 `node xxx.mjs` 直接执行，不依赖 `node_modules/.bin` 里的包装脚本：Termux 上那些
+  脚本的 shebang 指向 `/usr/bin/env`（不存在），统一直跑 `node` 才能跨平台。
+- Chromium 必须 `--no-sandbox`：容器 / Android 上没有可用的 setuid sandbox，驱动封装已带上。
 - Chromium 的 dbus / inotify 报错是无害噪音。
 - 应用使用 hash 路由，页面地址形如 `http://127.0.0.1:3100/#/prompt-preset`。
 

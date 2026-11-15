@@ -2,7 +2,7 @@
  * E2E 浏览器测试检查
  *
  * 依赖：
- * - Termux 系统 Chromium / ChromeDriver
+ * - 系统 Chromium / ChromeDriver（路径探测见 e2e/helpers/chromedriver-path.mjs）
  * - 前端 :3100 与后端 :3900（会尝试通过 scripts/dev/manage.sh 自动启动）
  *
  * 注意：E2E 默认较慢，health-check 中可通过 --skip-e2e 跳过。

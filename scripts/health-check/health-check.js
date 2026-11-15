@@ -29,7 +29,8 @@ const CHECKS = [
   {
     name: 'test-check',
     description: '单元测试检查',
-    critical: false,
+    // 关键项：单测与覆盖率门槛都属提交前的硬闸，挂掉应当阻断而非仅告警。
+    critical: true,
     run: (opts) => runTestCheck(opts),
   },
   {

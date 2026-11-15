@@ -6,8 +6,10 @@
 「已完成清单 / 边界规则 / 待办优先级 / 验证命令」上互相重复，且各有一套
 冲突的优先级编号。
 
-> 文档同步状态：最后校对 2026-10-14（补齐 9 个路由页 + `AppProvider.vue`
-> 的页面级单测并校正质量基线，`src/components` 语句覆盖率 26.7% → 81.2%；此前
+> 文档同步状态：最后校对 2026-11-15（把覆盖率统计范围改回全量 `src/**`，
+> 使本文档记的页面覆盖率可复现；去除 E2E 文档中已过时的 Termux 主导描述。
+> 此前 2026-10-14 补齐 9 个路由页 + `AppProvider.vue`
+> 的页面级单测并校正质量基线，`src/components` 语句覆盖率 26.7% → 81.2%；再前
 > 2026-10-12 校正质量基线数字、补记角色卡编辑器 / 开场白 / 返回键接管 /
 > 聊天内容处理管线，为 chat-prompt 与 conversation-compression 补上 module README，
 > 并补上 ApiPresetPage 页面级测试）。
@@ -45,8 +47,19 @@ npm run check:architecture     # 180 文件扫描
 npx vue-tsc -b                 # 类型检查
 npm run build                  # 构建
 npm run e2e                    # E2E（需服务在线）
+npm run test:coverage          # 覆盖率，统计范围 src/**（含 .vue，排除 src/main.ts 与测试文件）
 npm run health-check           # 提交前的完整检查（6 项，约 65s）
 ```
+
+> 覆盖率口径：`vitest.config.ts` 的 `coverage.include` 为 `src/**/*.{ts,vue}`，
+> 只排除测试文件、类型声明与进程入口 `src/main.ts`。早前该配置只统计
+> `src/modules/system-prompt` 与 `src/utils` 两个目录，导致本文档记的页面覆盖率
+> 无法用 `npm run test:coverage` 复现；改回全量后在 2026-11-15 校正为
+> 语句 78.1% / 分支 65.6% / 函数 72.4% / 行 79.8%（`src/components` 语句 79.9%）。
+>
+> 门槛（`coverage.thresholds`）：语句 77 / 分支 64 / 函数 71 / 行 78，略低于实测，
+> 用于拦住「新增代码不带测试」的明显退步。v8 覆盖率有约 ±0.3% 的抖动，
+> 门槛不要调到贴近实测值。仅在 `--coverage` 模式下校验。
 
 已完成的结构治理（细节见 git log，此处仅作索引）：
 
@@ -73,9 +86,10 @@ npm run health-check           # 提交前的完整检查（6 项，约 65s）
 - Markdown 支持 `<details>/<summary>` 折叠块与 `kbd` / `mark` / `sub` / `sup` / `abbr` 等语义标签
 - Markdown 脚注（`[^1]` + `[^1]: 内容`）改为上标标记 + 文末列表，不再生成指向相对路径的错误链接
 - 支持 KaTeX 数学公式（`$...$` / `$$...$$`，用占位符在 sanitize 后回填，不放宽白名单）
-- 引入 Selenium E2E（Termux 无可用 Playwright 二进制，复用系统 Chromium + chromedriver），
-  用例已扩展到 8 个文件 / 14 个用例，新增聊天操作布局与条件跟随滚动验证
-- chromedriver 路径自动探测，E2E 在 Debian / Ubuntu 上也可运行
+- 引入 Selenium E2E（最初在 Termux 上开发，无可用 Playwright 二进制，复用系统 Chromium
+  + chromedriver），用例当前为 9 个文件 / 15 个用例（2026-11-15 在 Arch 上全量实测通过），
+  含聊天操作布局与条件跟随滚动验证
+- chromedriver 路径自动探测，E2E 在 Arch / Debian / Ubuntu / Termux 上都能运行
 - 覆盖层接管 Android 系统返回键（`useBackGuard`）：有弹窗或二级页时先关它们，
   而不是直接离开聊天页
 - 角色卡模块（`src/modules/character-card/`）：SillyTavern v1 / v2 导入导出 + 本应用备份，
@@ -102,13 +116,14 @@ npm run health-check           # 提交前的完整检查（6 项，约 65s）
   `KnowledgeBasePage`（10 用例）/ `PromptPresetPage`（13）/ `ConversationListPage`（9）/
   `RoleManagementPage`（12）/ `SettingsPage`（7）/ `MainPage`（4）/ `AppProvider`（4），
   均只在 fetch 边界打桩，穿过 页面 → composable → repository 的真实链路。
-  `src/components` 语句覆盖率 26.7% → 81.2%。
+  `src/components` 语句覆盖率 26.7% → 81.2%（口径：全量 `src/**`，见「质量基线」）。
 - 连同页面测试修掉的真实缺陷：知识库重命名重复提示、知识库全局启用开关文案颠倒、
   提示词预设切换时「标题已换、条目还是旧的」中间态；以及两处「读设置会回写设置」
   （`useBackendSetting` / `useTheme` 在冷启动时把后端已有值原样 PUT 回去）。
 - 本次提交检查：全量单测 305 项及构建、架构边界检查通过；上下文统计、回复版本、
   删除多选的独立提交快照均通过构建和全量单测。返回保护、聊天布局滚动及新建会话
-  E2E 已通过；全量 E2E 运行中 ChromeDriver 提前退出，未完成全部用例。
+  E2E 已通过；当时全量 E2E 运行中 ChromeDriver 提前退出，未完成全部用例。
+  2026-11-15 在 Arch 上复跑全量 E2E，15 用例全绿，该问题未复现。
 
 ---
 
@@ -189,10 +204,32 @@ npm run e2e                      # 全部用例；npm run e2e macro 按名字过
 npm run health-check
 ```
 
-E2E 在健康检查中标记为**非关键项**（`critical: false`），失败只告警不阻断；
-但改动 Markdown 清理、宏变量、路由时仍应手动确认 E2E 通过。
+健康检查的 6 项里，**关键项**是 type-check / deps-check / test-check /
+architecture-check / build-check（挂掉即非 0 退出），只有 E2E 是**非关键项**
+（`critical: false`，失败只告警不阻断）；但改动 Markdown 清理、宏变量、路由时
+仍应手动确认 E2E 通过。
+
+`test-check` 已改为带 `--coverage` 执行（约多 4s），因此
+`coverage.thresholds` 在本地也是硬闸：低于门槛会被判为
+「测试通过但覆盖率未达门槛」。带上 E2E 的完整健康检查约 110s。
 
 无法跑完整验证时，至少说明：跑了什么、没跑什么、剩余风险。
+
+### CI（GitHub Actions）
+
+`.github/workflows/ci.yml`，`push main` 与 `pull_request` 触发，跑 5 步：
+
+```txt
+npm ci → npx vue-tsc -b --noEmit → npm run check:architecture
+       → npm run test:coverage → npm run build
+```
+
+- **E2E 刻意不进 CI**：它依赖系统 Chromium 与版本匹配的 chromedriver，在 runner 上
+  要额外维护版本对应关系，而本地跑完只要 4 分钟
+- `npm ci` 是故意的：lock 与 `package.json` 不一致、依赖只存在于本机
+  `node_modules` 这两类漂移只能靠纯净环境抓出来
+- 覆盖率门槛在 CI 上是硬闸（`npm run test:coverage`）
+- 仓库是公开的，Actions 额度不限
 
 ---
 
@@ -232,11 +269,11 @@ E2E 在健康检查中标记为**非关键项**（`critical: false`），失败�
    聊天页主体已经瘦下来（`ChatPage.vue` 204 行），厚度转移到了聊天侧的大组件上。
 4. **页面级测试已补齐，但两页仍偏薄**。9 个路由页与 `AppProvider.vue` 都有页面级
    单测了，其中 `SettingsPage` 97.2% / `ConversationListPage` 91.1% /
-   `PromptPresetPage` 90.1% / `RoleManagementPage` 87.0% / `ChatPage` 87.0% /
+   `PromptPresetPage` 90.1% / `RoleManagementPage` 87.0% / `ChatPage` 82.6% /
    `KnowledgeBasePage` 86.2% / `MainPage` 68.1% 语句覆盖；仍偏薄的是
    `ApiPresetPage.vue`（56.6%）与 `RegexScriptPage.vue`（49.5%），
    聊天侧大组件（`PromptPreviewModal.vue`、`TokenDetailsPanel.vue`）与
-   `FormSlider.vue` 还是空白。E2E 目前 8 个文件 / 14 个用例（含聊天布局 / 条件跟随滚动 /
+   `FormSlider.vue` 还是空白。E2E 目前 9 个文件 / 15 个用例（含聊天布局 / 条件跟随滚动 /
    新建角色弹窗与编辑器返回键），覆盖冒烟、
    两处渲染与两处交互，还没形成页面回归网。
 5. **横切 UI 尚未完全收口**。`ConfirmDialog`（10 处）与 `Modal`（8 个文件）已是事实上

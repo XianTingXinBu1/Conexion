@@ -4,8 +4,8 @@
  * 单独成文件（不 import selenium）：health-check 需要在加载 selenium 之前
  * 判断驱动是否可用，驱动不可用时应「跳过 E2E」而不是让整条检查报错。
  *
- * Termux 把 chromium 装在 `$PREFIX/bin`，Debian / Ubuntu 由 `chromium-driver`
- * 包装在 `/usr/bin`。两条路径都试，别把 E2E 绑死在某个发行版上；
+ * 各发行版的驱动位置不同：Arch 的 chromium 包直接把驱动装在 `/usr/bin`，Debian / Ubuntu 由
+ * `chromium-driver` 包提供，Termux 在 `$PREFIX/bin`。几条路径都试，别把 E2E 绑死在某个发行版上；
  * `CHROMEDRIVER_PATH` 环境变量始终优先。
  */
 import { existsSync } from 'node:fs';
@@ -28,6 +28,7 @@ export function findChromedriverPath() {
 /** 找不到驱动时的提示文案（安装方式按平台给出）。 */
 export function chromedriverMissingMessage() {
   return `未找到 chromedriver，已尝试: ${CHROMEDRIVER_CANDIDATES.join(', ')}`
-    + '（Termux: pkg install chromium；Debian/Ubuntu: apt-get install chromium chromium-driver）'
+    + '（Arch: pacman -S chromium；Debian/Ubuntu: apt-get install chromium chromium-driver；'
+    + 'Termux: pkg install chromium）'
     + '，也可用 CHROMEDRIVER_PATH 指定路径';
 }

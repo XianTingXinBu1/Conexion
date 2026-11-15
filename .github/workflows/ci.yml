@@ -1,0 +1,55 @@
+name: CI
+
+# 只跑「不需要用户态浏览器」的那部分验证：
+# 类型 / 架构边界 / 单测 + 覆盖率门槛 / 构建。
+# E2E 刻意不进 CI —— 它依赖系统 Chromium 与版本匹配的 chromedriver，
+# 在 runner 上要额外维护版本对应关系，而本地跑完只要 4 分钟。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # 手动触发：想单独验证一次 CI 而不想空提交时用
+  # gh workflow run ci.yml
+  workflow_dispatch:
+
+# 同一分支连推时取消旧运行，省额度也少刷通知
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 类型 / 架构 / 测试 / 构建
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # 用 ci 而不是 install：lock 与 package.json 不一致时直接失败，
+      # 「本机 install 悄悄改了 lock」「依赖只存在于本机 node_modules」
+      # 这两类漂移正是 CI 要抓的东西。
+      - name: 安装依赖（严格按 lock）
+        run: npm ci
+
+      - name: 类型检查
+        run: npx vue-tsc -b --noEmit
+
+      - name: 架构边界检查
+        run: npm run check:architecture
+
+      # 必须带 coverage：覆盖率门槛（vitest.config.ts 的 coverage.thresholds）
+      # 只在 --coverage 模式下校验，裸跑 vitest run 等于没有闸。
+      - name: 单元测试与覆盖率门槛
+        run: npm run test:coverage
+
+      - name: 构建
+        run: npm run build

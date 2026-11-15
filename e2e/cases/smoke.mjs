@@ -1,5 +1,5 @@
 /**
- * Smoke E2E：验证 Selenium + Termux Chromium 能加载应用
+ * Smoke E2E：验证 Selenium + 系统 Chromium 能加载应用
  */
 
 import { buildDriver, BASE_URL, By, until, waitForElement } from '../helpers/driver.mjs';

@@ -158,7 +158,7 @@ npm run check:architecture
 | `npm run build` | 类型检查并构建前端 |
 | `npm run preview` | 预览构建产物 |
 | `npm run test:run` | Vitest 单测（`test` 为 watch 模式） |
-| `npm run test:coverage` | 单测 + 覆盖率 |
+| `npm run test:coverage` | 单测 + 覆盖率并校验门槛 |
 | `npm run check:architecture` | 架构边界检查 |
 | `npm run e2e` | Selenium 端到端测试，需前后端在线（见 `e2e/README.md`） |
 | `npm run health-check` | 全量健康检查（类型 / 依赖 / 架构 / 测试 / 构建 / E2E） |
@@ -172,6 +172,21 @@ npm run check:architecture
 | 聊天模块 | `test:run` + `check:architecture` |
 | 渲染 / 宏变量 / 路由等浏览器行为 | 额外跑 `e2e` |
 | 提交前 | `health-check` |
+
+### CI
+
+GitHub Actions 在 `push` 到 `main` 与 `pull_request` 时触发：
+
+```txt
+npm ci -> vue-tsc -b --noEmit -> check:architecture -> test:coverage -> build
+```
+
+E2E 刻意不进 CI：它依赖系统 Chromium 与版本匹配的 chromedriver，在 runner 上维护版本
+对应关系不划算，而本地跑完只要四分钟。
+
+覆盖率门槛在 `vitest.config.ts` 里，只在 `--coverage` 模式下校验；阈值设得略低于当前实测值，
+目的是让「新增代码不带测试」挂掉，而不是拦住统计抖动。`health-check` 里的 `test-check` 
+已带 `--coverage` 执行，所以本地也是硬闸。
 
 ## 文档
 

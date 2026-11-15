@@ -1,12 +1,12 @@
 /**
  * E2E 驱动封装（Selenium + 系统 Chromium）
  *
- * Playwright 自带的浏览器二进制在 Termux (Android/aarch64) 上无法运行，
- * 因此复用系统 chromium + chromedriver（路径解析见 chromedriver-path.mjs）。
+ * 为什么不下载自己的浏览器：直接复用系统 chromium + chromedriver，驱动与浏览器版本天然一致，
+ * 同一套用例在 Arch / Debian / Termux 上都能跑（路径解析见 chromedriver-path.mjs）。
  * 注意：
- * - 必须 --no-sandbox（Android 上无法用 setuid sandbox）
+ * - 必须 --no-sandbox（容器 / Android 上没有可用的 setuid sandbox）
  * - dbus / inotify 报错是无害噪音
- * - npm .bin 的 shebang 指向 /usr/bin/env，Termux 不存在，需用 node 直跑
+ * - 用 node 直跑，不依赖 node_modules/.bin（Termux 上的 shebang 指向不存在的 /usr/bin/env）
  */
 
 import { Builder, By, until } from 'selenium-webdriver';

@@ -41,6 +41,10 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  /* 关掉浏览器的滚动锚定：跟随输出是靠 useChatScrollPolicy 手动设 scrollTop 的，
+     而浏览器在内容增长时会自己调整一次滚动位置来「保持可见内容稳定」，两套机制
+     打架会让流式输出看起来一下一下地抽。关掉后由我们的 rAF 独占控制。 */
+  overflow-anchor: none;
   width: 100%;
   padding: 20px 16px;
   display: flex;

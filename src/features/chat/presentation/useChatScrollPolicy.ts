@@ -5,11 +5,11 @@ const SCROLL_THRESHOLD = 24;
 /** Follow output only while the reader stays at the bottom. No delayed forced scroll. */
 export function useChatScrollPolicy(container: Ref<HTMLElement | undefined>) {
   const isNearBottom = ref(true);
-  let frame: number | undefined;
   let mutations: MutationObserver | undefined;
   let resize: ResizeObserver | undefined;
   let attached: HTMLElement | undefined;
   let lastScrollTop = 0;
+  let pendingScroll = false;
 
   const updateIsNearBottom = () => {
     const el = container.value;
@@ -23,18 +23,23 @@ export function useChatScrollPolicy(container: Ref<HTMLElement | undefined>) {
   };
 
   const scrollToBottom = () => {
-    if (!isNearBottom.value) return;
+    // 必须在 DOM 更新后的**同一个帧内**设 scrollTop。
+    // 早期这里是 nextTick + requestAnimationFrame：DOM 在帧 N 更新，scrollTop 却到
+    // 帧 N+1 才设。中间那一帧浏览器已经按旧 scrollTop 把增长的内容画出来了，
+    // 表现为消息内容和下方按钮先往上跑、再被拉回底部——流式输出时的「上下跳」。
+    // nextTick 是微任务，在 DOM 更新后、浏览器绘制前执行，设完立即反映在同一帧。
+    // 加待滚动标记避免一帧内被 MutationObserver / ResizeObserver 多次触发。
+    if (!isNearBottom.value || pendingScroll) return;
+    pendingScroll = true;
+
     nextTick(() => {
-      if (frame !== undefined) cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        frame = undefined;
-        const el = container.value;
-        // Recheck after rendering: the reader may have scrolled up in the meantime.
-        if (el && isNearBottom.value) {
-          el.scrollTop = el.scrollHeight;
-          lastScrollTop = el.scrollTop;
-        }
-      });
+      pendingScroll = false;
+      const el = container.value;
+      // Recheck after rendering: the reader may have scrolled up in the meantime.
+      if (!el || !isNearBottom.value) return;
+
+      el.scrollTop = el.scrollHeight;
+      lastScrollTop = el.scrollTop;
     });
   };
 
@@ -42,8 +47,7 @@ export function useChatScrollPolicy(container: Ref<HTMLElement | undefined>) {
     attached?.removeEventListener('scroll', updateIsNearBottom);
     mutations?.disconnect();
     resize?.disconnect();
-    if (frame !== undefined) cancelAnimationFrame(frame);
-    frame = undefined;
+    pendingScroll = false;
   };
 
   watch(container, (el) => {

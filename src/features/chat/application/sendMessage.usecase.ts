@@ -67,7 +67,8 @@ export class SendMessageUseCase {
     options: SendMessageUseCaseOptions = {},
   ) {
     this.deps = deps;
-    this.flushIntervalMs = options.flushIntervalMs ?? 50;
+    // 与 StreamMessageAssembler 的默认值保持一致（一帧，约 16ms）
+    this.flushIntervalMs = options.flushIntervalMs ?? 16;
   }
 
   async execute(content: string): Promise<void> {

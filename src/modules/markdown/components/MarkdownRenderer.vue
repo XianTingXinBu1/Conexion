@@ -12,7 +12,8 @@ import { useNotifications } from '../../notification/useNotifications';
 import { getNotificationMessage } from '../../notification/messages';
 import type { MarkdownRendererProps } from '../types';
 
-const STREAM_RENDER_DEBOUNCE_MS = 80;
+/** 无 rAF 环境下的兼容间隔（约一帧） */
+const STREAM_RENDER_FRAME_MS = 16;
 
 const props = withDefaults(defineProps<MarkdownRendererProps>(), {
   enabled: true,
@@ -28,31 +29,65 @@ const { showSuccess, showError } = useNotifications();
 // 引用 DOM 元素
 const containerRef = ref<HTMLElement>();
 const debouncedContent = ref(props.content);
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let frameHandle: number | null = null;
+let frameTimer: ReturnType<typeof setTimeout> | null = null;
 
-const clearDebounceTimer = () => {
-  if (!debounceTimer) {
+const cancelScheduledRender = () => {
+  if (frameHandle !== null) {
+    if (typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(frameHandle);
+    }
+    frameHandle = null;
+  }
+
+  if (frameTimer !== null) {
+    clearTimeout(frameTimer);
+    frameTimer = null;
+  }
+};
+
+/** 立即把当前内容推到渲染层（定稿时用） */
+const commitContent = () => {
+  cancelScheduledRender();
+  debouncedContent.value = props.content;
+};
+
+/**
+ * 合帧调度：同一帧内的多次变化只渲染一次，且**不会无限推迟**。
+ *
+ * 早期这里是 80ms 的 debounce。流式时内容每 50ms 就变一次，每次变化都会重置
+ * 定时器，于是定时器永远等不到「80ms 内没有新内容」的空闲——界面只在下一片
+ * 数据迟迟不到时才刷新一次，肉眼看到的就是「一卡一卡」（不是算不过来，
+ * 是根本画不出来）。合帧没有这个缺陷：最新内容最多等一帧就上屏。
+ */
+const scheduleRender = () => {
+  if (frameHandle !== null || frameTimer !== null) {
     return;
   }
 
-  clearTimeout(debounceTimer);
-  debounceTimer = null;
+  if (typeof requestAnimationFrame === 'function') {
+    frameHandle = requestAnimationFrame(() => {
+      frameHandle = null;
+      debouncedContent.value = props.content;
+    });
+    return;
+  }
+
+  frameTimer = setTimeout(() => {
+    frameTimer = null;
+    debouncedContent.value = props.content;
+  }, STREAM_RENDER_FRAME_MS);
 };
 
 watch(
   () => props.content,
-  (content) => {
+  () => {
     if (!props.streaming) {
-      clearDebounceTimer();
-      debouncedContent.value = content;
+      commitContent();
       return;
     }
 
-    clearDebounceTimer();
-    debounceTimer = setTimeout(() => {
-      debouncedContent.value = content;
-      debounceTimer = null;
-    }, STREAM_RENDER_DEBOUNCE_MS);
+    scheduleRender();
   },
   { immediate: true }
 );
@@ -61,8 +96,7 @@ watch(
   () => props.streaming,
   (isStreaming) => {
     if (!isStreaming) {
-      clearDebounceTimer();
-      debouncedContent.value = props.content;
+      commitContent();
     }
   }
 );
@@ -195,8 +229,21 @@ const addCopyButtons = () => {
   });
 };
 
-// 监听内容变化，重新添加复制按钮
-watch(renderedBlocks, () => {
+// 监听块结构变化，重新添加复制按钮
+//
+// 不能直接 watch(renderedBlocks)：computed 每帧都返回新数组，而流式时尾部块
+// 的内容每帧都在变。那样会每帧 nextTick + 遍历所有 pre code，而且 appendChild
+// 又会反过来触发滚动跟随的 MutationObserver，形成无谓的连锁。
+// 真正需要补按钮的时机只有「块结构变了」（新块出现到页面上）。
+let lastBlockSignature = '';
+
+watch(renderedBlocks, (blocks) => {
+  const signature = blocks.map((block) => block.key).join('|');
+  if (signature === lastBlockSignature) {
+    return;
+  }
+
+  lastBlockSignature = signature;
   nextTick(() => {
     addCopyButtons();
   });
@@ -211,7 +258,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  clearDebounceTimer();
+  cancelScheduledRender();
 });
 </script>
 

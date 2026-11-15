@@ -120,7 +120,7 @@ interface MarkdownRendererProps {
 
 ## 流式增量渲染
 
-背景：流式回复每 50~80ms 到达一小片文本。若每次都把**全文**重新走一遍
+背景：流式回复每十来毫秒就到达一小片文本。若每次都把**全文**重新走一遍
 marked + KaTeX + DOMPurify，再用 `v-html` 整块替换，开销随回复长度线性增长。
 实测 2434 字符、200 次 flush 的累计渲染耗时约 1073ms；更长回复单轮可达
 30~45ms 渲染 + 30~57ms DOM 重建，主线程占用过半，表现为输出「一卡一卡」。
@@ -146,6 +146,17 @@ const { blocks, renderedChars, reusedBlocks } = renderer.render(markdown)
 
 已知的流式近似：loose list（列表项之间有空行）在流式过程中可能被切成两个 `<ul>`。
 **定稿时 `streaming` 变 false，组件切回整篇渲染**，所以最终结果永远正确。
+
+### 刷新节奏：合帧，不是防抖
+
+渲染器的内容同步必须用**合帧**（`requestAnimationFrame`，无 rAF 环境退化为 16ms
+定时器），不能用 debounce：流式时内容每隔十几毫秒就变一次，debounce 每次变化都
+重置定时器，永远等不到「空闲」——界面停在旧内容上不刷新，只在下一片数据迟迟
+不到时才跳一下，肉眼就是「一卡一卡」。合帧保证最新内容最多等一帧就上屏。
+
+与之配套，`StreamMessageAssembler.flushIntervalMs` 默认 16ms（一帧）。
+实测每轮成本约 0.5ms（渲染）+ 1.2ms（DOM 重建）+ 0.05ms（正则管线），
+60fps 下约占主线程 10%，比「降到 50ms 但卡成幻灯片」划算。
 
 样式上每块外面套一个 `.md-block`，用 `display: contents` 让它在布局上透明，
 后代选择器（`.markdown-renderer p` 等）与内容直接挂在容器下完全等价。

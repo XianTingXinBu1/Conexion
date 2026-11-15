@@ -27,6 +27,9 @@ Markdown 模块提供安全的 Markdown 渲染能力，用于聊天消息、通�
 - 渲染前 / 渲染后 hooks。
 - 全局配置和运行时配置。
 - `MarkdownRenderer` 组件支持高频流式更新标记。
+- **流式增量渲染**：`streaming=true` 时按顶层块切分并缓存已完成块的 HTML，
+  只有末尾正在增长的块重渲；配合每块一个 `v-html`，前面块的 DOM 完全不动。
+  实测 2434 字符 / 200 次 flush，累计耗时 1073ms → 212ms，最终 HTML 与整篇渲染一致。
 
 ## 主要文件
 
@@ -39,10 +42,13 @@ src/modules/markdown/
 ├── math.ts
 ├── footnote.ts
 ├── segments.ts
+├── blocks.ts            顶层块切分（增量渲染的缓存单位）
+├── incremental.ts       流式增量渲染器
 ├── types.ts
 ├── markdown.test.ts
 ├── math.test.ts
 ├── footnote.test.ts
+├── incremental.test.ts
 ├── components/
 │   └── MarkdownRenderer.vue
 ├── styles/
@@ -109,8 +115,40 @@ interface MarkdownRendererProps {
 说明：
 
 - `enabled=false` 时直接显示原文。
-- `streaming=true` 可用于标记内容正在高频更新。
+- `streaming=true` 时走增量渲染（见「流式增量渲染」），定稿时自动回到整篇渲染。
 - `config` 会覆盖默认渲染配置。
+
+## 流式增量渲染
+
+背景：流式回复每 50~80ms 到达一小片文本。若每次都把**全文**重新走一遍
+marked + KaTeX + DOMPurify，再用 `v-html` 整块替换，开销随回复长度线性增长。
+实测 2434 字符、200 次 flush 的累计渲染耗时约 1073ms；更长回复单轮可达
+30~45ms 渲染 + 30~57ms DOM 重建，主线程占用过半，表现为输出「一卡一卡」。
+
+实现分两层：
+
+1. **`blocks.ts`**：`splitTopLevelBlocks` 把内容切成顶层块。切点只落在空行上，
+   且必须位于 fenced code block 与块级公式之外——否则会把一个代码块或公式拆成两半。
+2. **`incremental.ts`**：`IncrementalMarkdownRenderer` 按「源文本逐字相同」复用
+   已完成块的 HTML，只有新增块与末尾正在增长的块需要重渲。缓存的块返回稳定 `key`，
+   组件用 `v-for` + 每块一个 `v-html`，于是前面块的 DOM 完全不动。
+
+```typescript
+const renderer = new IncrementalMarkdownRenderer(source => renderSafe(source))
+const { blocks, renderedChars, reusedBlocks } = renderer.render(markdown)
+```
+
+整篇退化为全量渲染的情况（宁可慢也不能渲染错）：
+
+- 含脚注 `[^x]`：引用与定义常常分处不同块，切开后引用会退化成普通文本
+- 块级公式未闭合（`$$` / `\[` 定界符配对不上）
+- 块级公式自身跨空行
+
+已知的流式近似：loose list（列表项之间有空行）在流式过程中可能被切成两个 `<ul>`。
+**定稿时 `streaming` 变 false，组件切回整篇渲染**，所以最终结果永远正确。
+
+样式上每块外面套一个 `.md-block`，用 `display: contents` 让它在布局上透明，
+后代选择器（`.markdown-renderer p` 等）与内容直接挂在容器下完全等价。
 
 ## 全局配置
 
@@ -218,6 +256,9 @@ const { renderSafe } = useMarkdown()
   也避开多条消息共用容器时的 id 冲突。
 - 公式与脚注的预处理统一走 `segments.ts`（按 fenced code block + 行内代码切分），
   代码里的 `$...$` / `[^1]` 不会被改写。
+- **增量渲染的等价性断言要用 `render`，不要用 `renderSafe`**：happy-dom 下的
+  DOMPurify 会把 `<p>` / `<ul>` / `<pre>` 这些标签削掉（见下方「验证建议」），
+  用 `renderSafe` 比较完整 HTML 字符串得到的是与浏览器不一致的结果。
 - 默认不依赖 highlight.js。
 - 渲染出来的 HTML 应使用模块提供的 sanitizer。
 - 需要直接 `v-html` 时优先使用 `renderSafe`。

@@ -17,6 +17,12 @@ export type {
 // Composable
 export { useMarkdown, setGlobalMarkdownConfig, getGlobalMarkdownConfig, marked } from './useMarkdown';
 
+// 流式增量渲染
+export { IncrementalMarkdownRenderer } from './incremental';
+export type { IncrementalBlock, IncrementalRenderResult } from './incremental';
+export { splitTopLevelBlocks, hasUnclosedDisplayMath } from './blocks';
+export type { TopLevelBlocks } from './blocks';
+
 // 配置
 export {
   DEFAULT_MARKDOWN_CONFIG,

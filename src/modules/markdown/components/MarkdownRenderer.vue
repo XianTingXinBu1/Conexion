@@ -7,6 +7,7 @@
  */
 import { computed, ref, watch, nextTick } from 'vue';
 import { useMarkdown } from '../useMarkdown';
+import { IncrementalMarkdownRenderer } from '../incremental';
 import { useNotifications } from '../../notification/useNotifications';
 import { getNotificationMessage } from '../../notification/messages';
 import type { MarkdownRendererProps } from '../types';
@@ -67,11 +68,24 @@ watch(
 );
 
 // 计算渲染结果
-const renderedHtml = computed(() => {
-  if (!props.enabled || !debouncedContent.value) {
-    return '';
+//
+// 流式时走增量渲染：已完成的块按源文本缓存，只有新增块与末尾正在增长的块重渲；
+// 定稿时走整篇渲染，把分块在跨块语法（如 loose list）上的近似差异收敛掉。
+// 两者共用同一个 renderSafe，所以定稿结果与单次整篇渲染完全一致。
+const incrementalRenderer = new IncrementalMarkdownRenderer((source) => renderSafe(source));
+
+const renderedBlocks = computed(() => {
+  const content = debouncedContent.value;
+  if (!props.enabled || !content) {
+    return [];
   }
-  return renderSafe(debouncedContent.value);
+
+  if (!props.streaming) {
+    incrementalRenderer.reset();
+    return [{ key: 0, html: renderSafe(content) }];
+  }
+
+  return incrementalRenderer.render(content).blocks;
 });
 
 // 降级复制方法（使用 execCommand）
@@ -182,7 +196,7 @@ const addCopyButtons = () => {
 };
 
 // 监听内容变化，重新添加复制按钮
-watch(renderedHtml, () => {
+watch(renderedBlocks, () => {
   nextTick(() => {
     addCopyButtons();
   });
@@ -207,14 +221,32 @@ onBeforeUnmount(() => {
     ref="containerRef"
     class="markdown-renderer"
     :class="props.class"
-    v-html="renderedHtml"
-  />
+  >
+    <!-- 每块一个 v-html：前面的块 key 不变，Vue 不会重设它们的 innerHTML，
+         于是流式过程中只有末尾块真正重建 DOM -->
+    <div
+      v-for="block in renderedBlocks"
+      :key="block.key"
+      class="md-block"
+      v-html="block.html"
+    />
+  </div>
   <div v-else-if="props.content" class="markdown-renderer" :class="props.class">
     {{ props.content }}
   </div>
 </template>
 
 <style>
+/* 块级容器
+ *
+ * display: contents 让这个包装元素在布局上不存在，于是后代选择器
+ * （.markdown-renderer p / ul / pre …）的匹配结果与「内容直接挂在容器下」
+ * 完全一致，样式与间距不会因为分包而改变。
+ */
+.markdown-renderer .md-block {
+  display: contents;
+}
+
 /* 代码块复制按钮样式 */
 .markdown-renderer pre {
   position: relative;

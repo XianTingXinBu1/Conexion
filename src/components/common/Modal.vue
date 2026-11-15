@@ -48,7 +48,9 @@ const handleBackdropClick = () => {
 };
 
 const handleEscape = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && props.closeOnEscape) {
+  // 监听器挂在 document 上、整个生命周期都在，必须自己判断弹窗是否打开，
+  // 否则弹窗关闭后按 Esc 仍会触发关闭逻辑（连累同一页面里的其它交互）
+  if (event.key === 'Escape' && props.show && props.closeOnEscape) {
     handleClose();
   }
 };

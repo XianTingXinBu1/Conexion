@@ -68,7 +68,7 @@ export async function getStoredConversation(id: string): Promise<Conversation | 
   try {
     return cloneConversation(await requestConversations<Conversation>(`/${encodeURIComponent(id)}`));
   } catch (error) {
-    if (error instanceof ApiRequestError && error.serverMessage === '会话不存在') {
+    if (error instanceof ApiRequestError && error.status === 404) {
       return undefined;
     }
 
@@ -104,7 +104,7 @@ export async function updateConversationRecord(
       body: JSON.stringify({ updates }),
     }));
   } catch (error) {
-    if (error instanceof ApiRequestError && error.serverMessage === '会话不存在') {
+    if (error instanceof ApiRequestError && error.status === 404) {
       return undefined;
     }
 
@@ -138,7 +138,7 @@ export async function updateConversationMessages(
       body: JSON.stringify({ messages, updates }),
     }));
   } catch (error) {
-    if (error instanceof ApiRequestError && error.serverMessage === '会话不存在') {
+    if (error instanceof ApiRequestError && error.status === 404) {
       return undefined;
     }
 
@@ -164,7 +164,7 @@ export async function editConversationMessage(
       },
     ));
   } catch (error) {
-    if (error instanceof ApiRequestError && error.serverMessage === '会话不存在') {
+    if (error instanceof ApiRequestError && error.status === 404) {
       return undefined;
     }
 
@@ -186,7 +186,7 @@ export async function deleteConversationMessage(
       { method: 'DELETE' },
     ));
   } catch (error) {
-    if (error instanceof ApiRequestError && error.serverMessage === '会话不存在') {
+    if (error instanceof ApiRequestError && error.status === 404) {
       return undefined;
     }
 

@@ -37,16 +37,40 @@ const inputClasses = computed(() => [
   },
 ]);
 
+/**
+ * 聚焦期间的原始文本。
+ *
+ * 数字输入不能把「显示值」完全派生自 modelValue：逐字符 parseFloat 会把 `1.`
+ * 解析成 `1`，回填后小数点被吃掉、光标跳到末尾，于是温度/种子这类小数根本打不出来。
+ * 所以输入过程中保留用户敲的原文，失焦后再回落到归一化后的值。
+ */
+const rawValue = ref<string | null>(null);
+
+const displayValue = computed<string | number>(() => {
+  if (rawValue.value !== null) return rawValue.value;
+  return props.modelValue === undefined || props.modelValue === null ? '' : props.modelValue;
+});
+
 const handleInput = (event: Event) => {
   const target = event.target as HTMLInputElement;
-  let value: string | number = target.value;
+  const text = target.value;
 
-  if (props.type === 'number') {
-    value = parseFloat(value);
-    if (isNaN(value)) value = '';
+  if (props.type !== 'number') {
+    emit('update:modelValue', text);
+    return;
   }
 
-  emit('update:modelValue', value as string | number);
+  rawValue.value = text;
+
+  const trimmed = text.trim();
+  if (trimmed === '') {
+    emit('update:modelValue', '');
+    return;
+  }
+
+  const parsed = Number(trimmed);
+  // 输入到一半（如 `-`、`1.`）先不发数字，避免把中间态写回 props 再回灌到输入框
+  emit('update:modelValue', Number.isFinite(parsed) ? parsed : '');
 };
 
 const handleFocus = (event: FocusEvent) => {
@@ -54,6 +78,8 @@ const handleFocus = (event: FocusEvent) => {
 };
 
 const handleBlur = (event: FocusEvent) => {
+  // 失焦后回到归一化显示（例如 `1.` → `1`）
+  rawValue.value = null;
   emit('blur', event);
 };
 
@@ -81,7 +107,7 @@ defineExpose({
     :class="inputClasses"
     :placeholder="placeholder"
     :disabled="disabled"
-    :value="modelValue"
+    :value="displayValue"
     :min="min"
     :max="max"
     :step="step"

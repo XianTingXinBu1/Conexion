@@ -57,7 +57,13 @@ const normalizeRouteName = (target: RouteLocationRaw): PrefetchableRouteName | n
     }
   }
 
-  if ('name' in target && target.name && target.name in routePrefetchers) {
+  // 不能直接用 `in`：它会沿原型链查找，'toString' / 'constructor' / 'hasOwnProperty'
+  // 都会命中，随后 `routePrefetchers[name]()` 会调用到非预取函数上
+  if (
+    'name' in target &&
+    typeof target.name === 'string' &&
+    Object.prototype.hasOwnProperty.call(routePrefetchers, target.name)
+  ) {
     return target.name as PrefetchableRouteName;
   }
 

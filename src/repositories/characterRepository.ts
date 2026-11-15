@@ -38,7 +38,8 @@ export async function loadAICharacterById(id: string): Promise<AICharacter | und
   try {
     return await requestCharacters<AICharacter>(`/ai/${encodeURIComponent(id)}`);
   } catch (error) {
-    if (error instanceof ApiRequestError && error.serverMessage === '角色不存在') {
+    // 按状态码判断，不比较后端文案：改文案 / 走代理 / 换语言都会让字符串比较失效
+    if (error instanceof ApiRequestError && error.status === 404) {
       return undefined;
     }
 

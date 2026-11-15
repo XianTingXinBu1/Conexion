@@ -71,10 +71,10 @@ watch(() => [props.show, props.messageId] as const, ([newShow]) => {
     </div>
 
     <template #footer>
-      <button class="btn btn-secondary" :disabled="isSaving" @click="handleCancel">
+      <button type="button" class="btn btn-secondary" :disabled="isSaving" @click="handleCancel">
         取消
       </button>
-      <button class="btn btn-primary" :disabled="isSaving || !editContent.trim()" @click="handleSave">
+      <button type="button" class="btn btn-primary" :disabled="isSaving || !editContent.trim()" @click="handleSave">
         {{ isSaving ? '保存中…' : '保存' }}
       </button>
     </template>

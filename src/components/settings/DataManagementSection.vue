@@ -71,7 +71,7 @@ const dataSizeFormatted = computed(() => {
           <div class="action-desc">清除所有本地存储数据</div>
         </div>
       </div>
-      <button class="action-btn delete-btn" @click="handleDeleteAllData">
+      <button type="button" class="action-btn delete-btn" @click="handleDeleteAllData">
         删除
       </button>
     </div>
@@ -84,7 +84,7 @@ const dataSizeFormatted = computed(() => {
           <div class="action-desc">重置所有设置项为默认值</div>
         </div>
       </div>
-      <button class="action-btn restore-btn" @click="handleRestoreDefaults">
+      <button type="button" class="action-btn restore-btn" @click="handleRestoreDefaults">
         恢复
       </button>
     </div>

@@ -35,7 +35,7 @@ const handleClick = () => {
 
 <template>
   <div class="form-toggle-wrapper">
-    <button
+    <button type="button"
       :class="toggleClasses"
       :disabled="disabled"
       @click="handleClick"

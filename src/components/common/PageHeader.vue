@@ -32,7 +32,7 @@ const handleBack = () => {
 
 <template>
   <header class="page-header">
-    <button v-if="showBack" class="nav-btn" @click="handleBack">
+    <button aria-label="返回" type="button" v-if="showBack" class="nav-btn" @click="handleBack">
       <ArrowLeft :size="22" />
     </button>
     <div class="header-content">
@@ -40,7 +40,7 @@ const handleBack = () => {
       <div v-if="subtitle" class="page-subtitle">{{ subtitle }}</div>
     </div>
     <slot>
-      <button v-if="showAction" class="nav-btn" @click="emit('action')">
+      <button type="button" v-if="showAction" class="nav-btn" @click="emit('action')">
         <component :is="actionIcon" :size="22" />
       </button>
     </slot>

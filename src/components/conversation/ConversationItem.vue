@@ -79,10 +79,10 @@ const getConversationPreview = (conversation: Conversation) => {
       </div>
     </div>
     <div class="conversation-actions">
-      <button class="edit-btn" @click="handleEdit">
+      <button aria-label="重命名会话" type="button" class="edit-btn" @click="handleEdit">
         <Edit2 :size="16" />
       </button>
-      <button class="delete-btn" @click="handleDelete">
+      <button aria-label="删除会话" type="button" class="delete-btn" @click="handleDelete">
         <Trash2 :size="16" />
       </button>
     </div>

@@ -216,7 +216,7 @@ const handleConfirmDelete = () => {
 <template>
   <div class="kb-detail-view" @click="closeKbMenu">
     <header class="page-header" @click.stop>
-      <button class="nav-btn" @click="emit('back')">
+      <button aria-label="返回知识库列表" type="button" class="nav-btn" @click="emit('back')">
         <ChevronLeft :size="22" />
       </button>
       <div class="header-content">
@@ -228,21 +228,21 @@ const handleConfirmDelete = () => {
         </div>
       </div>
       <div class="header-actions">
-        <button class="nav-btn" @click="showEntryFormModal ? (showEntryFormModal = false) : (entryFormMode = 'create', editingEntryData = {}, showEntryFormModal = true)">
+        <button type="button" class="nav-btn" @click="showEntryFormModal ? (showEntryFormModal = false) : (entryFormMode = 'create', editingEntryData = {}, showEntryFormModal = true)">
           <X v-if="showEntryFormModal" :size="22" />
           <Plus v-else :size="22" />
         </button>
         <div class="menu-container">
-          <button class="nav-btn" @click="openKbMenu">
+          <button aria-label="更多操作" type="button" class="nav-btn" @click="openKbMenu">
             <MoreVertical :size="22" />
           </button>
           <transition name="dropdown">
             <div v-if="showKbMenu" class="dropdown-menu" @click.stop>
-              <button class="dropdown-item" @click="handleRenameKb">
+              <button type="button" class="dropdown-item" @click="handleRenameKb">
                 <Edit2 :size="16" />
                 <span>重命名</span>
               </button>
-              <button class="dropdown-item dropdown-item--danger" @click="handleDeleteKb">
+              <button type="button" class="dropdown-item dropdown-item--danger" @click="handleDeleteKb">
                 <Trash2 :size="16" />
                 <span>删除</span>
               </button>

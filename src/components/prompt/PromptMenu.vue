@@ -82,7 +82,7 @@ const canRenamePreset = computed(() => renamePresetName.value.trim());
         <div v-if="show" class="modal-content preset-menu" @click.stop>
           <div class="modal-header">
             <div class="modal-title">预设管理</div>
-            <button class="modal-close" @click="emit('update:show', false)">
+            <button aria-label="关闭预设菜单" type="button" class="modal-close" @click="emit('update:show', false)">
               <X :size="20" />
             </button>
           </div>
@@ -98,10 +98,10 @@ const canRenamePreset = computed(() => renamePresetName.value.trim());
                 <span class="preset-option-count">{{ preset.items.length }} 条目</span>
               </div>
               <div class="preset-option-actions">
-                <button class="preset-action-btn" @click.stop="openRenameDialog(preset.id)">
+                <button aria-label="重命名预设" type="button" class="preset-action-btn" @click.stop="openRenameDialog(preset.id)">
                   <Pencil :size="14" />
                 </button>
-                <button
+                <button type="button"
                   v-if="presets.length > 1"
                   class="preset-action-btn preset-action-btn--delete"
                   @click.stop="emit('delete', preset.id)"
@@ -112,7 +112,7 @@ const canRenamePreset = computed(() => renamePresetName.value.trim());
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn-full" @click="showAddDialog = true">
+            <button type="button" class="btn-full" @click="showAddDialog = true">
               <Plus :size="16" />
               添加预设
             </button>
@@ -143,11 +143,11 @@ const canRenamePreset = computed(() => renamePresetName.value.trim());
     </div>
     <template #footer>
       <div class="modal-footer-actions">
-        <button class="btn-secondary" @click="handleCancelAddPreset">
+        <button type="button" class="btn-secondary" @click="handleCancelAddPreset">
           <X :size="16" />
           取消
         </button>
-        <button
+        <button type="button"
           class="btn-primary"
           :disabled="!canAddPreset"
           @click="handleAddPreset"
@@ -177,11 +177,11 @@ const canRenamePreset = computed(() => renamePresetName.value.trim());
     </div>
     <template #footer>
       <div class="modal-footer-actions">
-        <button class="btn-secondary" @click="handleCancelRenamePreset">
+        <button type="button" class="btn-secondary" @click="handleCancelRenamePreset">
           <X :size="16" />
           取消
         </button>
-        <button
+        <button type="button"
           class="btn-primary"
           :disabled="!canRenamePreset"
           @click="handleRenamePreset"

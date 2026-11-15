@@ -82,7 +82,7 @@ useBackGuard({
           
           <div class="modal-header">
             <div class="modal-title">{{ title }}</div>
-            <button class="modal-close" @click="handleCancel">
+            <button aria-label="关闭" type="button" class="modal-close" @click="handleCancel">
               <X :size="20" />
             </button>
           </div>
@@ -102,10 +102,10 @@ useBackGuard({
           </div>
 
           <div class="modal-footer">
-            <button class="btn-cancel" @click="handleCancel">
+            <button type="button" class="btn-cancel" @click="handleCancel">
               {{ cancelText }}
             </button>
-            <button 
+            <button type="button" 
               class="btn-confirm" 
               :style="{ background: getConfirmBtnBg() }" 
               @click="handleConfirm"

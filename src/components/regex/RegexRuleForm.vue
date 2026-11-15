@@ -129,7 +129,7 @@ const updateField = <K extends keyof RegexRule>(field: K, value: RegexRule[K]) =
       <div class="form-group">
         <label class="form-label">作用域</label>
         <div class="scope-options">
-          <button
+          <button type="button"
             v-for="opt in scopeOptions"
             :key="opt.value"
             :class="['scope-btn', { 'active': localValue.scope === opt.value }]"
@@ -143,7 +143,7 @@ const updateField = <K extends keyof RegexRule>(field: K, value: RegexRule[K]) =
       <div class="form-group">
         <label class="form-label">应用时机</label>
         <div class="apply-options">
-          <button
+          <button type="button"
             v-for="opt in applyToOptions"
             :key="opt.value"
             :class="['apply-btn', { 'active': localValue.applyTo === opt.value }]"

@@ -150,7 +150,7 @@ onUnmounted(() => {
       </div>
 
       <!-- 关闭按钮 -->
-      <button class="notification-close" @click.stop="handleClose">
+      <button aria-label="关闭" type="button" class="notification-close" @click.stop="handleClose">
         <X :size="16" stroke-width="2" />
       </button>
     </div>

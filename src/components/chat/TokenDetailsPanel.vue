@@ -180,7 +180,7 @@ watch(() => [props.currentContextCount, props.maxContextLength], ([current, max]
                   {{ hasCompressionSummary ? '已压缩' : (isCompressionThresholdReached ? '建议压缩' : '正常') }}
                 </span>
               </div>
-              <button
+              <button type="button"
                 v-if="showCompressionSection && compressionMode === 'manual'"
                 class="compress-action"
                 :disabled="isCompressing || !canCompress"

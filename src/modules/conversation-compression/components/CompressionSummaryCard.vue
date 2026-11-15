@@ -19,7 +19,7 @@ const toggleExpanded = () => {
 
 <template>
   <div v-if="normalizedSummary" :class="['compression-summary-card', theme]">
-    <button class="compression-summary-toggle" @click="toggleExpanded">
+    <button type="button" class="compression-summary-toggle" @click="toggleExpanded">
       <span class="compression-summary-title">
         <FileText :size="16" />
         已压缩的历史上下文

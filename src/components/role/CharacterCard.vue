@@ -66,7 +66,7 @@ const selectBtnClasses = computed(() => [
   <div :class="cardClasses" data-testid="character-card">
     <div class="character-header">
       <div class="character-info">
-        <button
+        <button aria-label="isSelected ? '当前使用中' : '设为当前用户角色'" type="button"
           v-if="type === 'user'"
           :class="selectBtnClasses"
           :title="isSelected ? '当前使用中' : '设为当前用户角色'"
@@ -91,7 +91,7 @@ const selectBtnClasses = computed(() => [
       </div>
 
       <div class="character-actions">
-        <button
+        <button aria-label="导出为角色卡" type="button"
           v-if="canExport"
           class="action-btn"
           title="导出为角色卡"
@@ -99,14 +99,14 @@ const selectBtnClasses = computed(() => [
         >
           <Download :size="16" />
         </button>
-        <button
+        <button aria-label="编辑" type="button"
           class="action-btn"
           title="编辑"
           @click="emit('edit', character.id)"
         >
           <Edit2 :size="16" />
         </button>
-        <button
+        <button aria-label="删除" type="button"
           class="action-btn action-btn--delete"
           title="删除"
           :disabled="!canDelete"

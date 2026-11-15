@@ -22,14 +22,14 @@ const emit = defineEmits<{
 <template>
   <div class="kb-list-view">
     <header class="page-header">
-      <button class="nav-btn" @click="emit('back')">
+      <button aria-label="关闭列表" type="button" class="nav-btn" @click="emit('back')">
         <ChevronLeft :size="22" />
       </button>
       <div class="header-content">
         <div class="page-title">知识库</div>
         <div class="page-subtitle">{{ knowledgeBases.length }} 个知识库</div>
       </div>
-      <button class="nav-btn" @click="emit('add')">
+      <button aria-label="新建知识库" type="button" class="nav-btn" @click="emit('add')">
         <Plus :size="22" />
       </button>
     </header>
@@ -46,7 +46,7 @@ const emit = defineEmits<{
             :is-selected="selectedKnowledgeBaseId === kb.id"
             @select="emit('select', kb.id)"
           />
-          <button
+          <button type="button"
             :class="['global-toggle-btn', { 'global-toggle-btn--active': kb.globallyEnabled }]"
             @click.stop="emit('toggleGlobalEnabled', kb.id)"
           >

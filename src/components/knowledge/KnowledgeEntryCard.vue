@@ -103,7 +103,7 @@ const canSave = computed(() => {
         <GripVertical :size="18" />
       </div>
       <div class="entry-toggle">
-        <button :class="toggleSwitchClasses" @click="emit('toggle', entry.id)">
+        <button type="button" :class="toggleSwitchClasses" @click="emit('toggle', entry.id)">
           <div class="toggle-knob"></div>
         </button>
       </div>
@@ -115,10 +115,10 @@ const canSave = computed(() => {
         <div class="entry-content">{{ entry.content }}</div>
       </div>
       <div class="entry-actions">
-        <button :class="actionBtnClasses('edit')" @click="emit('startEdit', entry)">
+        <button aria-label="编辑条目" type="button" :class="actionBtnClasses('edit')" @click="emit('startEdit', entry)">
           <Pencil :size="16" />
         </button>
-        <button :class="actionBtnClasses('delete')" @click="emit('delete', entry.id)">
+        <button aria-label="删除条目" type="button" :class="actionBtnClasses('delete')" @click="emit('delete', entry.id)">
           <Trash2 :size="16" />
         </button>
       </div>

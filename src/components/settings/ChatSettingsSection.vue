@@ -107,35 +107,35 @@ const compressionModeOptions: { value: ConversationCompressionMode; label: strin
 
     <div class="toggle-item">
       <div class="toggle-label">回车发送</div>
-      <button class="toggle-btn" :class="{ 'active': enterToSend }" @click="handleEnterToSendToggle">
+      <button type="button" class="toggle-btn" :class="{ 'active': enterToSend }" @click="handleEnterToSendToggle">
         <span>{{ enterToSend ? '已启用' : '已禁用' }}</span>
       </button>
     </div>
 
     <div class="toggle-item">
       <div class="toggle-label">显示词符数</div>
-      <button class="toggle-btn" :class="{ 'active': showWordCount }" @click="handleShowWordCountToggle">
+      <button type="button" class="toggle-btn" :class="{ 'active': showWordCount }" @click="handleShowWordCountToggle">
         <span>{{ showWordCount ? '已启用' : '已禁用' }}</span>
       </button>
     </div>
 
     <div class="toggle-item">
       <div class="toggle-label">Markdown 渲染</div>
-      <button class="toggle-btn" :class="{ 'active': enableMarkdown }" @click="handleEnableMarkdownToggle">
+      <button type="button" class="toggle-btn" :class="{ 'active': enableMarkdown }" @click="handleEnableMarkdownToggle">
         <span>{{ enableMarkdown ? '已启用' : '已禁用' }}</span>
       </button>
     </div>
 
     <div class="toggle-item">
       <div class="toggle-label">显示楼层数</div>
-      <button class="toggle-btn" :class="{ 'active': showMessageIndex }" @click="handleShowMessageIndexToggle">
+      <button type="button" class="toggle-btn" :class="{ 'active': showMessageIndex }" @click="handleShowMessageIndexToggle">
         <span>{{ showMessageIndex ? '已启用' : '已禁用' }}</span>
       </button>
     </div>
 
     <div class="toggle-item">
       <div class="toggle-label">调试模式</div>
-      <button class="toggle-btn" :class="{ 'active': debugMode }" @click="handleDebugModeToggle">
+      <button type="button" class="toggle-btn" :class="{ 'active': debugMode }" @click="handleDebugModeToggle">
         <span>{{ debugMode ? '已启用' : '已禁用' }}</span>
       </button>
     </div>
@@ -143,7 +143,7 @@ const compressionModeOptions: { value: ConversationCompressionMode; label: strin
     <div class="selector-item">
       <div class="selector-label">提示词合并模式</div>
       <div class="selector-options">
-        <button
+        <button type="button"
           v-for="option in mergeModeOptions"
           :key="option.value"
           class="selector-option"
@@ -159,7 +159,7 @@ const compressionModeOptions: { value: ConversationCompressionMode; label: strin
     <div class="selector-item">
       <div class="selector-label">会话压缩模式</div>
       <div class="selector-options">
-        <button
+        <button type="button"
           v-for="option in compressionModeOptions"
           :key="option.value"
           class="selector-option"

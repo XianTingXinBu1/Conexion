@@ -39,7 +39,7 @@ const handleCreateNew = () => {
   <div class="preset-selector">
     <div class="selector-label">选择预设</div>
     <div class="model-dropdown">
-      <button class="selector-btn" @click="showPresetList = !showPresetList">
+      <button type="button" class="selector-btn" @click="showPresetList = !showPresetList">
         <span>{{ presets.find(p => p.id === selectedPresetId)?.name || '选择预设' }}</span>
         <ChevronDown :size="16" :class="{ 'rotate': showPresetList }" />
       </button>
@@ -54,17 +54,17 @@ const handleCreateNew = () => {
           >
             <span class="preset-name">{{ preset.name }}</span>
             <div class="preset-actions">
-              <button class="preset-action-btn" @click.stop="openRenameDialog(preset.id)">
+              <button aria-label="重命名预设" type="button" class="preset-action-btn" @click.stop="openRenameDialog(preset.id)">
                 <Edit2 :size="14" />
               </button>
-              <button v-if="presets.length > 1" class="preset-action-btn delete" @click.stop="openDeleteDialog(preset.id)">
+              <button type="button" v-if="presets.length > 1" class="preset-action-btn delete" @click.stop="openDeleteDialog(preset.id)">
                 <Trash2 :size="14" />
               </button>
             </div>
           </div>
         </div>
         <div class="dropdown-footer">
-          <button class="new-preset-btn" @click="handleCreateNew">
+          <button type="button" class="new-preset-btn" @click="handleCreateNew">
             <Plus :size="16" />
             <span>新建预设</span>
           </button>

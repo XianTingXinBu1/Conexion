@@ -76,7 +76,7 @@ onUnmounted(() => {
                 {{ title }}
               </slot>
             </div>
-            <button class="modal-close" @click="handleClose">
+            <button aria-label="关闭" type="button" class="modal-close" @click="handleClose">
               <X :size="20" />
             </button>
           </div>

@@ -39,7 +39,7 @@ const getApplyToLabel = (applyTo: RegexApplyTo) => {
   <div :class="['rule-card', { 'disabled': !rule.enabled }]">
     <div class="rule-header">
       <div class="rule-info">
-        <button
+        <button type="button"
           :class="['toggle-btn', { 'active': rule.enabled }]"
           :disabled="busy"
           @click="emit('toggle', rule.id)"
@@ -50,10 +50,10 @@ const getApplyToLabel = (applyTo: RegexApplyTo) => {
         <div class="rule-name">{{ rule.name }}</div>
       </div>
       <div class="rule-actions">
-        <button class="action-btn" :disabled="busy" @click="emit('edit', rule)">
+        <button aria-label="编辑" type="button" class="action-btn" :disabled="busy" @click="emit('edit', rule)">
           <Edit2 :size="16" />
         </button>
-        <button class="action-btn delete" :disabled="busy" @click="emit('delete', rule.id)">
+        <button aria-label="删除" type="button" class="action-btn delete" :disabled="busy" @click="emit('delete', rule.id)">
           <Trash2 :size="16" />
         </button>
       </div>

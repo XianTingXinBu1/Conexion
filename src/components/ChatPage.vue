@@ -96,7 +96,7 @@ const {
 <template>
   <div class="chat-page">
     <header class="chat-header">
-      <button class="nav-btn" @click="router.back()">
+      <button aria-label="返回会话列表" type="button" class="nav-btn" @click="router.back()">
         <ArrowLeft :size="22" />
       </button>
       <div class="header-content">
@@ -134,7 +134,7 @@ const {
         :summary="compressionSummary"
         :theme="theme"
       />
-      <button
+      <button type="button"
         v-if="hasMoreMessages"
         class="load-more-btn"
         @click="loadMoreMessages"
@@ -203,8 +203,8 @@ const {
 
     <div v-if="isSelectingMessages" class="message-selection-bar">
       <span>已选 {{ selectedMessageCount }} 条消息</span>
-      <button :disabled="isUpdatingMessage" @click="cancelMessageSelection">取消</button>
-      <button :disabled="!selectedMessageCount || isUpdatingMessage" @click="requestDeleteSelected">{{ isUpdatingMessage ? '删除中…' : '删除选中消息' }}</button>
+      <button type="button" :disabled="isUpdatingMessage" @click="cancelMessageSelection">取消</button>
+      <button type="button" :disabled="!selectedMessageCount || isUpdatingMessage" @click="requestDeleteSelected">{{ isUpdatingMessage ? '删除中…' : '删除选中消息' }}</button>
     </div>
     <p v-if="draftError" role="alert" class="draft-error">{{ draftError }}</p>
     <ChatInput v-if="!isSelectingMessages"

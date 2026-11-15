@@ -19,7 +19,7 @@ const emit = defineEmits<{
 
 <template>
   <header class="page-header">
-    <button class="nav-btn" @click="emit('back')">
+    <button aria-label="返回预设列表" type="button" class="nav-btn" @click="emit('back')">
       <ChevronLeft :size="22" />
     </button>
     <div class="header-content">
@@ -29,7 +29,7 @@ const emit = defineEmits<{
       </div>
       <div class="page-subtitle">{{ enabledCount }}/{{ totalCount }} 个条目已启用</div>
     </div>
-    <button class="nav-btn" @click="emit('toggleNewForm')">
+    <button type="button" class="nav-btn" @click="emit('toggleNewForm')">
       <X v-if="showNewForm" :size="22" />
       <Plus v-else :size="22" />
     </button>

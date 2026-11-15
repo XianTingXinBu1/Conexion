@@ -64,7 +64,7 @@ const formatContextLength = (length: number): string => {
           @focus="showModelList = true"
           @input="handleInput"
         />
-        <button class="dropdown-arrow" @click="showModelList = !showModelList">
+        <button aria-label="展开模型列表" type="button" class="dropdown-arrow" @click="showModelList = !showModelList">
           <ChevronDown :size="14" :class="{ 'rotate': showModelList }" />
         </button>
         <div v-if="showModelList" class="dropdown-menu">
@@ -86,7 +86,7 @@ const formatContextLength = (length: number): string => {
         </div>
       </div>
     </div>
-    <button class="fetch-models-btn" @click="emit('fetchModels')" :disabled="isLoading">
+    <button type="button" class="fetch-models-btn" @click="emit('fetchModels')" :disabled="isLoading">
       <Database :size="16" />
       <span>{{ isLoading ? '获取中...' : '获取模型列表' }}</span>
     </button>

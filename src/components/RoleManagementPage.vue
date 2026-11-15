@@ -286,14 +286,14 @@ onMounted(async () => {
     />
 
     <div class="tabs-container">
-      <button
+      <button type="button"
         :class="['tab-btn', { 'active': activeTab === 'user' }]"
         @click="activeTab = 'user'"
       >
         <User :size="18" />
         <span>用户角色</span>
       </button>
-      <button
+      <button type="button"
         :class="['tab-btn', { 'active': activeTab === 'ai' }]"
         @click="activeTab = 'ai'"
       >
@@ -310,11 +310,11 @@ onMounted(async () => {
       @update:show="isCreateOpen = false"
     >
       <div class="create-options">
-        <button class="create-option" :disabled="isImporting" data-testid="create-character-manually" @click="openCreateEditor">
+        <button type="button" class="create-option" :disabled="isImporting" data-testid="create-character-manually" @click="openCreateEditor">
           <Plus :size="20" />
           <span>从空白创建</span>
         </button>
-        <button v-if="activeTab === 'ai'" class="create-option" :disabled="isImporting" @click="handleImportClick">
+        <button type="button" v-if="activeTab === 'ai'" class="create-option" :disabled="isImporting" @click="handleImportClick">
           <Upload :size="20" />
           <span>{{ isImporting ? '导入中…' : '导入角色卡' }}</span>
         </button>

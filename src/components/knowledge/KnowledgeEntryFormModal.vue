@@ -73,7 +73,7 @@ const handleClose = () => {
     <div class="entry-form-modal">
       <div class="modal-header">
         <h2 class="modal-title">{{ mode === 'create' ? '新建知识条目' : '编辑知识条目' }}</h2>
-        <button class="close-btn" @click="handleClose">
+        <button aria-label="关闭" type="button" class="close-btn" @click="handleClose">
           <X :size="20" />
         </button>
       </div>

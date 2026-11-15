@@ -93,7 +93,7 @@ defineExpose({
     <transition name="fade-slide">
       <div v-if="isToolbarExpanded" class="toolbar-panel">
         <div class="toolbar-grid">
-          <button class="toolbar-item" @click="handlePromptAssistant">
+          <button type="button" class="toolbar-item" @click="handlePromptAssistant">
             <div class="icon-wrapper"><Sparkles :size="20" /></div>
             <span>提示词助手</span>
           </button>
@@ -102,7 +102,7 @@ defineExpose({
     </transition>
 
     <div class="input-container">
-      <button
+      <button aria-label="更多输入选项" type="button"
         class="toolbar-toggle-btn"
         @click="toggleToolbar"
         :class="{ active: isToolbarExpanded }"
@@ -123,7 +123,7 @@ defineExpose({
         rows="1"
       />
 
-      <button
+      <button aria-label="停止生成" type="button"
         v-if="isRequestActive"
         class="send-btn stop-btn"
         @click="cancelMessage"
@@ -131,7 +131,7 @@ defineExpose({
       >
         <Square :size="18" />
       </button>
-      <button
+      <button aria-label="requestStatus === 'cancelled' ? '重新输入后发送' : '发送'" type="button"
         v-else
         class="send-btn"
         @click="sendMessage"

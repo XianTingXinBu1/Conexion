@@ -287,7 +287,7 @@ async function handleTestConnection() {
           <Zap :size="18" />
           <span>连接测试</span>
         </div>
-        <button class="test-btn" @click="handleTestConnection" :disabled="isTestingConnection">
+        <button type="button" class="test-btn" @click="handleTestConnection" :disabled="isTestingConnection">
           <RefreshCw :size="18" :class="{ 'spinning': isTestingConnection }" />
           <span>{{ isTestingConnection ? '测试中...' : '测试连接' }}</span>
         </button>
@@ -335,8 +335,8 @@ async function handleTestConnection() {
         />
       </div>
       <template #footer>
-        <button class="modal-btn secondary" @click="showNewPresetDialog = false">取消</button>
-        <button class="modal-btn primary" :disabled="!canCreatePreset" @click="handleCreateNewPreset">创建</button>
+        <button type="button" class="modal-btn secondary" @click="showNewPresetDialog = false">取消</button>
+        <button type="button" class="modal-btn primary" :disabled="!canCreatePreset" @click="handleCreateNewPreset">创建</button>
       </template>
     </Modal>
 
@@ -357,8 +357,8 @@ async function handleTestConnection() {
         />
       </div>
       <template #footer>
-        <button class="modal-btn secondary" @click="showRenameDialog = false">取消</button>
-        <button class="modal-btn primary" :disabled="!canRenamePreset" @click="renamePreset">确定</button>
+        <button type="button" class="modal-btn secondary" @click="showRenameDialog = false">取消</button>
+        <button type="button" class="modal-btn primary" :disabled="!canRenamePreset" @click="renamePreset">确定</button>
       </template>
     </Modal>
 
@@ -385,9 +385,9 @@ async function handleTestConnection() {
         </div>
       </div>
       <template #footer>
-        <button class="modal-btn secondary" @click="onDiscardAndExit">{{ leaveConfirmDialogProps.thirdButtonText }}</button>
-        <button class="modal-btn secondary" @click="onCancelExit">{{ leaveConfirmDialogProps.cancelText }}</button>
-        <button class="modal-btn primary" @click="onSaveAndExit">{{ leaveConfirmDialogProps.confirmText }}</button>
+        <button type="button" class="modal-btn secondary" @click="onDiscardAndExit">{{ leaveConfirmDialogProps.thirdButtonText }}</button>
+        <button type="button" class="modal-btn secondary" @click="onCancelExit">{{ leaveConfirmDialogProps.cancelText }}</button>
+        <button type="button" class="modal-btn primary" @click="onSaveAndExit">{{ leaveConfirmDialogProps.confirmText }}</button>
       </template>
     </Modal>
   </div>

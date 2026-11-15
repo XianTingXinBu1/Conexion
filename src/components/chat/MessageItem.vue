@@ -138,22 +138,22 @@ const messageLabel = computed(() => {
       <div v-if="showMessageIndex" class="message-index">#{{ totalMessages - displayCount + index + 1 }}</div>
     </div>
     <div v-if="!selectionMode" class="message-footer">
-      <button v-if="variantCount > 1" class="variant-btn" :disabled="variantSwitchDisabled" title="上一条回复" @click="switchVariant(-1)">
+      <button type="button" v-if="variantCount > 1" class="variant-btn" :disabled="variantSwitchDisabled" title="上一条回复" @click="switchVariant(-1)">
         <ChevronLeft :size="18" />
       </button>
       <div class="message-actions">
-        <button v-if="canRetry" class="action-btn" @click="emit('retry', message.id)" title="重新生成">
+        <button aria-label="重新生成" type="button" v-if="canRetry" class="action-btn" @click="emit('retry', message.id)" title="重新生成">
           <RefreshCw :size="14" />
         </button>
-        <button class="action-btn" :disabled="actionsDisabled" @click="$emit('edit', message.id)" title="编辑">
+        <button aria-label="编辑" type="button" class="action-btn" :disabled="actionsDisabled" @click="$emit('edit', message.id)" title="编辑">
           <Edit2 :size="14" />
         </button>
-        <button class="action-btn" :disabled="actionsDisabled" @click="$emit('delete', message.id)" title="删除">
+        <button aria-label="删除" type="button" class="action-btn" :disabled="actionsDisabled" @click="$emit('delete', message.id)" title="删除">
           <Trash2 :size="14" />
         </button>
         <span v-if="variantCount > 1" class="variant-indicator">{{ variantIndex + 1 }}/{{ variantCount }}</span>
       </div>
-      <button v-if="variantCount > 1" class="variant-btn" :disabled="variantSwitchDisabled" title="下一条回复" @click="switchVariant(1)">
+      <button type="button" v-if="variantCount > 1" class="variant-btn" :disabled="variantSwitchDisabled" title="下一条回复" @click="switchVariant(1)">
         <ChevronRight :size="18" />
       </button>
     </div>

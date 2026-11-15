@@ -172,7 +172,7 @@ const onTouchCancel = (event: TouchEvent) => {
         <GripVertical :size="18" />
       </div>
       <div class="item-toggle">
-        <button :class="toggleSwitchClasses" @click="emit('toggle', item.id)">
+        <button type="button" :class="toggleSwitchClasses" @click="emit('toggle', item.id)">
           <div class="toggle-knob"></div>
         </button>
       </div>
@@ -182,10 +182,10 @@ const onTouchCancel = (event: TouchEvent) => {
         <div v-if="item.prompt" class="prompt-content">{{ item.prompt }}</div>
       </div>
       <div class="item-actions">
-        <button :class="actionBtnClasses('edit')" @click="emit('startEdit', item)">
+        <button aria-label="编辑" type="button" :class="actionBtnClasses('edit')" @click="emit('startEdit', item)">
           <Pencil :size="16" />
         </button>
-        <button :class="actionBtnClasses('delete')" @click="emit('delete', item.id)">
+        <button aria-label="删除" type="button" :class="actionBtnClasses('delete')" @click="emit('delete', item.id)">
           <Trash2 :size="16" />
         </button>
       </div>
@@ -215,7 +215,7 @@ const onTouchCancel = (event: TouchEvent) => {
         <div v-if="shouldShowPrompt" class="form-group">
           <label class="form-label">角色类型</label>
           <div class="role-type-selector">
-            <button
+            <button type="button"
               v-for="option in ROLE_OPTIONS"
               :key="option.value"
               :class="['role-type-btn', { 'role-type-btn--active': getEditingDataRoleType() === option.value }]"

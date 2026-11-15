@@ -175,19 +175,19 @@ const handleNameKeydown = (event: KeyboardEvent) => {
     <div v-if="shouldShowPrompt" class="form-group">
       <label class="form-label">角色类型</label>
       <div class="role-type-selector">
-        <button
+        <button type="button"
           :class="['role-type-btn', { 'role-type-btn--active': formData.roleType === 'system' }]"
           @click="formData.roleType = 'system'"
         >
           System
         </button>
-        <button
+        <button type="button"
           :class="['role-type-btn', { 'role-type-btn--active': formData.roleType === 'user' }]"
           @click="formData.roleType = 'user'"
         >
           User
         </button>
-        <button
+        <button type="button"
           :class="['role-type-btn', { 'role-type-btn--active': formData.roleType === 'assistant' }]"
           @click="formData.roleType = 'assistant'"
         >
@@ -221,11 +221,11 @@ const handleNameKeydown = (event: KeyboardEvent) => {
     </div>
     <template #footer>
       <div class="modal-footer-actions">
-        <button class="btn-secondary" @click="handleCancel">
+        <button type="button" class="btn-secondary" @click="handleCancel">
           <X :size="16" />
           取消
         </button>
-        <button
+        <button type="button"
           class="btn-primary"
           :disabled="!canSave"
           @click="handleSave"

@@ -97,7 +97,7 @@ const navigateToKnowledgeBase = () => {
         <span class="brand-name">Conexion</span>
         <span class="brand-dot"></span>
       </div>
-      <button class="theme-toggle" @click="handleToggleTheme">
+      <button type="button" class="theme-toggle" @click="handleToggleTheme">
         <Sun v-if="theme === 'light'" :size="20" />
         <Moon v-else :size="20" />
       </button>

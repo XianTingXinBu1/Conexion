@@ -81,7 +81,7 @@ onMounted(async () => {
   <div class="settings-page">
     <!-- 顶部导航栏 -->
     <header class="page-header">
-      <button class="nav-btn" @click="router.back()">
+      <button aria-label="返回" type="button" class="nav-btn" @click="router.back()">
         <ArrowLeft :size="22" />
       </button>
       <div class="header-content">

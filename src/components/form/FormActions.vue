@@ -48,7 +48,7 @@ const handleClick = (button: ButtonProps, index: number) => {
 
 <template>
   <div :class="wrapperClasses">
-    <button
+    <button type="button"
       v-for="(button, index) in buttons"
       :key="index"
       :class="buttonClasses(button)"

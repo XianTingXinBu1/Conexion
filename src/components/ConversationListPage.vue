@@ -202,7 +202,7 @@ const selectCharacter = async (character: AICharacter) => {
       title="会话"
       subtitle="Conversations"
     >
-      <button class="nav-btn" @click="openCharacterSelector">
+      <button aria-label="新建会话" type="button" class="nav-btn" @click="openCharacterSelector">
         <Plus :size="22" />
       </button>
     </PageHeader>
@@ -309,8 +309,8 @@ const selectCharacter = async (character: AICharacter) => {
         />
       </div>
       <template #footer>
-        <button class="modal-btn secondary" @click="showRenameDialog = false">取消</button>
-        <button class="modal-btn primary" @click="confirmRename">确定</button>
+        <button type="button" class="modal-btn secondary" @click="showRenameDialog = false">取消</button>
+        <button type="button" class="modal-btn primary" @click="confirmRename">确定</button>
       </template>
     </Modal>
   </div>

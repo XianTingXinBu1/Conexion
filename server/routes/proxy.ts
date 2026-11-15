@@ -28,6 +28,12 @@ function getResolvedUpstream(payload: { baseURL?: unknown; apiKey?: unknown }, c
   return { baseURL, apiKey };
 }
 
+/** GET /models 只从 query 里取 baseURL，其余字段（尤其 apiKey）一律忽略 */
+function pickBaseUrlFromQuery(url: URL): Record<string, string> {
+  const baseURL = url.searchParams.get('baseURL');
+  return baseURL ? { baseURL } : {};
+}
+
 function jsonResponse(data: unknown, status: number): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -55,6 +61,12 @@ function streamHeadersFromUpstream(upstreamHeaders: Headers): HeadersInit {
 const LOCAL_ONLY_FIELDS = ['baseURL', 'apiKey'];
 
 /**
+ * 不允许透传的键：`__proto__` / `constructor` / `prototype` 这类键一旦被赋到普通对象上，
+ * 会改写该对象的原型链（原型污染），而请求体完全是客户端可控的。
+ */
+const FORBIDDEN_BODY_KEYS = ['__proto__', 'constructor', 'prototype'];
+
+/**
  * 构造发给上游的 chat/completions 请求体。
  *
  * 早期这里是显式白名单（model / messages / temperature / max_tokens / stream），
@@ -69,7 +81,7 @@ export function buildUpstreamChatBody(
   const body: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(payload)) {
-    if (LOCAL_ONLY_FIELDS.includes(key)) {
+    if (LOCAL_ONLY_FIELDS.includes(key) || FORBIDDEN_BODY_KEYS.includes(key)) {
       continue;
     }
     body[key] = value;
@@ -86,7 +98,9 @@ export function createProxyRoutes(config: ServerConfig) {
 
   app.on(['GET', 'POST'], '/models', async (c) => {
     const source = c.req.method === 'GET'
-      ? Object.fromEntries(new URL(c.req.url).searchParams.entries())
+      // GET 只接受 baseURL 走 query：把 apiKey 放进 URL 会留在访问日志、浏览器历史与
+      // Referer 里，需要自定义 Key 的场景请用 POST。
+      ? pickBaseUrlFromQuery(new URL(c.req.url))
       : ensureObjectPayload(await readJsonBody(c.req.raw, config.maxBodyBytes));
 
     const { baseURL, apiKey } = getResolvedUpstream(source, config);

@@ -27,5 +27,9 @@ export async function replaceSettings(settings: Record<string, unknown>): Promis
 }
 
 export async function clearBackendData(): Promise<void> {
-  await requestJson<{ ok: boolean }>('/api/data', { method: 'DELETE' });
+  // 后端要求显式确认标记：清库不可逆，不能只靠一个 DELETE 就成立
+  await requestJson<{ ok: boolean }>('/api/data', {
+    method: 'DELETE',
+    headers: { 'X-Confirm-Destroy': 'delete-all-data' },
+  });
 }

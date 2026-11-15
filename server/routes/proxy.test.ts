@@ -64,4 +64,19 @@ describe('buildUpstreamChatBody', () => {
 
     expect(body.stop).toBeNull();
   });
+
+  it('丢弃会污染原型的键，也绝不把 baseURL/apiKey 透传出去', () => {
+    const payload = JSON.parse(
+      '{"baseURL":"https://upstream.example.com","apiKey":"sk-1","model":"m",' +
+      '"__proto__":{"polluted":true},"constructor":{"x":1},"messages":[]}',
+    );
+
+    const body = buildUpstreamChatBody(payload, 'm');
+
+    expect(body.baseURL).toBeUndefined();
+    expect(body.apiKey).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(body, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(body, 'constructor')).toBe(false);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
 });

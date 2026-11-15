@@ -556,4 +556,52 @@ describe('server api validation', () => {
       restoreDataDir();
     }
   });
+
+  it('requires an explicit confirmation header to wipe all data', async () => {
+    const restoreDataDir = await useTempDataDir();
+    const started = await startTestServer();
+    servers.push(started.server);
+
+    try {
+      const withoutConfirm = await fetch(`${started.baseUrl}/api/data`, { method: 'DELETE' });
+      expect(withoutConfirm.status).toBe(400);
+      await expect(withoutConfirm.json()).resolves.toEqual({
+        error: { message: '缺少确认标记（X-Confirm-Destroy: delete-all-data）' },
+      });
+
+      const withConfirm = await fetch(`${started.baseUrl}/api/data`, {
+        method: 'DELETE',
+        headers: { 'X-Confirm-Destroy': 'delete-all-data' },
+      });
+      expect(withConfirm.status).toBe(200);
+    } finally {
+      restoreDataDir();
+    }
+  });
+
+  it('rejects settings writes without a value or with a non-object settings payload', async () => {
+    const restoreDataDir = await useTempDataDir();
+    const started = await startTestServer();
+    servers.push(started.server);
+
+    try {
+      const missingValue = await fetch(`${started.baseUrl}/api/settings/some-key`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(missingValue.status).toBe(400);
+      await expect(missingValue.json()).resolves.toEqual({ error: { message: '缺少 value' } });
+
+      const badSettings = await fetch(`${started.baseUrl}/api/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: 'not-an-object' }),
+      });
+      expect(badSettings.status).toBe(400);
+      await expect(badSettings.json()).resolves.toEqual({ error: { message: 'settings 必须是对象' } });
+    } finally {
+      restoreDataDir();
+    }
+  });
 });

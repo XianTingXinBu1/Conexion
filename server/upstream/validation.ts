@@ -33,6 +33,12 @@ export function isPrivateHostname(hostname: string): boolean {
       (a === 172 && b >= 16 && b <= 31) ||
       (a === 192 && b === 168) ||
       (a === 169 && b === 254) ||
+      // 运营商级 NAT（100.64.0.0/10）：在内网侧同样不该被当作公网目标
+      (a === 100 && b >= 64 && b <= 127) ||
+      // 基准测试网段（198.18.0.0/15）
+      (a === 198 && (b === 18 || b === 19)) ||
+      // 240.0.0.0/4 保留段（含 255.255.255.255 广播）
+      a >= 240 ||
       a === 0
     );
   }
@@ -47,7 +53,18 @@ export function isPrivateHostname(hostname: string): boolean {
       return true;
     }
 
-    return normalized === '::1' || normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80:');
+    // 未指定地址 / 回环
+    if (normalized === '::1' || normalized === '::') return true;
+
+    const firstHextet = normalized.split(':')[0] ?? '';
+    // 唯一本地地址 fc00::/7
+    if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+    // 链路本地 fe80::/10（fe80 – febf）
+    if (['fe8', 'fe9', 'fea', 'feb'].some(prefix => firstHextet.startsWith(prefix))) return true;
+    // 组播 ff00::/8
+    if (firstHextet.startsWith('ff')) return true;
+
+    return false;
   }
 
   return false;

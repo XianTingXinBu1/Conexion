@@ -57,16 +57,34 @@ export function createSettingsRoutes(config: ServerConfig, repository: SettingsR
   app.put('/settings/:key', async (c) => {
     const key = c.req.param('key');
     const payload = ensureObjectPayload(await readJsonBody(c.req.raw, config.maxBodyBytes));
+    // 以前缺 value 会把 undefined 写进去，读回来是 null，前端随后把 null 当成真实值
+    if (!('value' in payload)) {
+      throw new HttpError(400, '缺少 value');
+    }
     return jsonResponse({ value: await repository.set(key, payload.value) });
   });
 
   app.put('/settings', async (c) => {
     const payload = ensureObjectPayload(await readJsonBody(c.req.raw, config.maxBodyBytes));
+    // 带 settings 字段但它不是对象时，以前会把整个 payload（连同 settings 字段本身）
+    // 静默写进设置文件，掩盖客户端错误
+    if ('settings' in payload && !isObject(payload.settings)) {
+      throw new HttpError(400, 'settings 必须是对象');
+    }
     const settings = isObject(payload.settings) ? payload.settings : payload;
     return jsonResponse(await repository.replaceAll(settings));
   });
 
-  app.delete('/data', async () => {
+  /**
+   * 全量清库。
+   *
+   * 必须带显式的确认标记：这类不可逆操作不该因为「有人能发 DELETE」就成立
+   * （例如误触、脚本复用同一个 baseURL、跨站简单请求）。
+   */
+  app.delete('/data', async (c) => {
+    if (c.req.header('X-Confirm-Destroy') !== 'delete-all-data') {
+      throw new HttpError(400, '缺少确认标记（X-Confirm-Destroy: delete-all-data）');
+    }
     await repository.clear();
     return jsonResponse({ ok: true });
   });

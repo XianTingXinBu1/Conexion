@@ -57,7 +57,7 @@ export async function runE2ECheck(options = {}) {
       name: 'E2E 浏览器测试',
       status: 'skip',
       duration: 0,
-      message: '已跳过 E2E',
+      message: '已跳过（用 --e2e 或 npm run health-check:full 启用）',
     };
   }
 

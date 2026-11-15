@@ -28,9 +28,11 @@ export async function runTestCheck(options = {}) {
     const vitestCli = resolve(projectRoot, 'node_modules/vitest/vitest.mjs');
 
     // Termux 友好：直接用 node 跑 vitest 入口，避开 .bin shebang
+    // 只输出 text reporter：健康检查只需要控制台结果，html / json / lcov
+    // 文件生成在提交前快检里是纯开销（`npm run test:coverage` 仍产全量报告）。
     const command = existsSync(vitestCli)
-      ? `node "${vitestCli}" run --coverage`
-      : 'npx vitest run --coverage';
+      ? `node "${vitestCli}" run --coverage --coverage.reporter=text`
+      : 'npx vitest run --coverage --coverage.reporter=text';
 
     execSync(command, {
       stdio: 'pipe',

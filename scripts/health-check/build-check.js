@@ -1,5 +1,10 @@
 /**
- * 构建检查
+ * 构建检查（兼类型检查）
+ *
+ * 命令是 `vue-tsc -b && vite build`，所以它本身就是类型检查 + 打包两件事。
+ * 以前 health-check 里另有一项 type-check 跑 `vue-tsc -b --noEmit`，但后者
+ * 每次都是全量重查（约 15s，不读增量缓存），与这里的 `vue-tsc -b` 完全重复。
+ * 现已合并到本项，失败时按输出区分「类型错误」与「打包错误」。
  *
  * 注意：Termux 上 npm .bin 的 shebang 指向 /usr/bin/env（不存在），
  * `npm run build` 会报 vue-tsc / vite not found。
@@ -51,7 +56,7 @@ export async function runBuildCheck(options = {}) {
       name: '项目构建检查',
       status: 'fail',
       duration: Date.now() - startTime,
-      message: '构建失败',
+      message: output.includes('error TS') ? '存在类型错误' : '构建失败',
       details: output,
     };
   }

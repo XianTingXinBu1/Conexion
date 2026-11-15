@@ -169,8 +169,9 @@ Layering details live in `docs/chat-architecture.md`.
 | `npm run test:coverage` | Unit tests with coverage and threshold check |
 | `npm run check:architecture` | Architecture boundary check |
 | `npm run e2e` | Selenium end-to-end tests, backend + frontend must be running (see `e2e/README.md`) |
-| `npm run health-check` | Full health check (types / deps / architecture / tests / build / E2E) |
-| `npm run health-check:quick` | Skip tests, build, and E2E |
+| `npm run health-check` | Health check (deps / tests + coverage thresholds / architecture / build), E2E skipped by default |
+| `npm run health-check:full` | Same plus E2E |
+| `npm run health-check:quick` | Skip tests and build |
 
 Verification scope by change type:
 
@@ -178,8 +179,9 @@ Verification scope by change type:
 |---|---|
 | General change | `test:run` + `check:architecture` + `build` |
 | Chat module | `test:run` + `check:architecture` |
-| Rendering / macros / routing (browser behavior) | additionally run `e2e` |
+| Rendering / macros / routing / drag geometry (browser behavior) | additionally run `e2e` |
 | Before committing | `health-check` |
+| Before committing browser-facing changes | `health-check:full` |
 
 ### CI
 

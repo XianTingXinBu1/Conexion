@@ -48,7 +48,8 @@ npx vue-tsc -b                 # 类型检查
 npm run build                  # 构建
 npm run e2e                    # E2E（需服务在线）
 npm run test:coverage          # 覆盖率，统计范围 src/**（含 .vue，排除 src/main.ts 与测试文件）
-npm run health-check           # 提交前的完整检查（6 项，约 65s）
+npm run health-check           # 提交前检查（依赖 / 测试 + 覆盖率门槛 / 架构 / 构建，约 63s）
+npm run health-check:full      # 同上加 E2E，约 105s
 ```
 
 > 覆盖率口径：`vitest.config.ts` 的 `coverage.include` 为 `src/**/*.{ts,vue}`，
@@ -204,14 +205,25 @@ npm run e2e                      # 全部用例；npm run e2e macro 按名字过
 npm run health-check
 ```
 
-健康检查的 6 项里，**关键项**是 type-check / deps-check / test-check /
-architecture-check / build-check（挂掉即非 0 退出），只有 E2E 是**非关键项**
-（`critical: false`，失败只告警不阻断）；但改动 Markdown 清理、宏变量、路由时
-仍应手动确认 E2E 通过。
+健康检查串行跑 5 项，**关键项**是 deps-check / test-check / architecture-check /
+build-check（挂掉即非 0 退出）。**没有独立的 type-check**：构建检查里的
+`vue-tsc -b` 就是类型检查，而 `vue-tsc -b --noEmit` 每次都是全量重查
+（约 15s，不读增量缓存），单独再跑一遍纯属重复。
 
-`test-check` 已改为带 `--coverage` 执行（约多 4s），因此
-`coverage.thresholds` 在本地也是硬闸：低于门槛会被判为
-「测试通过但覆盖率未达门槛」。带上 E2E 的完整健康检查约 110s。
+**E2E 默认跳过**（`optional: true`），需要时用 `--e2e`：
+
+```bash
+npm run health-check:full                                    # 含 E2E
+node scripts/health-check/health-check.js --e2e              # 等价写法
+npm run e2e                                                  # 只跑 E2E
+```
+
+为什么不并行：机器是 i5-2430M / 2 核，实测三路并行时 test 34s→61s、
+E2E 42s→105s，总耗时几乎不变；只并行「E2E + 构建」时 E2E 也会从 42s 拖到
+68s。CPU 争抢吃掉了全部收益，还让耗时不可预测。
+
+耗时参考（本机）：默认约 63s（test 35s + build 26s），`--e2e` 再加约 42s。
+改动 Markdown 清理、宏变量、路由、拖拽几何时仍应手动跑 E2E 确认。
 
 无法跑完整验证时，至少说明：跑了什么、没跑什么、剩余风险。
 

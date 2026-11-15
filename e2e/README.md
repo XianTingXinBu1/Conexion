@@ -50,12 +50,14 @@ npm run e2e                # 等价于 node e2e/run.mjs
 通过健康检查一起跑（会自动确保服务就绪）：
 
 ```bash
-npm run health-check              # 含 E2E
-npm run health-check:quick        # 跳过测试/构建/E2E
-node scripts/health-check/health-check.js --skip-e2e   # 单独跳过 E2E
+npm run health-check:full                        # 含 E2E
+node scripts/health-check/health-check.js --e2e  # 等价写法
 ```
 
-> E2E 较慢，因此在 health-check 中标记为**非关键项**（critical: false），失败不会阻断构建。
+> **E2E 在健康检查里默认跳过**：占掉一半耗时，而覆盖面（DOM 级 XSS、拖拽几何、
+> 返回键）只在改渲染 / 路由 / 交互时才相关。需要时用 `--e2e`
+> （即 `npm run health-check:full`）。它仍标记为**非关键项**（critical: false），
+> 失败只告警不阻断。
 
 ## 注意
 

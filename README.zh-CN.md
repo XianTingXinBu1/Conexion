@@ -161,8 +161,9 @@ npm run check:architecture
 | `npm run test:coverage` | 单测 + 覆盖率并校验门槛 |
 | `npm run check:architecture` | 架构边界检查 |
 | `npm run e2e` | Selenium 端到端测试，需前后端在线（见 `e2e/README.md`） |
-| `npm run health-check` | 全量健康检查（类型 / 依赖 / 架构 / 测试 / 构建 / E2E） |
-| `npm run health-check:quick` | 跳过测试、构建、E2E |
+| `npm run health-check` | 健康检查（依赖 / 测试 + 覆盖率门槛 / 架构 / 构建），默认跳过 E2E |
+| `npm run health-check:full` | 同上并包含 E2E |
+| `npm run health-check:quick` | 跳过测试与构建 |
 
 验证标准范围：
 
@@ -170,8 +171,9 @@ npm run check:architecture
 |---|---|
 | 普通改动 | `test:run` + `check:architecture` + `build` |
 | 聊天模块 | `test:run` + `check:architecture` |
-| 渲染 / 宏变量 / 路由等浏览器行为 | 额外跑 `e2e` |
+| 渲染 / 宏变量 / 路由 / 拖拽几何等浏览器行为 | 额外跑 `e2e` |
 | 提交前 | `health-check` |
+| 提交前（改到浏览器行为） | `health-check:full` |
 
 ### CI
 

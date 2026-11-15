@@ -5,7 +5,6 @@
  * 快速检查项目代码质量
  */
 
-import { runTypeCheck } from './type-check.js';
 import { runBuildCheck } from './build-check.js';
 import { runTestCheck } from './test-check.js';
 import { runDepsCheck } from './deps-check.js';
@@ -13,13 +12,11 @@ import { runArchitectureCheck } from './architecture-check.js';
 import { runE2ECheck } from './e2e-check.js';
 
 // 定义所有检查项
+//
+// 没有独立的 type-check 项：构建检查里的 `vue-tsc -b` 就是类型检查，
+// 而 `vue-tsc -b --noEmit` 每次都是全量重查（约 15s，不读增量缓存），
+// 单独再跑一遍纯属重复。构建失败时按输出区分「类型错误」与「打包错误」。
 const CHECKS = [
-  {
-    name: 'type-check',
-    description: 'TypeScript 类型检查',
-    critical: true,
-    run: () => runTypeCheck(),
-  },
   {
     name: 'deps-check',
     description: '依赖完整性检查',
@@ -42,7 +39,11 @@ const CHECKS = [
   {
     name: 'e2e-check',
     description: 'E2E 浏览器测试',
+    // 非关键项：依赖系统 Chromium 与版本匹配的 chromedriver，环境不对时只告警
     critical: false,
+    // 默认跳过，由 --e2e 显式启用：它是一半的耗时，而覆盖面（DOM 级 XSS、
+    // 拖拽几何、返回键）只在改渲染 / 路由 / 交互时才可能受影响
+    optional: true,
     run: (opts) => runE2ECheck(opts),
   },
   {
@@ -121,6 +122,12 @@ function printSummary(report) {
 
 /**
  * 运行健康检查
+ *
+ * 串行执行，刻意不做并行：这台机器（i5-2430M / 2 核）实测并行是负收益——
+ * 三路同时跑时 test 34s→61s、E2E 42s→105s，总耗时几乎不变；
+ * 只并行「E2E + 构建」时 E2E 也会从 42s 拖到 68s。CPU 争抢吃掉了全部收益，
+ * 还让耗时变得不可预测。真正有效的削时手段是：不重复跑类型检查（build 已含）
+ * 与默认跳过 E2E（--e2e 启用）。
  */
 export async function runHealthCheck(options = {}) {
   const startTime = Date.now();
@@ -149,8 +156,8 @@ export async function runHealthCheck(options = {}) {
   };
 
   const criticalFailures = results
-    .filter((r, i) => r.status === 'fail' && CHECKS[i].critical)
-    .map(r => r.name);
+    .filter((result, index) => result.status === 'fail' && CHECKS[index].critical)
+    .map(result => result.name);
 
   const report = {
     startTime,
@@ -174,7 +181,9 @@ async function main() {
   const options = {
     skipTests: args.includes('--skip-tests'),
     skipBuild: args.includes('--skip-build'),
-    skipE2E: args.includes('--skip-e2e'),
+    // E2E 默认跳过：它占掉一半耗时，而覆盖面只在改渲染 / 路由 / 交互时才相关。
+    // 需要时用 --e2e 显式启用（npm run health-check:full）。
+    skipE2E: args.includes('--skip-e2e') || !args.includes('--e2e'),
     verbose: args.includes('--verbose') || args.includes('-v'),
   };
 

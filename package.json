@@ -17,7 +17,8 @@
     "e2e": "node e2e/run.mjs",
     "e2e:check": "node scripts/health-check/health-check.js",
     "health-check": "node scripts/health-check/health-check.js",
-    "health-check:quick": "node scripts/health-check/health-check.js --skip-tests --skip-build --skip-e2e",
+    "health-check:full": "node scripts/health-check/health-check.js --e2e",
+    "health-check:quick": "node scripts/health-check/health-check.js --skip-tests --skip-build",
     "health-check:verbose": "node scripts/health-check/health-check.js --verbose"
   },
   "dependencies": {

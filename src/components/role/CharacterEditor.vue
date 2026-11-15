@@ -10,6 +10,7 @@ import { Check, X } from '@lucide/vue';
 import type { UserCharacter, AICharacter, CharacterType, KnowledgeBase } from '@/types';
 import { loadKnowledgeBases as loadKnowledgeBasesFromRepository } from '@/repositories/knowledgeBaseRepository';
 import { useBackGuard } from '@/composables/useBackGuard';
+import { createId } from '@/utils/id';
 import FormInput from '../form/FormInput.vue';
 import FormTextarea from '../form/FormTextarea.vue';
 import FormActions from '../form/FormActions.vue';
@@ -145,7 +146,7 @@ const buildCharacter = (): UserCharacter | AICharacter => {
   const isNew = !existing;
 
   const base = {
-    id: isNew ? Date.now().toString() : existing.id,
+    id: isNew ? createId() : existing.id,
     name: draft.value.name.trim(),
     description: draft.value.description,
     createdAt: isNew ? Date.now() : existing.createdAt,
@@ -179,14 +180,14 @@ const handleSubmit = () => {
 <template>
   <div v-if="show" class="character-editor" data-testid="character-editor">
     <header class="editor-header">
-      <button class="editor-nav-btn" title="取消" @click="emit('cancel')">
+      <button aria-label="取消" type="button" class="editor-nav-btn" title="取消" @click="emit('cancel')">
         <X :size="22" />
       </button>
       <div class="editor-header__content">
         <div class="editor-title">{{ title }}</div>
         <div class="editor-subtitle">{{ isEditing ? 'Character' : 'New Character' }}</div>
       </div>
-      <button
+      <button aria-label="保存" type="button"
         class="editor-nav-btn editor-nav-btn--primary"
         title="保存"
         :disabled="!canSubmit"

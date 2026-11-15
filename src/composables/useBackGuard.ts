@@ -35,8 +35,23 @@ function pushSentinel(): void {
  * 我们自己调 history.back() 丢占位记录时也会触发 popstate，
  * 不记数的话它会被当成用户按了返回，进而关掉下一层覆盖层。
  */
+/**
+ * 等待我们自己发起的 history.back() 被消费的超时兜底。
+ *
+ * popstate 并不保证一定触发（当前已是历史首条、被路由或其它监听吞掉、
+ * 页面在后台被冻结等），一旦不触发，pendingCleanup 里的 Promise 就永远不会 resolve，
+ * 调用 waitForBackGuardCleanup() 的路由跳转会被永久挂死。
+ */
+const BACK_GUARD_CLEANUP_TIMEOUT_MS = 300;
+
+interface PendingCleanup {
+  promise: Promise<void>;
+  resolve: () => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 let selfInitiatedBacks = 0;
-const pendingCleanup: Array<{ promise: Promise<void>; resolve: () => void }> = [];
+const pendingCleanup: PendingCleanup[] = [];
 
 /** Close the overlay first, then await its asynchronous history.back before routing. */
 export async function waitForBackGuardCleanup(): Promise<void> {
@@ -48,14 +63,31 @@ function discardSentinel(): void {
   selfInitiatedBacks += 1;
   let resolve!: () => void;
   const promise = new Promise<void>(done => { resolve = done; });
-  pendingCleanup.push({ promise, resolve });
+
+  const entry: PendingCleanup = {
+    promise,
+    resolve,
+    timer: setTimeout(() => {
+      // popstate 没来：撤掉这条待忽略计数并 resolve，避免永久挂起与计数错位
+      const index = pendingCleanup.indexOf(entry);
+      if (index !== -1) pendingCleanup.splice(index, 1);
+      if (selfInitiatedBacks > 0) selfInitiatedBacks -= 1;
+      resolve();
+    }, BACK_GUARD_CLEANUP_TIMEOUT_MS),
+  };
+
+  pendingCleanup.push(entry);
   window.history.back();
 }
 
 function handlePopState(): void {
   if (selfInitiatedBacks > 0) {
     selfInitiatedBacks -= 1;
-    pendingCleanup.shift()?.resolve();
+    const entry = pendingCleanup.shift();
+    if (entry) {
+      clearTimeout(entry.timer);
+      entry.resolve();
+    }
     return;
   }
 

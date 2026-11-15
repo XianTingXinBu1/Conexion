@@ -7,6 +7,7 @@ import {
   saveKnowledgeBases as saveKnowledgeBasesToRepository,
 } from '@/repositories/knowledgeBaseRepository';
 import { clearKnowledgeBaseReferenceFromAICharacters } from '@/repositories/characterRepository';
+import { createId } from '@/utils/id';
 
 /**
  * 知识库管理 Composable
@@ -74,7 +75,7 @@ export function useKnowledgeBases() {
    */
   const createKnowledgeBase = async (name: string, description: string = ''): Promise<KnowledgeBase> => {
     const newKnowledgeBase: KnowledgeBase = {
-      id: 'kb-' + Date.now(),
+      id: `kb-${createId()}`,
       name,
       description,
       entries: [],
@@ -144,7 +145,7 @@ export function useKnowledgeBases() {
       if (!kb) return null;
 
       const newEntry: KnowledgeEntry = {
-        id: 'entry-' + Date.now(),
+        id: `entry-${createId()}`,
         name,
         content,
         enabled: true,

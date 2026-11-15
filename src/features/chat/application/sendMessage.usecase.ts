@@ -4,6 +4,7 @@ import { REQUEST_CANCELLED_MESSAGE } from '@/api/errors';
 import { processChatContent } from './chatContentPipeline';
 import { StreamMessageAssembler } from './streamMessageAssembler';
 import { applyVariantContent, beginNewVariant, revertLastVariant } from './messageVariants';
+import { createId } from '@/utils/id';
 
 export interface SendMessageUseCaseDeps {
   getMessages: () => Message[];
@@ -88,7 +89,7 @@ export class SendMessageUseCase {
     });
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: createId(),
       type: 'user',
       content: processedContent,
       timestamp: Date.now(),
@@ -120,7 +121,7 @@ export class SendMessageUseCase {
 
     await this.deps.onMessageSend();
 
-    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantMessageId = createId();
     const assistantMessage: Message = {
       id: assistantMessageId,
       type: 'assistant',

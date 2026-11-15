@@ -42,34 +42,54 @@ export function useChatDraft(key: Ref<string | null>) {
     timer = setTimeout(saveDraft, 300);
   }, { flush: 'sync' });
 
-  // 新角色会话首次保存后取得正式 ID，将当前草稿迁移到该会话。
-  watch(key, (next, previous) => {
-    clearTimeout(timer);
-    if (next) {
-      void persist(next, draft.value).then(saved => {
-        if (saved && previous && previous !== next) void persist(previous, '');
-      });
-    }
-  });
+  /** 临时会话的 key 形如 `character:<id>`，只有它拿到正式会话 ID 时才需要迁移草稿 */
+  const TEMP_KEY_PREFIX = 'character:';
 
-  onMounted(async () => {
-    window.addEventListener('pagehide', saveDraft);
-    const target = key.value;
+  const loadDraft = async (target: string): Promise<void> => {
     const initialRevision = revision;
     try {
-      if (target) {
-        const saved = await getSetting<string>(`chatDraft:${target}`, '');
-        if (!disposed && target === key.value && revision === initialRevision) {
-          hydrating = true;
-          draft.value = typeof saved === 'string' ? saved : '';
-          hydrating = false;
-        }
-      }
+      const saved = await getSetting<string>(`chatDraft:${target}`, '');
+      // 期间用户已经输入（revision 变了）或 key 又切走了：不要用旧值盖掉新内容
+      if (disposed || target !== key.value || revision !== initialRevision) return;
+      hydrating = true;
+      draft.value = typeof saved === 'string' ? saved : '';
+      hydrating = false;
     } catch (error) {
       if (!disposed) draftError.value = `草稿读取失败：${error instanceof Error ? error.message : '请重试'}`;
     } finally {
       loading = false;
       if (revision !== initialRevision) void saveDraft();
+    }
+  };
+
+  // 会话切换时的草稿归属：
+  // - 临时 `character:*` 会话拿到正式 ID → 迁移（把当前草稿写到新 key，再清掉临时 key）
+  // - 正式会话之间切换 → 各存各的：先保存旧草稿，再载入新草稿
+  //   （否则 A 的输入会被写进 B，同时 A 已持久化的草稿还会被清空）
+  watch(key, (next, previous) => {
+    clearTimeout(timer);
+    if (!next || next === previous) return;
+
+    if (previous && previous.startsWith(TEMP_KEY_PREFIX)) {
+      if (!edited) return;
+      void persist(next, draft.value).then(saved => {
+        if (saved && previous) void persist(previous, '');
+      });
+      return;
+    }
+
+    if (previous && edited) void persist(previous, draft.value);
+    edited = false;
+    void loadDraft(next);
+  });
+
+  onMounted(async () => {
+    window.addEventListener('pagehide', saveDraft);
+    const target = key.value;
+    if (target) {
+      await loadDraft(target);
+    } else {
+      loading = false;
     }
   });
 

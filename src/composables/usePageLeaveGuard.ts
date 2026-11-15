@@ -139,7 +139,13 @@ export function usePageLeaveGuard(options: PageLeaveGuardOptions = {}) {
    */
   function forceLeave(onLeave?: () => void): void {
     showLeaveConfirm.value = false;
-    onLeave?.() ?? pendingLeaveCallback.value?.();
+    // 注意不能用 `onLeave?.() ?? pendingLeaveCallback.value?.()`：
+    // `??` 两侧都是 void 调用，左边恒为 undefined，两个回调会都被触发。
+    if (onLeave) {
+      onLeave();
+    } else {
+      pendingLeaveCallback.value?.();
+    }
     pendingLeaveCallback.value = null;
   }
 

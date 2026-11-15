@@ -34,6 +34,7 @@ export default {
       await driver.wait(async () => (await driver.findElements(By.css('.create-option'))).length === 0, 10000);
       if (!(await driver.getCurrentUrl()).includes('/role-management')) throw new Error('返回键离开角色管理页');
       const sizes = await driver.executeScript(() => Array.from(document.querySelectorAll('.character-card')).map(el => el.getBoundingClientRect().height));
+      if (sizes.length === 0) throw new Error('角色卡列表为空，高度断言无从校验');
       if (sizes.some(height => Math.abs(height - 72) > 1)) throw new Error(`角色卡高度不统一: ${sizes}`);
     } finally { await driver.quit(); }
   },

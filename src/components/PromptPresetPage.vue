@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import type { PromptPreset, PromptItem } from '@/types';
 import { DEFAULT_PROMPT_ITEMS } from '../constants';
 import { useConfirmDialog } from '../composables/useConfirmDialog';
+import { createId } from '@/utils/id';
 import { useNotifications, getNotificationMessage } from '../modules/notification';
 import {
   loadPromptPresets as loadPromptPresetsFromRepository,
@@ -140,7 +141,7 @@ const closePresetMenu = () => {
 const handleAddPreset = async (name: string) => {
   showPresetMenu.value = false;
   const newPreset: PromptPreset = {
-    id: 'preset-' + Date.now(),
+    id: `preset-${createId()}`,
     name: name,
     items: [...DEFAULT_PROMPT_ITEMS].map(item => ({ ...item })),
     createdAt: Date.now(),
@@ -209,7 +210,7 @@ const addNewItem = async (item: Partial<PromptItem>) => {
   if (!item.name?.trim()) return;
 
   const newItemData: PromptItem = {
-    id: 'custom-' + Date.now(),
+    id: `custom-${createId()}`,
     name: item.name,
     description: item.description ?? '',
     prompt: item.prompt || '',

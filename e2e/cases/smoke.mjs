@@ -20,7 +20,9 @@ export default {
 
       const appRoot = await waitForElement(driver, '#app', 15000);
       const text = await appRoot.getText();
-      if (!text && text !== '') {
+      // getText() 对「只有空白」的内容会返回 ''，所以必须按 trim 后判空，
+      // 否则这条断言永远不会成立，用例即使根节点空白也会通过。
+      if (!text.trim()) {
         throw new Error('应用根节点无内容');
       }
     } finally {

@@ -10,6 +10,7 @@ import { DEFAULT_MARKDOWN_CONFIG, CSS_CLASSES } from './config';
 import { sanitize, updateSanitizerConfig, resetSanitizerConfig } from './sanitizer';
 import { extractMath, restoreMath } from './math';
 import { transformFootnotes } from './footnote';
+import { toSafeHref, toSafeImageSrc, toSafeLanguageClassToken } from './url';
 
 // 全局配置
 let globalConfig: ResolvedMarkdownConfig = { ...DEFAULT_MARKDOWN_CONFIG };
@@ -24,7 +25,9 @@ function createRenderer() {
 
   // 自定义代码块渲染（不使用高亮）
   renderer.code = ({ text, lang }) => {
-    const language = lang || '';
+    // info string 完全来自消息内容，未转义就拼进 class 会变成属性注入
+    // （```"onmouseover=alert(1)），因此只保留安全字符
+    const language = toSafeLanguageClassToken(lang || '');
     const langClass = language ? `${CSS_CLASSES.highlightPrefix}${language}` : '';
     const escapedCode = escapeHtml(text);
 
@@ -45,24 +48,30 @@ function createRenderer() {
   // parseInline 渲染子 token，否则会以字面量形式原样输出。
   // 这里用 function 而非箭头函数，才能拿到 marked 注入的 this.parser。
   renderer.link = function ({ href, title, text, tokens }) {
-    const safeHref = escapeHtmlAttribute(href || '');
-    const titleAttr = title ? ` title="${escapeHtmlAttribute(title)}"` : '';
     const content = tokens?.length
       ? this.parser.parseInline(tokens)
       : escapeHtml(text || '');
-    return `<a href="${safeHref}"${titleAttr} target="_blank" rel="noopener noreferrer">${content}</a>`;
+    // 协议白名单：javascript: / data: 这类地址降级成纯文本，不生成可点击链接
+    const safeHref = toSafeHref(href || '');
+    if (!safeHref) return content;
+
+    const titleAttr = title ? ` title="${escapeHtmlAttribute(title)}"` : '';
+    return `<a href="${escapeHtmlAttribute(safeHref)}"${titleAttr} target="_blank" rel="noopener noreferrer">${content}</a>`;
   };
 
   // 自定义图片渲染
   // alt 只能是纯文本，用 textRenderer 把子 token 摊平（与 marked 默认行为一致）。
   renderer.image = function ({ href, title, text, tokens }) {
-    const safeSrc = escapeHtmlAttribute(href || '');
-    const titleAttr = title ? ` title="${escapeHtmlAttribute(title)}"` : '';
     const altText = tokens?.length
       ? this.parser.parseInline(tokens, this.parser.textRenderer)
       : (text || '');
+    // 与链接同一套白名单：不安全的 src 直接退化成 alt 文本
+    const safeSrc = toSafeImageSrc(href || '');
+    if (!safeSrc) return escapeHtml(altText);
+
+    const titleAttr = title ? ` title="${escapeHtmlAttribute(title)}"` : '';
     const altAttr = altText ? ` alt="${escapeHtmlAttribute(altText)}"` : '';
-    return `<img src="${safeSrc}"${altAttr}${titleAttr} loading="lazy" />`;
+    return `<img src="${escapeHtmlAttribute(safeSrc)}"${altAttr}${titleAttr} loading="lazy" />`;
   };
 
   // 自定义表格渲染：默认实现外层再包一层横向滚动容器

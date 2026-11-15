@@ -24,26 +24,44 @@ const collapsedMessages = ref<Record<number, boolean>>({});
 const searchQuery = ref('');
 
 // 过滤后的消息列表
+//
+// 每条带着它在 `systemMessages` 里的**原始索引**：折叠状态是按原始索引维护的，
+// 如果模板改用过滤后的下标去读写，搜索时展开/收起会全部错位。
 const filteredMessages = computed(() => {
-  if (!props.systemMessages) return [];
+  const all = props.systemMessages ?? [];
+  const entries = all.map((message, index) => ({ message, index }));
 
-  if (!searchQuery.value.trim()) {
-    return props.systemMessages;
-  }
+  const query = searchQuery.value.trim().toLowerCase();
+  if (!query) return entries;
 
-  const query = searchQuery.value.toLowerCase();
-  return props.systemMessages.filter(msg =>
-    msg.content.toLowerCase().includes(query) ||
-    msg.role.toLowerCase().includes(query)
+  return entries.filter(({ message }) =>
+    message.content.toLowerCase().includes(query) ||
+    message.role.toLowerCase().includes(query)
   );
 });
 
-// 高亮匹配的文本
-const highlightText = (text: string, query: string) => {
-  if (!query.trim()) return text;
+const escapeHtmlText = (text: string): string =>
+  text.replace(/[&<>"']/g, char => {
+    switch (char) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      default: return '&#039;';
+    }
+  });
 
-  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-  const highlighted = text.replace(regex, '<mark class="highlight">$1</mark>');
+// 高亮匹配的文本
+//
+// 这段结果最终归 `v-html` 消费，所以必须**先转义再高亮**：
+// 以前搜索词为空时直接返回原文，提示词里的 `<img onerror=...>` 会被当成 HTML 执行。
+const highlightText = (text: string, query: string) => {
+  const escaped = escapeHtmlText(text);
+  const keyword = query.trim();
+  if (!keyword) return escaped;
+
+  const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const highlighted = escaped.replace(regex, '<mark class="highlight">$1</mark>');
   // 使用 DOMPurify 清洗 HTML，只允许 <mark> 标签
   return DOMPurify.sanitize(highlighted, { ALLOWED_TAGS: ['mark'], ALLOWED_ATTR: ['class'] });
 };
@@ -167,10 +185,10 @@ const truncateText = (text: string, maxLength: number) => {
             </div>
           </div>
           <div class="header-actions">
-            <button class="icon-btn" @click="handleRefresh" title="刷新提示词">
+            <button aria-label="刷新提示词" type="button" class="icon-btn" @click="handleRefresh" title="刷新提示词">
               <RefreshCw :size="18" />
             </button>
-            <button class="icon-btn" @click="closeModal">
+            <button aria-label="关闭预览" type="button" class="icon-btn" @click="closeModal">
               <X :size="20" />
             </button>
           </div>
@@ -206,26 +224,26 @@ const truncateText = (text: string, maxLength: number) => {
 
           <div v-else class="messages-list">
             <div
-              v-for="(message, filteredIndex) in filteredMessages"
-              :key="filteredIndex"
+              v-for="item in filteredMessages"
+              :key="item.index"
               class="message-card"
             >
               <div
                 class="message-header"
-                :class="{ expanded: !collapsedMessages[filteredIndex] }"
-                @click="toggleCollapse(filteredIndex)"
+                :class="{ expanded: !collapsedMessages[item.index] }"
+                @click="toggleCollapse(item.index)"
               >
                 <div class="message-title">
-                  <span class="role-dot" :style="{ backgroundColor: getRoleColor(message.role) }"></span>
-                  <span class="role-label">{{ getRoleLabel(message.role) }}</span>
+                  <span class="role-dot" :style="{ backgroundColor: getRoleColor(item.message.role) }"></span>
+                  <span class="role-label">{{ getRoleLabel(item.message.role) }}</span>
                   <span class="message-separator">·</span>
                   <span class="message-preview">
-                    <span v-if="collapsedMessages[filteredIndex]" v-html="highlightText(truncateText(message.content, 60), searchQuery)" />
+                    <span v-if="collapsedMessages[item.index]" v-html="highlightText(truncateText(item.message.content, 60), searchQuery)" />
                     <span v-else class="expand-hint">点击收起</span>
                   </span>
                 </div>
                 <ChevronDown
-                  v-if="collapsedMessages[filteredIndex]"
+                  v-if="collapsedMessages[item.index]"
                   :size="18"
                   class="chevron-icon"
                 />
@@ -233,8 +251,8 @@ const truncateText = (text: string, maxLength: number) => {
               </div>
 
               <Transition name="slide">
-                <div v-if="!collapsedMessages[filteredIndex]" class="message-body">
-                  <pre v-html="highlightText(message.content, searchQuery)" class="message-content"></pre>
+                <div v-if="!collapsedMessages[item.index]" class="message-body">
+                  <pre v-html="highlightText(item.message.content, searchQuery)" class="message-content"></pre>
                 </div>
               </Transition>
             </div>
@@ -242,10 +260,10 @@ const truncateText = (text: string, maxLength: number) => {
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="closeModal">
+          <button type="button" class="btn btn-secondary" @click="closeModal">
             关闭
           </button>
-          <button
+          <button type="button"
             class="btn btn-primary"
             @click="copyPrompt"
             :disabled="!systemMessages || systemMessages.length === 0"

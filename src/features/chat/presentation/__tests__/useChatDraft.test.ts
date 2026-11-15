@@ -66,4 +66,23 @@ describe('chat drafts', () => {
     await state.saveDraft();
     expect(state.draftError.value).toBe('');
   });
+
+  it('keeps two formal conversations from overwriting each other', async () => {
+    // 回归：以前 key 一变就无条件把当前草稿写进新 key，还会清空旧 key 的已存草稿，
+    // 于是在 A → B 切换时 A 的输入污染了 B、A 的草稿被删。
+    vi.mocked(getSetting).mockImplementation(async (key: string) =>
+      key === 'chatDraft:conversation:b' ? 'B 的草稿' : '',
+    );
+
+    const view = mountDraft('conversation:a');
+    await waitFor(() => expect(getSetting).toHaveBeenCalledWith('chatDraft:conversation:a', ''));
+
+    state.draft.value = 'A 的输入';
+    await waitFor(() => expect(setSetting).toHaveBeenCalledWith('chatDraft:conversation:a', 'A 的输入'));
+
+    view.key.value = 'conversation:b';
+
+    await waitFor(() => expect(state.draft.value).toBe('B 的草稿'));
+    expect(setSetting).not.toHaveBeenCalledWith('chatDraft:conversation:b', 'A 的输入');
+  });
 });

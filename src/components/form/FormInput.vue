@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue';
 
 interface Props {
+  /** 传进来才能被父层的 <label for> 关联上 */
+  id?: string;
   modelValue: string | number | undefined;
   type?: 'text' | 'password' | 'email' | 'number' | 'tel';
   placeholder?: string;
@@ -13,6 +15,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  id: undefined,
   type: 'text',
   placeholder: '',
   disabled: false,
@@ -72,7 +75,9 @@ defineExpose({
 <template>
   <input
     ref="inputRef"
+    :id="id"
     :type="type"
+    :aria-invalid="error || undefined"
     :class="inputClasses"
     :placeholder="placeholder"
     :disabled="disabled"

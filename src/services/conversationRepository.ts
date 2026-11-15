@@ -1,6 +1,7 @@
 import { requestJson } from '@/api/http';
 import { ApiRequestError } from '@/api/errors';
 import type { AICharacter, Conversation, Message } from '@/types';
+import { createId } from '@/utils/id';
 
 const TEMP_CONVERSATION_PREFIX = 'temp-';
 const PERSISTED_CONVERSATION_PREFIX = 'conv-';
@@ -26,7 +27,7 @@ export const isTemporaryConversationId = (id?: string): boolean => {
 };
 
 export const createTemporaryConversation = (firstMessage: Message, now = Date.now()): Conversation => ({
-  id: `${TEMP_CONVERSATION_PREFIX}${now}`,
+  id: `${TEMP_CONVERSATION_PREFIX}${createId()}`,
   title: TEMP_CONVERSATION_TITLE,
   messages: [firstMessage],
   createdAt: now,
@@ -38,7 +39,7 @@ export const createStoredConversation = (
   character: AICharacter,
   now = Date.now(),
 ): Conversation => ({
-  id: `${PERSISTED_CONVERSATION_PREFIX}${now}`,
+  id: `${PERSISTED_CONVERSATION_PREFIX}${createId()}`,
   title: createConversationTitle(firstMessage.content),
   characterId: character.id,
   characterName: character.name,

@@ -1,4 +1,5 @@
 import type { AICharacter, Conversation, Message } from '../../src/types';
+import { randomUUID } from 'node:crypto';
 import { HttpError } from '../errors';
 import type { AppStorage } from '../storage/appStorage';
 
@@ -33,7 +34,7 @@ export const isTemporaryConversationId = (id?: string): boolean => {
 };
 
 export const createTemporaryConversation = (firstMessage: Message, now = Date.now()): Conversation => ({
-  id: `${TEMP_CONVERSATION_PREFIX}${now}`,
+  id: `${TEMP_CONVERSATION_PREFIX}${randomUUID()}`,
   title: TEMP_CONVERSATION_TITLE,
   messages: [firstMessage],
   createdAt: now,
@@ -45,7 +46,7 @@ export const createStoredConversation = (
   character: AICharacter,
   now = Date.now(),
 ): Conversation => ({
-  id: `${PERSISTED_CONVERSATION_PREFIX}${now}`,
+  id: `${PERSISTED_CONVERSATION_PREFIX}${randomUUID()}`,
   title: createConversationTitle(firstMessage.content),
   characterId: character.id,
   characterName: character.name,

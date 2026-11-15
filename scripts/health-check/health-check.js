@@ -5,6 +5,8 @@
  * 快速检查项目代码质量
  */
 
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { runBuildCheck } from './build-check.js';
 import { runTestCheck } from './test-check.js';
 import { runDepsCheck } from './deps-check.js';
@@ -140,7 +142,20 @@ export async function runHealthCheck(options = {}) {
   for (const check of CHECKS) {
     console.log(`\x1b[90m检查: ${check.description}...\x1b[0m`);
 
-    const result = await check.run(options);
+    // 单个检查抛异常不能让整轮检查中断，也不能让 results 与 CHECKS 下标错位
+    let result;
+    const checkStart = Date.now();
+    try {
+      result = await check.run(options);
+    } catch (error) {
+      result = {
+        name: check.name,
+        status: 'fail',
+        duration: Date.now() - checkStart,
+        message: `检查抛出异常：${error instanceof Error ? error.message : String(error)}`,
+        details: error instanceof Error ? error.stack : undefined,
+      };
+    }
     results.push(result);
 
     printResult(result, options.verbose || false);
@@ -156,7 +171,7 @@ export async function runHealthCheck(options = {}) {
   };
 
   const criticalFailures = results
-    .filter((result, index) => result.status === 'fail' && CHECKS[index].critical)
+    .filter((result, index) => result.status === 'fail' && CHECKS[index]?.critical)
     .map(result => result.name);
 
   const report = {
@@ -197,10 +212,13 @@ async function main() {
   process.exit(0);
 }
 
-// 直接运行 main 函数
-main().catch(error => {
-  console.error('\x1b[31m健康检查执行失败:\x1b[0m', error);
-  process.exit(1);
-});
+// 仅在被直接执行时才跑：被 import（单测 / 复用 runHealthCheck）时不该触发整轮检查与 process.exit
+const isCli = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isCli) {
+  main().catch(error => {
+    console.error('\x1b[31m健康检查执行失败:\x1b[0m', error);
+    process.exit(1);
+  });
+}
 
 export { CHECKS };

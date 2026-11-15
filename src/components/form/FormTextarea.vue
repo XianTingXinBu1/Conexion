@@ -2,6 +2,8 @@
 import { computed } from 'vue';
 
 interface Props {
+  /** 传进来才能被父层的 <label for> 关联上 */
+  id?: string;
   modelValue: string;
   placeholder?: string;
   disabled?: boolean;
@@ -12,6 +14,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  id: undefined,
   placeholder: '',
   disabled: false,
   error: false,
@@ -50,7 +53,9 @@ const handleBlur = (event: FocusEvent) => {
 
 <template>
   <textarea
+    :id="id"
     :class="textareaClasses"
+    :aria-invalid="error || undefined"
     :placeholder="placeholder"
     :disabled="disabled"
     :value="modelValue"

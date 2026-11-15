@@ -53,7 +53,9 @@ const PROBE_SCRIPT = [
   '          wrapperWidth: wrapper ? wrapper.clientWidth : null,',
   "          tableWidth: wrapper ? Math.round(wrapper.querySelector('table').getBoundingClientRect().width) : null,",
   '          scrollable: wrapper ? wrapper.scrollWidth > wrapper.clientWidth : false,',
-  "          escapedPage: wrapper ? wrapper.getBoundingClientRect().right > document.documentElement.clientWidth : null,",
+  "          escapedPage: wrapper
+            ? wrapper.getBoundingClientRect().right - host.getBoundingClientRect().right > 1
+            : null,",
   '        };',
   '        host.remove();',
   '        return result;',

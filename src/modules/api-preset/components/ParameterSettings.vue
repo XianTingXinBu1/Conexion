@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Sliders } from '@lucide/vue';
 import FormToggle from '../../../components/form/FormToggle.vue';
 import FormSlider from '../../../components/form/FormSlider.vue';
@@ -39,11 +39,31 @@ const emit = defineEmits<{
 /**
  * 停止序列在 UI 里是「一行一条」，数据模型里是 `string[]`。
  * 解析规则集中在 `stopSequences.ts`，组件只负责接线。
+ *
+ * 输入框必须用**本地文本状态**承接：直接绑到 parse→format 往返的 computed 上时，
+ * 往返本身会破坏逐字符输入——换行被空行过滤吞掉（敲 Enter 无法新起一条）、
+ * 输入中的孤立反斜杠被转义成 `\\\\`（所以逐字敲 `\\n` 永远变不成换行），
+ * 并且每次按键都重写 textarea 的值，光标会跳到末尾。
  */
-const stopText = computed({
-  get: () => formatStopSequences(props.stopSequences),
-  set: (text: string | undefined) => emit('update:stopSequences', parseStopSequences(text ?? '')),
-});
+const stopText = ref(formatStopSequences(props.stopSequences));
+
+const sameStopSequences = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
+
+watch(
+  () => props.stopSequences,
+  (value) => {
+    // 只是自己刚 emit 出去的回声就别回灌，否则会把用户正在输入的文本冲掉
+    if (sameStopSequences(parseStopSequences(stopText.value), value)) return;
+    stopText.value = formatStopSequences(value);
+  }
+);
+
+const handleStopTextInput = (text: string | number | undefined) => {
+  const next = String(text ?? '');
+  stopText.value = next;
+  emit('update:stopSequences', parseStopSequences(next));
+};
 
 const seedText = computed({
   get: () => (props.seed === undefined ? '' : String(props.seed)),
@@ -128,7 +148,7 @@ const seedText = computed({
         :model-value="stopText"
         :rows="3"
         placeholder="一行一条，如 ### 或 \\n\\nUser:"
-        @update:model-value="stopText = $event"
+        @update:model-value="handleStopTextInput"
       />
       <p class="field-note">
         每行一条，最多 {{ MAX_STOP_SEQUENCES }} 条；留空表示不设置。

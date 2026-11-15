@@ -140,4 +140,29 @@ describe('markdown security boundaries', () => {
     expect(html).toContain('katex-block--inline');
     expect(html).not.toMatch(/<p>[^]*?<div/);
   });
+
+  it('drops dangerous link protocols instead of rendering them clickable', () => {
+    const { render, renderSafe } = useMarkdown();
+
+    // 回归：href 以前只做 HTML 实体转义，javascript: 在未净化的 render() 上直接可执行
+    expect(render('[x](javascript:alert(1))')).not.toMatch(/javascript:/i);
+    expect(renderSafe('[x](javascript:alert(1))')).not.toMatch(/href/i);
+    expect(render('[x](JAVASCRIPT:alert(1))')).not.toMatch(/javascript:/i);
+  });
+
+  it('drops dangerous image sources and keeps the alt text', () => {
+    const { render } = useMarkdown();
+
+    // 回归：src 以前同样没有协议白名单
+    expect(render('![alt](javascript:alert(1))')).not.toMatch(/javascript:/i);
+    expect(render('![alt](javascript:alert(1))')).toContain('alt');
+  });
+
+  it('cannot inject attributes through a code fence info string', () => {
+    const { render } = useMarkdown();
+
+    // 回归：```"onmouseover=alert(1) 以前会拼出 <pre class="..."onmouseover=...>
+    const html = render('```"onmouseover=alert(1)\nx\n```');
+    expect(html).not.toMatch(/onmouseover\s*=/);
+  });
 });

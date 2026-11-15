@@ -177,4 +177,16 @@ describe('ParameterSettings', () => {
 
     expect(state.streamEnabled).toBe(false);
   });
+
+  it('保留用户正在输入的换行，不被 parse→format 往返吞掉', async () => {
+    // 回归：停止序列文本框以前直接绑在 parse→format 的 computed 上，
+    // 敲 Enter 想加第二条时新行立刻被空行过滤吞掉，光标还会跳到末尾。
+    const { container, state } = mountSettings({ stopSequences: ['###'] });
+    const textarea = stopTextarea(container);
+
+    await fireEvent.update(textarea, '###\n');
+
+    expect(textarea.value).toBe('###\n');
+    expect(state.stopSequences).toEqual(['###']);
+  });
 });

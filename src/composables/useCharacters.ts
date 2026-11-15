@@ -10,6 +10,7 @@ import {
   saveSelectedUserCharacterId,
   saveUserCharacters as saveUserCharactersToRepository,
 } from '@/repositories/characterRepository';
+import { createId } from '@/utils/id';
 
 /**
  * 角色管理 Composable
@@ -133,7 +134,7 @@ export function useCharacters() {
    */
   const addUserCharacter = async (character: Omit<UserCharacter, 'id' | 'createdAt'>): Promise<UserCharacter> => {
     const newCharacter: UserCharacter = {
-      id: Date.now().toString(),
+      id: createId(),
       ...character,
       createdAt: Date.now(),
     };
@@ -152,7 +153,7 @@ export function useCharacters() {
    */
   const addAICharacter = async (character: Omit<AICharacter, 'id' | 'createdAt'>): Promise<AICharacter> => {
     const newCharacter: AICharacter = {
-      id: Date.now().toString(),
+      id: createId(),
       ...character,
       createdAt: Date.now(),
     };

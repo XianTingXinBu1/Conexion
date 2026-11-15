@@ -1,4 +1,4 @@
-import { defineConfig, configDefaults } from 'vitest/config';
+import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
 
@@ -43,7 +43,6 @@ export default defineConfig({
     },
 
     include: ['**/*.test.ts', '**/*.spec.ts', '**/*.test.tsx', '**/*.spec.tsx'],
-    exclude: [...configDefaults.exclude],
     testTimeout: 10000,
     watch: false,
   },

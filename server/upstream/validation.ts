@@ -11,10 +11,11 @@ export function allowsPrivateUpstreams(config: ServerConfig): boolean {
 }
 
 function normalizeHostnameForPrivateCheck(hostname: string): string {
-  const normalized = hostname.toLowerCase();
-  return normalized.startsWith('[') && normalized.endsWith(']')
-    ? normalized.slice(1, -1)
-    : normalized;
+  const lower = hostname.toLowerCase();
+  const withoutBrackets = lower.startsWith('[') && lower.endsWith(']') ? lower.slice(1, -1) : lower;
+  // FQDN 允许以点的形式书写（`localhost.` 与 `localhost` 等价），
+  // 不去掉尾点会让 `http://localhost./` 绕过本机/内网校验。
+  return withoutBrackets.endsWith('.') ? withoutBrackets.slice(0, -1) : withoutBrackets;
 }
 
 export function isPrivateHostname(hostname: string): boolean {

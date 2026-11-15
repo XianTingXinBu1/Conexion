@@ -173,7 +173,10 @@ export default {
         throw new Error(`自动滚动未到两端就停了：${scrolled.scrollTop} → ${settled.scrollTop}`);
       }
       // 卡片跟手：容器滚动后它在屏幕上的位置应基本不变
-      if (Math.abs((settled.dragTop ?? 0) - (scrolled.dragTop ?? 0)) > 4) {
+      if (typeof settled.dragTop !== 'number' || typeof scrolled.dragTop !== 'number') {
+        throw new Error(`取不到卡片在屏幕上的位置：${scrolled.dragTop} → ${settled.dragTop}`);
+      }
+      if (Math.abs(settled.dragTop - scrolled.dragTop) > 4) {
         throw new Error(`滚动补偿不对，卡片在屏幕上漂移：${scrolled.dragTop} → ${settled.dragTop}`);
       }
 

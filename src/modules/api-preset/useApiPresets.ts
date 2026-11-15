@@ -9,6 +9,7 @@ import {
   saveApiPresets,
   saveSelectedApiPresetId,
 } from '@/repositories/apiPresetRepository';
+import { createId } from '@/utils/id';
 
 const DEFAULT_PRESET_FORM_DATA: PresetFormData = {
   url: '',
@@ -159,7 +160,7 @@ export function useApiPresets() {
     }
 
     const newPreset: Preset = {
-      id: Date.now().toString(),
+      id: createId(),
       name: newPresetName.value,
       url: formData.url,
       apiKey: formData.apiKey,

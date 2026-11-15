@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, ref, type Ref } from 'vue';
 import { cleanup, render } from '@testing-library/vue';
-import { BACK_GUARD_STATE_KEY, useBackGuard } from '../useBackGuard';
+import { BACK_GUARD_STATE_KEY, useBackGuard, waitForBackGuardCleanup } from '../useBackGuard';
 
 /**
  * 挂一个最小覆盖层：open 为真时注册守卫，返回键触发 onBack 并关闭
@@ -128,5 +128,27 @@ describe('useBackGuard', () => {
     await nextTick();
 
     expect(onBack).not.toHaveBeenCalled();
+  });
+
+  it('does not hang route transitions when history.back never fires popstate', async () => {
+    // 回归：popstate 不保证触发（历史首条 / 被别的监听吞掉 / 页面冻结），
+    // 以前 pendingCleanup 里的 Promise 永远不会 resolve，路由跳转被永久卡死。
+    vi.useFakeTimers();
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+
+    const open = ref(false);
+    mountOverlay({ open, onBack: vi.fn() });
+
+    open.value = true;
+    await nextTick();
+    open.value = false;
+    await nextTick();
+
+    const cleanup = waitForBackGuardCleanup();
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(cleanup).resolves.toBeUndefined();
+
+    backSpy.mockRestore();
+    vi.useRealTimers();
   });
 });

@@ -4,17 +4,26 @@ import AppProvider from './components/AppProvider.vue';
 import RouteLoadingFallback from './components/common/RouteLoadingFallback.vue';
 import { NotificationContainer } from '@/modules/notification';
 
+// 同一路由 loader 只包装一次：每次渲染都 defineAsyncComponent 会返回新的组件定义对象，
+// Vue 靠 vnode.type 的引用判断是否复用，引用一变就会把整页卸载重建（状态/滚动/输入全丢）。
+const asyncRouteComponents = new WeakMap<object, Component>();
+
 const getRouteComponent = (component: unknown) => {
   if (typeof component !== 'function') {
     return component;
   }
 
-  return defineAsyncComponent({
+  const cached = asyncRouteComponents.get(component as object);
+  if (cached) return cached;
+
+  const asyncComponent = defineAsyncComponent({
     loader: component as () => Promise<Component>,
     loadingComponent: RouteLoadingFallback,
     delay: 120,
     suspensible: false,
   });
+  asyncRouteComponents.set(component as object, asyncComponent);
+  return asyncComponent;
 };
 </script>
 
@@ -53,7 +62,13 @@ const getRouteComponent = (component: unknown) => {
   --accent-gradient-end: #7D8FE8;
   --text-on-accent: #FFFFFF;
   --text-on-accent-muted: rgba(255, 255, 255, 0.88);
-  --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  /* 主题过渡：只列举颜色属性，别用 `all` —— transition 简写换成 `--transition: all ...` 拼进
+     `transition: background-color var(--transition)` 会变成非法值，整条声明失效。*/
+  --transition:
+    background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   --route-loading-surface: rgba(157, 141, 241, 0.14);
   --route-loading-shimmer: rgba(255, 255, 255, 0.48);
 }

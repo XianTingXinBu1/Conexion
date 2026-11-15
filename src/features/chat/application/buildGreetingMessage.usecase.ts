@@ -8,6 +8,7 @@
 
 import type { AICharacter, Message, RegexRule, UserCharacter } from '@/types';
 import { processChatContent } from './chatContentPipeline';
+import { createId } from '@/utils/id';
 
 export interface BuildGreetingMessageContext {
   character?: AICharacter;
@@ -52,7 +53,7 @@ export function buildGreetingMessage(context: BuildGreetingMessageContext): Mess
   if (!content.trim()) return null;
 
   return {
-    id: `greeting-${now.getTime()}`,
+    id: `greeting-${createId()}`,
     type: 'assistant',
     content,
     timestamp: now.getTime(),

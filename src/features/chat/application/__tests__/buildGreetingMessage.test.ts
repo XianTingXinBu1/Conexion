@@ -60,8 +60,12 @@ describe('buildGreetingMessage', () => {
       now,
     });
 
+    // id 由 createId() 生成（不再用时间戳，同毫秒内也不会碰撞），只校验前缀与形态
+    expect(message).not.toBeNull();
+    if (!message) throw new Error('未生成问候消息');
+    expect(message.id).toMatch(/^greeting-[0-9a-z-]+$/i);
     expect(message).toEqual({
-      id: `greeting-${now.getTime()}`,
+      id: message.id,
       type: 'assistant',
       content: '我是小助手，你是小明，现在是2026-07-08',
       timestamp: now.getTime(),

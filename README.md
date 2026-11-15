@@ -192,6 +192,10 @@ npm ci -> vue-tsc -b --noEmit -> check:architecture -> test:coverage -> build
 E2E is deliberately excluded: it relies on the system Chromium plus a matching chromedriver,
 which is not worth maintaining on a runner — it finishes in about four minutes locally.
 
+Documentation-only pushes do not trigger CI (`paths-ignore`: `**/*.md`, `docs/**`, `LICENSE`).
+If branch protection with a required CI check is ever enabled, switch to a `paths` allowlist or
+`dorny/paths-filter` — a workflow that never triggers leaves the check pending forever.
+
 Coverage thresholds live in `vitest.config.ts` and are only enforced in `--coverage` mode; the
 bounds sit slightly below the current measured values so that "new code without tests" fails
 rather than small statistical jitter. `test-check` inside `health-check` runs with `--coverage`,

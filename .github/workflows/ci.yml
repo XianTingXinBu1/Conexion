@@ -8,7 +8,21 @@ name: CI
 on:
   push:
     branches: [main]
+    # 纯文档提交不唤醒 CI。docs/ 与各 module 说明不影响类型、架构、测试、
+    # 构建的结果，而 48s 一轮全跑对文档改动是纯浪费。
+    # 注意：改 .github/workflows/ 本身仍会触发（它不在忽略列表里）。
+    # 若将来给 main 开分支保护并要求 CI 必绿，纯文档 PR 会因不触发而永久
+    # pending —— 那时应改用 paths（白名单）或 dorny/paths-filter。
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
   pull_request:
+    # 两边必须各写一份：paths-ignore 是各自的过滤器，不能共享
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
   # 手动触发：想单独验证一次 CI 而不想空提交时用
   # gh workflow run ci.yml
   workflow_dispatch:

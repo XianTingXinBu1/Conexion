@@ -184,6 +184,10 @@ npm ci -> vue-tsc -b --noEmit -> check:architecture -> test:coverage -> build
 E2E 刻意不进 CI：它依赖系统 Chromium 与版本匹配的 chromedriver，在 runner 上维护版本
 对应关系不划算，而本地跑完只要四分钟。
 
+纯文档提交不触发 CI（`paths-ignore`：`**/*.md`、`docs/**`、`LICENSE`）。若以后给 main
+开分支保护并要求 CI 必绿，应改用 `paths` 白名单或 `dorny/paths-filter` —— 根本不触发的
+workflow 会让检查永久 pending。
+
 覆盖率门槛在 `vitest.config.ts` 里，只在 `--coverage` 模式下校验；阈值设得略低于当前实测值，
 目的是让「新增代码不带测试」挂掉，而不是拦住统计抖动。`health-check` 里的 `test-check` 
 已带 `--coverage` 执行，所以本地也是硬闸。

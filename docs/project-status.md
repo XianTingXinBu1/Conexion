@@ -230,6 +230,10 @@ npm ci → npx vue-tsc -b --noEmit → npm run check:architecture
   `node_modules` 这两类漂移只能靠纯净环境抓出来
 - 覆盖率门槛在 CI 上是硬闸（`npm run test:coverage`）
 - 仓库是公开的，Actions 额度不限
+- **纯文档提交不触发**：`paths-ignore` 为 `**/*.md` / `docs/**` / `LICENSE`。
+  注意这是 `paths-ignore` 的代价：将来若给 main 开分支保护并要求 CI 必绿，
+  纯文档 PR 会因为根本不触发而永久 pending；那时改用 `paths` 白名单或
+  `dorny/paths-filter`（后者会把 job 报成 skipped，不卡检查）
 
 ---
 

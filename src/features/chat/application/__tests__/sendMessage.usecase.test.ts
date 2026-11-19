@@ -167,6 +167,80 @@ describe('SendMessageUseCase', () => {
     expect(messages[1]).toMatchObject({ type: 'assistant', content: '已停止生成' });
     expect(deps.onError).not.toHaveBeenCalledWith('send', expect.anything());
   });
+
+  it('取消时的占位文案会再落一次盘', async () => {
+    const saveConversation = vi.fn(async () => undefined);
+    const { deps, messages } = createDeps({
+      saveConversation,
+      sendStreamChatRequest: vi.fn(async (_messages, _onChunk, _onComplete, onError) => {
+        onError('请求已取消');
+      }),
+    });
+
+    await new SendMessageUseCase(deps).execute('hello');
+
+    expect(messages[1]).toMatchObject({ type: 'assistant', content: '已停止生成' });
+    // 一次是 finalizeSend，一次是写完占位文案后：
+    // 只保存一次的话刷新后「已停止生成」会变回空回复
+    expect(saveConversation.mock.calls.length).toBe(2);
+  });
+
+  it('收尾保存失败时上报错误，不静默当成功', async () => {
+    let saveCallCount = 0;
+    const saveConversation = vi.fn(async () => {
+      saveCallCount += 1;
+      // 只让收尾那次失败：错误文案本身还要落盘
+      if (saveCallCount === 2) {
+        throw new Error('收尾保存失败');
+      }
+    });
+
+    const { deps } = createDeps({
+      // 已有会话：execute 开头直接走 saveConversation，第 2 次才是 finalizeSend
+      getPersistedConversationId: () => 'conv-existing',
+      saveConversation,
+      sendStreamChatRequest: vi.fn(async (_messages, onChunk, onComplete) => {
+        onChunk('reply');
+        await vi.advanceTimersByTimeAsync(60);
+        await onComplete();
+      }),
+    });
+
+    await new SendMessageUseCase(deps).execute('hello');
+
+    expect(deps.onSuccess).not.toHaveBeenCalledWith('send');
+    expect(deps.onError).toHaveBeenCalledWith('send', expect.stringContaining('收尾保存失败'));
+  });
+
+  it('发送进行中时重复触发不会重复发请求或重复插消息', async () => {
+    let releaseStream: (() => void) | undefined;
+    const streamGate = new Promise<void>((resolve) => {
+      releaseStream = resolve;
+    });
+
+    const sendStreamChatRequest = vi.fn(async (_messages, onChunk, onComplete) => {
+      await streamGate;
+      onChunk('reply');
+      await vi.advanceTimersByTimeAsync(60);
+      await onComplete();
+    });
+
+    const { deps, messages } = createDeps({ sendStreamChatRequest });
+    const useCase = new SendMessageUseCase(deps);
+
+    const firstSend = useCase.execute('hello');
+    // 让第一次调用真正进入流式阶段
+    await vi.advanceTimersByTimeAsync(0);
+
+    await useCase.execute('second');
+
+    releaseStream!();
+    await firstSend;
+
+    expect(sendStreamChatRequest).toHaveBeenCalledTimes(1);
+    expect(messages.filter(message => message.type === 'user')).toHaveLength(1);
+    expect(messages.filter(message => message.type === 'assistant')).toHaveLength(1);
+  });
 });
 
 describe('SendMessageUseCase.regenerate', () => {

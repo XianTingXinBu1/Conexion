@@ -85,6 +85,59 @@ describe('system-prompt builder', () => {
     expect(isUserInstructionItem({ id: 'u', name: '用户指令', description: '', enabled: true, prompt: '', roleType: 'user' })).toBe(true);
   });
 
+  it('禁用的压缩摘要条目不会再被兜底注入', () => {
+    const disabledSummaryPreset: PromptPreset = {
+      ...preset,
+      items: [
+        { id: 'compression-summary', name: '压缩摘要', description: '', enabled: false, prompt: '', roleType: 'system', insertPosition: 0 },
+        ...presetItems,
+      ],
+    };
+
+    const result = buildSystemPrompt({
+      preset: disabledSummaryPreset,
+      aiCharacter,
+      userCharacter,
+      knowledgeBases,
+      chatHistory: [],
+      userInstruction: '你好',
+      compressionSummary: '之前的摘要内容',
+      mergeMode: 'adjacent',
+    });
+
+    // 预设里“存在但被禁用”的压缩摘要条目，不能触发兼容兜底注入
+    const joined = result.messages.map(message => message.content).join('\n');
+    expect(joined).not.toContain('之前的摘要内容');
+    expect(result.skippedItemIds).toContain('compression-summary');
+  });
+
+  it('同类特殊条目只注入一次', () => {
+    const duplicatedPreset: PromptPreset = {
+      ...preset,
+      items: [
+        { id: 'history-a', name: '聊天历史', description: '', enabled: true, prompt: '', roleType: 'system', insertPosition: 1 },
+        { id: 'history-b', name: '聊天历史', description: '', enabled: true, prompt: '', roleType: 'system', insertPosition: 2 },
+      ],
+    };
+
+    const result = buildSystemPrompt({
+      preset: duplicatedPreset,
+      aiCharacter,
+      userCharacter,
+      knowledgeBases,
+      chatHistory: [
+        { id: 'm1', type: 'user', content: '你好', timestamp: now },
+        { id: 'm2', type: 'assistant', content: '你好，我在', timestamp: now },
+      ],
+      userInstruction: '回答',
+      mergeMode: 'adjacent',
+    });
+
+    expect(result.chatHistoryCount).toBe(2);
+    expect(result.usedItemIds).toEqual(['history-a']);
+    expect(result.skippedItemIds).toContain('history-b');
+  });
+
   it('builds merged messages, tracks used items, and skips disabled items', () => {
     const result = buildSystemPrompt({
       preset,

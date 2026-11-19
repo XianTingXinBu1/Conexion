@@ -39,6 +39,13 @@ const startedAt = new Map<string, number>();
 const generateId = () => `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 const startTimer = (id: string, duration: number) => {
+  // 同一 id 可能被重复启动（重复 resume、hover 抖动）：旧定时器必须先清掉，
+  // 否则它到期后会把刚续上时间的通知提前移除，且 timers 里留下孤儿句柄
+  const previous = timers.get(id);
+  if (previous) {
+    clearTimeout(previous);
+  }
+
   startedAt.set(id, Date.now());
   remainingDurations.set(id, duration);
 
@@ -145,6 +152,12 @@ const pauseNotification = (id: string) => {
 const resumeNotification = (id: string) => {
   const notification = notifications.value.find(n => n.id === id);
   if (!notification || !notification.duration || notification.duration <= 0) {
+    return;
+  }
+
+  // 幂等：重复 resume（hover 移入移出、click + mouseleave 同时触发）
+  // 会把倒计时反复重置回上次剩余值，通知存活时间忽长忽短
+  if (!notification.paused) {
     return;
   }
 

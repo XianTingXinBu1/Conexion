@@ -159,18 +159,41 @@ export default {
         throw new Error('指针停在底部边缘时列表未自动滚动');
       }
 
-      // 再等一会儿：滚动到两端后应停下（不能因拖动项溢出而无限滚）
+      // 再等一会儿：自动滚动可以继续，但不能越过底部，也不能到两端后还在涨
+      // （拖动项的 translate 会把内容撑出容器、撑大 scrollHeight，不钳制就是
+      //   「撑出 → 又能滚」的正反馈无限滚）
       await driver.sleep(900);
       const settled = await driver.executeScript(`
         const scroller = document.querySelector('.page-content');
         const drag = document.querySelector('.prompt-item--dragging');
         return {
           scrollTop: Math.round(scroller.scrollTop),
+          maxScroll: Math.round(scroller.scrollHeight - scroller.clientHeight),
           dragTop: drag ? Math.round(drag.getBoundingClientRect().top) : null,
         };
       `);
-      if (settled.scrollTop <= scrolled.scrollTop) {
-        throw new Error(`自动滚动未到两端就停了：${scrolled.scrollTop} → ${settled.scrollTop}`);
+      if (settled.scrollTop < scrolled.scrollTop) {
+        throw new Error(`自动滚动回退了：${scrolled.scrollTop} → ${settled.scrollTop}`);
+      }
+      if (settled.scrollTop > settled.maxScroll) {
+        throw new Error(`自动滚动越过底部：${settled.scrollTop} > ${settled.maxScroll}`);
+      }
+
+      // 已经到底的话，再等一会儿必须停住；没到底则允许继续，但依然不能越过底部。
+      // 以前这里断言「必须继续增长」，与注释「滚动到两端后应停下」正好相反。
+      await driver.sleep(600);
+      const afterWait = await driver.executeScript(`
+        const scroller = document.querySelector('.page-content');
+        return {
+          scrollTop: Math.round(scroller.scrollTop),
+          maxScroll: Math.round(scroller.scrollHeight - scroller.clientHeight),
+        };
+      `);
+      if (afterWait.scrollTop > afterWait.maxScroll) {
+        throw new Error(`自动滚动越过底部：${afterWait.scrollTop} > ${afterWait.maxScroll}`);
+      }
+      if (settled.scrollTop >= settled.maxScroll && afterWait.scrollTop > settled.scrollTop) {
+        throw new Error(`到底后仍在继续滚动（无限滚）：${settled.scrollTop} → ${afterWait.scrollTop}`);
       }
       // 卡片跟手：容器滚动后它在屏幕上的位置应基本不变
       if (typeof settled.dragTop !== 'number' || typeof scrolled.dragTop !== 'number') {

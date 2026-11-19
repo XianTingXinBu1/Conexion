@@ -27,7 +27,9 @@
 }
 
 .tab-btn.active {
-  background: rgba(157, 141, 241, 0.15);
+  /* 以前写死品牌紫 rgba(157, 141, 241, 0.15)：暗色主题下不会跟主题变量走，
+     与其它页面的选中态不一致 */
+  background: var(--accent-soft);
   color: var(--accent-purple);
 }
 

@@ -61,4 +61,21 @@ describe('useNotifications', () => {
 
     expect(notifications.notifications.value.some(item => item.id === id)).toBe(true);
   });
+
+  it('重复 resume 不会重置倒计时，也不会留下孤儿定时器', () => {
+    const notifications = useNotifications();
+
+    const id = notifications.addNotification('info', 'info', 'x', { duration: 1000 });
+
+    vi.advanceTimersByTime(400);
+    notifications.pauseNotification(id);
+
+    // 模拟 hover 抖动：未暂停情况下再 resume 一次
+    notifications.resumeNotification(id);
+    notifications.resumeNotification(id);
+
+    // 剩余 600ms 到点就关，不会被第二次 resume 重新拖到 1000ms
+    vi.advanceTimersByTime(601);
+    expect(notifications.notifications.value.some(item => item.id === id)).toBe(false);
+  });
 });

@@ -63,6 +63,14 @@ export class SendMessageUseCase {
    */
   private macroContext: MacroContext = {};
 
+  /**
+   * 「正在发送」互斥。
+   *
+   * 连续点发送、或在流式过程中触发重试，会交错 push 消息、并发覆盖
+   * macroContext，两个请求的 flush 回调还会分别写回不同消息。
+   */
+  private isSending = false;
+
   constructor(
     deps: SendMessageUseCaseDeps,
     options: SendMessageUseCaseOptions = {},
@@ -73,6 +81,20 @@ export class SendMessageUseCase {
   }
 
   async execute(content: string): Promise<void> {
+    if (this.isSending) {
+      return;
+    }
+
+    this.isSending = true;
+    try {
+      await this.executeInternal(content);
+    } finally {
+      this.isSending = false;
+    }
+  }
+
+  /** 真正的发送逻辑；`execute` 只负责「进行中」互斥。 */
+  private async executeInternal(content: string): Promise<void> {
     this.macroContext = {
       aiCharacter: this.deps.getCurrentCharacter(),
       userCharacter: this.deps.getSelectedUser(),
@@ -158,8 +180,11 @@ export class SendMessageUseCase {
           streamAssembler.append(chunk);
         },
         async () => {
-          hasCompleted = true;
           await finalizeSend();
+          // 先完成落库再置「已完成」：否则 finalizeSend 里的 saveConversation
+          // 抛错时会被下面的 `if (hasCompleted) return` 静默吞掉，
+          // 内容没落盘、用户也收不到任何提示
+          hasCompleted = true;
           if (this.shouldAutoCompress(this.deps.getMessages())) {
             await this.runAutoCompression({ blockOnFailure: false });
           }
@@ -175,11 +200,15 @@ export class SendMessageUseCase {
           if (isCancelled) {
             if (!msg.content.trim()) {
               applyVariantContent(msg, '已停止生成');
+              // 占位文案是在 finalizeSend 之后写的，必须再落一次盘，
+              // 否则刷新后变成空回复
+              await this.deps.saveConversation();
             }
             return;
           }
 
           applyVariantContent(msg, `错误: ${error}`);
+          await this.deps.saveConversation();
           this.deps.onError('send', error);
         },
         (chunk) => this.appendReasoning(assistantMessageId, chunk),
@@ -215,6 +244,20 @@ export class SendMessageUseCase {
    * 展示与上下文会不一致。
    */
   async regenerate(messageId: string): Promise<void> {
+    if (this.isSending) {
+      return;
+    }
+
+    this.isSending = true;
+    try {
+      await this.regenerateInternal(messageId);
+    } finally {
+      this.isSending = false;
+    }
+  }
+
+  /** 真正的重试逻辑；`regenerate` 只负责「进行中」互斥。 */
+  private async regenerateInternal(messageId: string): Promise<void> {
     const messages = this.deps.getMessages();
     const target = messages[messages.length - 1];
 
@@ -285,10 +328,11 @@ export class SendMessageUseCase {
           streamAssembler.append(chunk);
         },
         async () => {
-          hasCompleted = true;
           streamAssembler.finalize();
           discardEmptyVariant();
           await this.deps.saveConversation();
+          // 先落库再置「已完成」，避免保存抛错被下面的 hasCompleted 判断吞掉
+          hasCompleted = true;
           this.deps.onSuccess('retry');
         },
         async (error: string) => {

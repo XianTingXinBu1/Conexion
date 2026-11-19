@@ -160,6 +160,10 @@ export class ChatApi extends ApiClient {
   ): AsyncGenerator<string> {
     const { onChunk, onReasoningChunk, onComplete, onError, ...sampling } = options;
 
+    // 在 try 外声明：finally / catch 里要用它做身份比对，
+    // 而流真正建立之前的失败（URL 无效、请求体构造失败）还没有句柄
+    let streamHandle: (() => void) | null = null;
+
     try {
       this.validateUrl(this.baseURL);
 
@@ -173,10 +177,15 @@ export class ChatApi extends ApiClient {
       this.cancelActiveStream();
 
       const { controller, cleanup } = createTimeoutController(this.timeout);
-      this.activeStreamCleanup = () => {
+      // 本次流的取消句柄。finally / catch 里必须做身份比对再清空：
+      // 旧流被 abort 后它的 finally 是异步执行的，若新流已把
+      // activeStreamCleanup 指向自己，无条件置 null 会让新流再也取消不掉。
+      const streamHandleForRequest = () => {
         controller.abort();
         cleanup();
       };
+      streamHandle = streamHandleForRequest;
+      this.activeStreamCleanup = streamHandleForRequest;
 
       const headers = this.buildHeaders();
       const url = this.buildBackendUrl('/chat/completions');
@@ -264,8 +273,20 @@ export class ChatApi extends ApiClient {
         logApi('流式响应完成');
         await onComplete?.({ usage: latestUsage });
       } finally {
-        this.activeStreamCleanup = null;
-        reader.releaseLock();
+        if (this.activeStreamCleanup === streamHandle) {
+          this.activeStreamCleanup = null;
+        }
+
+        // 调用方 break / 抛错提前退出时，底层响应流不会被自动取消，
+        // 连接与上游生成会一直挂着。先 cancel 再放锁；
+        // 存在挂起 read() 时 releaseLock() 会抛 TypeError，不能让它
+        // 盖掉原始错误。
+        await reader.cancel().catch(() => {});
+        try {
+          reader.releaseLock();
+        } catch {
+          // 已经有挂起的 read()：锁会自动在 read 结束后释放
+        }
       }
 
     } catch (error) {
@@ -282,9 +303,16 @@ export class ChatApi extends ApiClient {
 
       logApiError('流式请求异常', { error: errorMessage });
       await onError?.(errorMessage);
-      this.activeStreamCleanup = null;
+      if (this.activeStreamCleanup === streamHandle) {
+        this.activeStreamCleanup = null;
+      }
 
-      throw new Error(errorMessage);
+      // 用 cause 保留原始错误：上游的 status / serverMessage / 超时类型
+      // 以前被一句 new Error(文案) 彻底抹掉，调用方只能猜文案。
+      // （target 的 lib 不含 ErrorOptions，手工挂 cause）
+      const wrappedError = new Error(errorMessage);
+      (wrappedError as Error & { cause?: unknown }).cause = error;
+      throw wrappedError;
     }
   }
 }

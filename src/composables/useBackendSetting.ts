@@ -1,4 +1,4 @@
-import { ref, watch, onMounted, nextTick } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
 
 /**
@@ -10,28 +10,45 @@ export function useBackendSetting<T>(key: string, defaultValue: T) {
   const isLoading = ref(false);
 
   /**
-   * 标记「当前这次赋值来自后端」。
+   * 「这次赋值来自后端」标记。
    *
-   * watch 是在微任务里触发的，而赋值后函数可能马上就返回了，
-   * 拿 isLoading 当标志并不可靠，所以显式等一次 nextTick：
-   * 让这次远程赋值引起的 watch 回调先跑完（被跳过），再清除标志。
+   * watch 用 `flush: 'sync'`，赋值语句内就会同步触发回调，因此这个布尔量
+   * 只需在赋值的前后极短窗口里有效，不存在「等 nextTick 时被另一次加载清掉」
+   * 的竞态。以前是异步 watch + nextTick 复位：两次加载并发时先返回的那次
+   * 会把标记清掉，另一次远程赋值引起的 watch 就会把值原样 PUT 回后端。
    */
   let applyingRemoteValue = false;
 
-  const applyRemoteValue = async (next: T) => {
+  /**
+   * 用户在加载期间改过值。
+   *
+   * getSetting 是网络请求，期间用户完全可能已经编辑过；远程结果回来时不能再覆盖，
+   * 否则用户刚敲的内容会被「读到的旧值」冲掉。加载失败时同样不写默认值。
+   */
+  let userTouchedDuringLoad = false;
+
+  const applyRemoteValue = (next: T) => {
+    if (userTouchedDuringLoad) {
+      return;
+    }
+
     applyingRemoteValue = true;
-    value.value = next;
-    await nextTick();
-    applyingRemoteValue = false;
+    try {
+      value.value = next;
+    } finally {
+      applyingRemoteValue = false;
+    }
   };
 
   const loadValue = async () => {
     isLoading.value = true;
+    userTouchedDuringLoad = false;
+
     try {
-      await applyRemoteValue(await getSetting(key, defaultValue));
+      applyRemoteValue(await getSetting(key, defaultValue));
     } catch (e) {
+      // 失败保持当前值：回写 defaultValue 会把用户刚改的内容重置掉
       console.warn(`Failed to load setting ${key}:`, e);
-      await applyRemoteValue(defaultValue);
     } finally {
       isLoading.value = false;
     }
@@ -41,8 +58,8 @@ export function useBackendSetting<T>(key: string, defaultValue: T) {
     try {
       await setSetting(key, val);
     } catch (e) {
+      // 不再 rethrow：调用点是 fire-and-forget，抛出会变成未处理的 Promise rejection
       console.warn(`Failed to save setting ${key}:`, e);
-      throw e;
     }
   };
 
@@ -54,8 +71,9 @@ export function useBackendSetting<T>(key: string, defaultValue: T) {
     // 读回来的值不再回写：否则每次打开设置页都会把后端已有的值原样 PUT 回去。
     if (applyingRemoteValue) return;
 
+    userTouchedDuringLoad = true;
     void saveValue(newValue);
-  }, { deep: true });
+  }, { deep: true, flush: 'sync' });
 
   onMounted(() => {
     void loadValue();

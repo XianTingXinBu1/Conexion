@@ -10,6 +10,7 @@ import { DEFAULT_MODELS, getModelById } from '../data/modelData';
 import { SETTING_KEYS, DEFAULTS } from '../constants';
 import { ModelsApi, type ApiClientConfig } from '@/api';
 import { getSetting, setSetting } from '@/repositories/settingsRepository';
+import { generalLogger } from '@/modules/debug';
 
 export function useApiModels() {
   // 模型相关状态
@@ -24,21 +25,43 @@ export function useApiModels() {
 
   /**
    * 加载模型列表
+   *
+   * 默认值传 null 而不是空对象：空数组 `[]` 既是真值又是合法数组，
+   * 首次运行（后端还没存过）时会把 DEFAULT_MODELS 覆盖成空列表。
    */
   async function loadModels() {
-    const saved = await getSetting<{ models: Model[]; presetId: string; url: string }>(
-      SETTING_KEYS.MODELS,
-      { models: [], presetId: '', url: '' }
-    );
-    if (saved && saved.models && Array.isArray(saved.models)) {
-      models.value = saved.models;
-      modelsAssociatedPreset.value = saved.presetId || '';
-      modelsAssociatedUrl.value = saved.url || '';
+    let saved: { models: Model[]; presetId: string; url: string } | null = null;
+
+    try {
+      saved = await getSetting<{ models: Model[]; presetId: string; url: string } | null>(
+        SETTING_KEYS.MODELS,
+        null
+      );
+    } catch (error) {
+      // 调用方（页面 onMounted）是「发起后不 await」，这里不捕获就是未处理的 rejection，
+      // 而且模型列表会停在不一致的状态
+      const msg = error instanceof Error ? error.message : String(error);
+      generalLogger.error('加载模型列表失败，回退到默认模型', { error: msg });
+      return;
     }
+
+    if (!saved) {
+      return;
+    }
+
+    if (Array.isArray(saved.models) && saved.models.length > 0) {
+      models.value = saved.models;
+    }
+    modelsAssociatedPreset.value = saved.presetId || '';
+    modelsAssociatedUrl.value = saved.url || '';
   }
 
   /**
    * 保存模型列表
+   *
+   * 同时更新内存里的关联预设/URL：否则刚保存成功后
+   * shouldClearModels(同一 presetId, 同一 url) 仍会返回 true，
+   * 切换预设时会把刚保存的模型列表误清空。
    */
   async function saveModels(presetId: string, url: string) {
     await setSetting(SETTING_KEYS.MODELS, {
@@ -46,6 +69,9 @@ export function useApiModels() {
       presetId,
       url,
     });
+
+    modelsAssociatedPreset.value = presetId;
+    modelsAssociatedUrl.value = url;
   }
 
   /**

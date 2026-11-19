@@ -73,7 +73,9 @@ export function parseStreamChunk(
       const reasoning = data.choices?.[0]?.delta?.reasoning_content ?? data.choices?.[0]?.delta?.reasoning;
       if (typeof reasoning === 'string' && reasoning) reasoningChunks.push(reasoning);
 
-      if (content) {
+      // content 是运行时数据：有些上游会返回 content parts 数组或对象，
+      // 直接 push 下去会在下游 join('') 时拼出 [object Object]
+      if (typeof content === 'string' && content) {
         chunks.push(content);
       }
 

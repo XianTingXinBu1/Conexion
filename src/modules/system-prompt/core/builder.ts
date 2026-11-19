@@ -76,11 +76,22 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
   let userInstructionIncluded = false;
   let compressionSummaryIncluded = false;
 
+  /**
+   * 已处理过的特殊条目类型。
+   *
+   * 预设里可能存在多个同类启用条目（用户复制/新增），无去重时会把同一份内容
+   * 重复 push 进 messages，chatHistoryCount 也会被反复赋值、与实际消息数不一致。
+   */
+  const handledSpecialKinds = new Set<'compression-summary' | 'chat-history' | 'user-instruction'>();
+
   // 按插入位置排序
   const sortedItems = [...preset.items].sort((a, b) =>
     (a.insertPosition ?? 999) - (b.insertPosition ?? 999)
   );
-  const hasCompressionSummaryItem = sortedItems.some(item => item.enabled && isCompressionSummaryItem(item));
+  // 这里刻意不看 enabled：只看「预设里是否存在这类条目」。
+  // 以前统计的是启用条目，于是「存在但被禁用」会被当成没有这个条目，
+  // 下面的兼容兜底又会把压缩摘要 unshift 进去，禁用配置就失效了。
+  const hasCompressionSummaryItem = sortedItems.some(isCompressionSummaryItem);
 
   // 处理每个条目
   for (const item of sortedItems) {
@@ -92,6 +103,12 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
 
     // 压缩摘要条目
     if (isCompressionSummaryItem(item)) {
+      if (handledSpecialKinds.has('compression-summary')) {
+        skippedItemIds.push(item.id);
+        continue;
+      }
+      handledSpecialKinds.add('compression-summary');
+
       const compressionMessage = processCompressionSummaryItem(compressionSummary);
       filledPlaceholders[item.id] = {
         placeholder: 'compression-summary',
@@ -111,6 +128,12 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
 
     // 聊天历史条目
     if (isChatHistoryItem(item)) {
+      if (handledSpecialKinds.has('chat-history')) {
+        skippedItemIds.push(item.id);
+        continue;
+      }
+      handledSpecialKinds.add('chat-history');
+
       const historyMessages = processChatHistoryItem(chatHistory);
       chatHistoryCount = historyMessages.length;
       filledPlaceholders[item.id] = {
@@ -130,6 +153,12 @@ export function buildSystemPrompt(config: SystemPromptConfig): SystemPromptResul
 
     // 用户指令条目
     if (isUserInstructionItem(item)) {
+      if (handledSpecialKinds.has('user-instruction')) {
+        skippedItemIds.push(item.id);
+        continue;
+      }
+      handledSpecialKinds.add('user-instruction');
+
       const instructionMessage = processUserInstructionItem(userInstruction);
       filledPlaceholders[item.id] = {
         placeholder: 'user-instruction',

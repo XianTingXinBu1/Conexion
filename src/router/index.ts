@@ -28,33 +28,54 @@ type PrefetchableRouteName = keyof typeof routePrefetchers;
 
 const prefetchedRouteNames = new Set<PrefetchableRouteName>();
 
+/**
+ * 把路径字符串归一成路由名。
+ *
+ * 动态路由（`/chat/123`、`/chat/character/123`）以前全部落到 default 返回 null，
+ * 按路径预取时被静默跳过。这三条实际都是同一个 ChatPage chunk，归一成 'chat' 即可。
+ */
+const normalizeRoutePath = (rawPath: string): PrefetchableRouteName | null => {
+  // 同时剥掉 query 与 hash：`/chat#anchor`、`/chat?foo=1`
+  const pathWithoutSuffix = rawPath.split(/[?#]/)[0] || '/';
+  // 去掉尾部斜杠（根路径除外）
+  const path = pathWithoutSuffix.length > 1
+    ? pathWithoutSuffix.replace(/\/+$/, '')
+    : pathWithoutSuffix;
+
+  switch (path) {
+    case '/':
+      return 'main';
+    case '/conversation-list':
+      return 'conversation-list';
+    case '/chat':
+      return 'chat';
+    case '/api-preset':
+      return 'api-preset';
+    case '/settings':
+      return 'settings';
+    case '/regex-script':
+      return 'regex-script';
+    case '/role-management':
+      return 'role-management';
+    case '/prompt-preset':
+      return 'prompt-preset';
+    case '/knowledge-base':
+      return 'knowledge-base';
+    default:
+      break;
+  }
+
+  // `/chat/character/:characterId` 与 `/chat/:conversationId`（注意顺序：更具体的先判）
+  if (/^\/chat\/character\/[^/]+$/.test(path) || /^\/chat\/[^/]+$/.test(path)) {
+    return 'chat';
+  }
+
+  return null;
+};
+
 const normalizeRouteName = (target: RouteLocationRaw): PrefetchableRouteName | null => {
   if (typeof target === 'string') {
-    const pathWithoutHash = target.split('?')[0] ?? '/';
-    const normalizedPath = pathWithoutHash.replace(/^#/, '') || '/';
-
-    switch (normalizedPath) {
-      case '/':
-        return 'main';
-      case '/conversation-list':
-        return 'conversation-list';
-      case '/chat':
-        return 'chat';
-      case '/api-preset':
-        return 'api-preset';
-      case '/settings':
-        return 'settings';
-      case '/regex-script':
-        return 'regex-script';
-      case '/role-management':
-        return 'role-management';
-      case '/prompt-preset':
-        return 'prompt-preset';
-      case '/knowledge-base':
-        return 'knowledge-base';
-      default:
-        return null;
-    }
+    return normalizeRoutePath(target);
   }
 
   // 不能直接用 `in`：它会沿原型链查找，'toString' / 'constructor' / 'hasOwnProperty'

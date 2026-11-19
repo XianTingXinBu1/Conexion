@@ -95,7 +95,7 @@ export class ApiClient {
   ): Promise<T> {
     this.validateUrl(this.baseURL);
 
-    const { controller, cleanup } = createTimeoutController(this.timeout);
+    const { controller, cleanup } = createTimeoutController(this.timeout, options.signal);
     this.activeRequestAbort = () => controller.abort();
 
     try {
@@ -108,7 +108,7 @@ export class ApiClient {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
-        signal: options.signal ?? controller.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {

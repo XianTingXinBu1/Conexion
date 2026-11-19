@@ -34,6 +34,7 @@ function createStreamingResponse(read: () => Promise<ReadableStreamReadResult<Ui
       getReader() {
         return {
           read,
+          cancel: vi.fn(async () => {}),
           releaseLock: vi.fn(),
         };
       },

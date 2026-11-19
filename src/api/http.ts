@@ -41,7 +41,7 @@ export async function readApiJson<T>(response: Response): Promise<T> {
  */
 export async function requestJson<T>(url: string, options: LocalRequestOptions = {}): Promise<T> {
   const { timeoutMs = LOCAL_REQUEST_TIMEOUT_MS, ...init } = options;
-  const { controller, cleanup } = createTimeoutController(timeoutMs);
+  const { controller, cleanup } = createTimeoutController(timeoutMs, init.signal);
   const method = (init.method ?? 'GET').toUpperCase();
 
   try {
@@ -53,7 +53,7 @@ export async function requestJson<T>(url: string, options: LocalRequestOptions =
         'Content-Type': 'application/json',
         ...init.headers,
       },
-      signal: init.signal ?? controller.signal,
+      signal: controller.signal,
     });
 
     const data = await readApiJson<T>(response);

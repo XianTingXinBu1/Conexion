@@ -361,9 +361,11 @@
   }
 }
 
-/* 深色模式适配 */
+/* 深色模式适配
+   只声明与主题相关的属性：以前这里又写了一次 padding: 1em，
+   其特异性（0,2,1）高于上面 @media 里的 .markdown-renderer pre（0,1,1），
+   导致小屏 / 超小屏的内边距在深色主题下全部失效。 */
 [data-theme='dark'] .markdown-renderer pre {
-  padding: 1em;
   background: linear-gradient(135deg, rgba(157, 141, 241, 0.12) 0%, rgba(183, 163, 227, 0.08) 100%);
   border-color: rgba(157, 141, 241, 0.4);
   box-shadow: 0 2px 12px rgba(157, 141, 241, 0.15);

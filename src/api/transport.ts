@@ -21,16 +21,38 @@ export interface AbortControllerHandle {
  * - 超时：error instanceof ApiTimeoutError
  * - 用户主动取消：error.name === 'AbortError'
  *
- * 调用方必须在请求结束时调用 cleanup()，否则会残留定时器。
+ * 传入 externalSignal 时两个 signal 会合并：外部取消或超时都会 abort。
+ * 以前调用方用 `options.signal ?? controller.signal` 二选一，只要传了自己的
+ * signal，超时 controller 就被整体丢弃，超时保护静默失效。
+ *
+ * 调用方必须在请求结束时调用 cleanup()，否则会残留定时器与 abort 监听。
  */
-export function createTimeoutController(timeoutMs: number): AbortControllerHandle {
+export function createTimeoutController(
+  timeoutMs: number,
+  externalSignal?: AbortSignal | null,
+): AbortControllerHandle {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     controller.abort(new ApiTimeoutError());
   }, timeoutMs);
 
+  let detachExternal = () => {};
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort(externalSignal.reason);
+    } else {
+      const onExternalAbort = () => controller.abort(externalSignal.reason);
+      externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+      detachExternal = () => externalSignal.removeEventListener('abort', onExternalAbort);
+    }
+  }
+
   return {
     controller,
-    cleanup: () => clearTimeout(timeoutId),
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      detachExternal();
+    },
   };
 }

@@ -106,15 +106,19 @@ export function usePageLeaveGuard(options: PageLeaveGuardOptions = {}) {
    * @param onSave - 保存回调，返回 Promise 表示异步保存
    */
   async function handleSaveAndLeave(onSave?: () => void | Promise<void>): Promise<void> {
-    showLeaveConfirm.value = false;
-    
     try {
       await onSave?.();
-      pendingLeaveCallback.value?.();
     } catch (error) {
+      // 保存失败时保留确认框与 pending 回调：调用方还要提示错误、用户还要重试
       console.error('[usePageLeaveGuard] 保存失败:', error);
       throw error;
     }
+
+    showLeaveConfirm.value = false;
+    const leave = pendingLeaveCallback.value;
+    // 先取再清：成功后清掉回调，否则它会在后续 forceLeave / 再次确认离开时再跑一次
+    pendingLeaveCallback.value = null;
+    leave?.();
   }
 
   /**

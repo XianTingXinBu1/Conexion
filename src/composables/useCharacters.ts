@@ -114,11 +114,12 @@ export function useCharacters() {
 
   /**
    * 保存选中的用户角色
+   *
+   * 不能只在非空时写：删掉当前角色后也要把 null 落库，
+   * 否则下次加载会把一个已不存在的角色当成当前角色。
    */
   const saveSelectedUser = async () => {
-    if (selectedUserId.value) {
-      await saveSelectedUserCharacterId(selectedUserId.value);
-    }
+    await saveSelectedUserCharacterId(selectedUserId.value);
   };
 
   /**
@@ -196,13 +197,11 @@ export function useCharacters() {
     userCharacters.value = userCharacters.value.filter(c => c.id !== id);
     if (userCharacters.value.length < initialLength) {
       await saveUserCharacters();
-      // 如果删除的是当前选中的角色，切换到第一个角色
-      if (selectedUserId.value === id && userCharacters.value.length > 0) {
-        const firstCharacter = userCharacters.value[0];
-        if (firstCharacter) {
-          selectedUserId.value = firstCharacter.id;
-          await saveSelectedUser();
-        }
+      // 删除的是当前选中角色：切到第一个；一个都不剩就清空选中态
+      // （以前 length === 0 时不动 selectedUserId，列表刷新后会指向一个不存在的角色）
+      if (selectedUserId.value === id) {
+        selectedUserId.value = userCharacters.value[0]?.id ?? null;
+        await saveSelectedUser();
       }
       return true;
     }

@@ -61,25 +61,53 @@ export function useChatPageInit(options: UseChatPageInitOptions) {
   };
 
   onMounted(async () => {
-    if (props.characterId && !props.character) {
-      const loadedCharacter = await loadAICharacter(props.characterId);
-      if (loadedCharacter) {
-        currentCharacter.value = loadedCharacter;
+    /**
+     * 逐步执行初始化，失败只记录不中断后续步骤。
+     *
+     * 以前整段是裸 await 串起来：任意一步 reject 都会让后面的会话加载、视口同步、
+     * preset 初始化、onPageLoad、开场白全部被跳过，页面停在半初始化状态，
+     * 同时抛一个未处理的 Promise rejection。
+     */
+    const runStep = async (label: string, step: () => Promise<unknown> | unknown) => {
+      try {
+        await step();
+      } catch (error) {
+        console.error(`[useChatPageInit] ${label}失败:`, error);
       }
-    }
+    };
 
-    await loadRegexRules();
-    await loadConversation();
-    syncVisibleMessages();
-    await loadPromptPresets();
-    await loadApiPresets();
+    await runStep('加载角色', async () => {
+      if (props.characterId && !props.character) {
+        const loadedCharacter = await loadAICharacter(props.characterId);
+        if (loadedCharacter) {
+          currentCharacter.value = loadedCharacter;
+        }
+      }
+    });
 
-    // 与之前一样先并发发起，不阻塞首屏（只把结果拿给开场白用）
-    const charactersReady = initCharacters();
-    initKnowledgeBases();
-    onPageLoad();
+    await runStep('加载正则规则', () => loadRegexRules());
+    await runStep('加载会话', () => loadConversation());
+    await runStep('同步可见消息', () => syncVisibleMessages());
+    await runStep('加载提示词预设', () => loadPromptPresets());
+    await runStep('加载 API 预设', () => loadApiPresets());
 
-    await seedGreetingIfNeeded(charactersReady);
+    // 与之前一样先并发发起，不阻塞首屏（只把结果拿给开场白用）。
+    // 两者都要显式兜住：initKnowledgeBases 的返回值以前被直接丢弃，
+    // charactersReady 也只在走到最后一行时才被 await。
+    const charactersReady = Promise.resolve()
+      .then(() => initCharacters())
+      .catch(error => {
+        console.error('[useChatPageInit] 初始化角色失败:', error);
+      });
+
+    void Promise.resolve()
+      .then(() => initKnowledgeBases())
+      .catch(error => {
+        console.error('[useChatPageInit] 初始化知识库失败:', error);
+      });
+
+    await runStep('页面加载回调', () => onPageLoad());
+    await runStep('灌入开场白', () => seedGreetingIfNeeded(charactersReady));
   });
 
   watch(

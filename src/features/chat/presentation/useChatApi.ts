@@ -153,6 +153,13 @@ export function useChatApi() {
    * 发送聊天请求（非流式）
    */
   async function sendChatRequest(messages: ChatMessage[]): Promise<string> {
+    // 防重入：requestStatus / activeChatApi 是 composable 级单例状态，
+    // 并发调用时第二个请求会覆盖 activeChatApi，第一个请求就再也取消不掉了
+    if (isRequestActive.value) {
+      logApiError('已有聊天请求正在进行中，忽略重复的非流式请求');
+      throw new Error('已有聊天请求正在进行中');
+    }
+
     usage.value = null;
     error.value = null;
     wasCancelled.value = false;
@@ -166,6 +173,15 @@ export function useChatApi() {
     logApi('开始发送聊天请求（非流式）', { messageCount: messages.length });
 
     const preset = await loadCurrentPreset();
+
+    // 预设加载包含多次网络往返，这期间状态已是 sending，用户可能已经点了停止。
+    // 不检查的话请求会照常发出，随后又把状态改回 completed。
+    if (wasCancelled.value) {
+      logApi('预设加载期间已取消，跳过非流式请求');
+      setRequestStatus('cancelled');
+      throw new Error(REQUEST_CANCELLED_MESSAGE);
+    }
+
     if (!preset) {
       error.value = '请先配置 API 预设';
       setRequestStatus('error');
@@ -251,6 +267,13 @@ export function useChatApi() {
     onError: (error: string) => void | Promise<void>,
     onReasoningChunk?: (chunk: string) => void,
   ): Promise<void> {
+    // 防重入：并发流式请求会互相覆盖 activeChatApi，导致旧请求无法取消、
+    // 以及先结束的那个把另一条请求的状态改成 idle / cancelled
+    if (isRequestActive.value) {
+      logApiError('已有聊天请求正在进行中，忽略重复的流式请求');
+      return;
+    }
+
     usage.value = null;
     error.value = null;
     wasCancelled.value = false;

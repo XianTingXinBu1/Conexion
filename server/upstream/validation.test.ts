@@ -32,6 +32,22 @@ describe('isPrivateHostname', () => {
     expect(isPrivateHostname('example.com')).toBe(false);
     expect(isPrivateHostname('8.8.8.8')).toBe(false);
     expect(isPrivateHostname('172.32.0.1')).toBe(false);
+    // IPv4-mapped 的十六进制写法也要按内层 IPv4 判断，不能一律当内网
+    expect(isPrivateHostname('::ffff:808:808')).toBe(false);
+    expect(isPrivateHostname('::ffff:8.8.8.8')).toBe(false);
+  });
+
+  it('IPv4-mapped 的内网地址依然拦下', () => {
+    expect(isPrivateHostname('::ffff:7f00:1')).toBe(true);
+    expect(isPrivateHostname('::ffff:127.0.0.1')).toBe(true);
+  });
+
+  it('链路本地与站点本地的完整网段都拦下', () => {
+    // fe80::/10 是 fe80–febf，只匹配字面 fe80: 会漏掉 feb0::1
+    expect(isPrivateHostname('feb0::1')).toBe(true);
+    expect(isPrivateHostname('fec0::1')).toBe(true);
+    expect(isPrivateHostname('ff02::1')).toBe(true);
+    expect(isPrivateHostname('::')).toBe(true);
   });
 
   it('带 FQDN 尾点的写法同样算本机', () => {

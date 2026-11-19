@@ -50,7 +50,11 @@ export async function runBuildCheck(options = {}) {
       duration: Date.now() - startTime,
     };
   } catch (error) {
-    const output = error.stderr || error.stdout || error.message || '';
+    // 两个流都要看：vue-tsc 的诊断（error TS…）写到 stdout，npm 的 warn 写到 stderr，
+    // 用 `||` 只取一个会把真正的类型错误丢掉
+    const output = [error?.stdout, error?.stderr, error?.message]
+      .filter(part => typeof part === 'string' && part.length > 0)
+      .join('\n');
 
     return {
       name: '项目构建检查',

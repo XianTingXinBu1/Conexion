@@ -9,7 +9,11 @@ command_name="${1:-status}"
 start_all() {
   ensure_runtime_dirs
 
-  if [ -f "$BACKEND_PID_FILE" ] && is_pid_running "$(cat "$BACKEND_PID_FILE")"; then
+  # pid 文件残留 + PID 被复用（重启后很常见）时，只看 is_pid_running 会把一个
+  # 无关进程当成后端在跑，于是跳过启动、服务实际不可用。再叠一层
+  # is_project_process，不匹配就当 pid 过期处理。
+  backend_pid="$(read_pid "$BACKEND_PID_FILE" 2>/dev/null || true)"
+  if [ -n "$backend_pid" ] && is_pid_running "$backend_pid" && is_project_process "$backend_pid"; then
     echo "backend already running"
   else
     rm -f "$BACKEND_PID_FILE"
@@ -24,7 +28,8 @@ start_all() {
     echo "backend started on $BACKEND_PORT (pid $(read_pid "$BACKEND_PID_FILE"))"
   fi
 
-  if [ -f "$FRONTEND_PID_FILE" ] && is_pid_running "$(cat "$FRONTEND_PID_FILE")"; then
+  frontend_pid="$(read_pid "$FRONTEND_PID_FILE" 2>/dev/null || true)"
+  if [ -n "$frontend_pid" ] && is_pid_running "$frontend_pid" && is_project_process "$frontend_pid"; then
     echo "frontend already running"
   else
     rm -f "$FRONTEND_PID_FILE"

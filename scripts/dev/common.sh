@@ -43,25 +43,53 @@ descendant_pids() {
   return 0
 }
 
+# 进程组是否还有活进程。
+#
+# 只看主 pid 是不够的：npm 外壳被 TERM 后很快退出，但它派生的 node / esbuild
+# 子进程（继承同一个进程组）可能忽略 TERM 继续占着端口。`kill -s 0 -PGID`
+# 只要组里还有一个活进程就返回 0。
+process_group_alive() {
+  pgid="$1"
+  [ -n "$pgid" ] || return 1
+  kill -s 0 "-$pgid" 2>/dev/null
+}
+
 # 优雅停止一棵进程树。
 #
 # 关键点：npm run dev:* 会派生 sh → node（tsx / vite）→ esbuild 多层子进程。
 # 只 kill npm 那个 pid 时，子进程会被 reparent 到 init 继续占着端口。
-# 因此优先整组终止（start_process 用 setsid 保证了组 id == 主 pid）；
+# 因此优先整组终止（start_process 用 setsid 保证了组 id == 主 pid），
 # 对老脚本启动的、与 shell 共用进程组的进程则退化为逐个收子进程。
 terminate_tree() {
   pid="$1"
-  is_pid_running "$pid" || return 0
-
   pgid="$(process_group_of "$pid")"
+
   if [ -n "$pgid" ] && [ "$pgid" = "$pid" ]; then
     kill -TERM "-$pgid" 2>/dev/null || true
-  else
-    for child in $(descendant_pids "$pid"); do
-      kill -TERM "$child" 2>/dev/null || true
+
+    i=0
+    while [ "$i" -lt 50 ] && process_group_alive "$pgid"; do
+      i=$((i + 1))
+      sleep 0.2
     done
-    kill -TERM "$pid" 2>/dev/null || true
+
+    if process_group_alive "$pgid"; then
+      kill -KILL "-$pgid" 2>/dev/null || true
+      sleep 0.5
+    fi
+
+    return 0
   fi
+
+  # 退化分支：进程与 shell 共用进程组，只能按子树收。
+  # 注意这里必须自己判活：主进程可能先退、子进程被 reparent 到 init，
+  # 那时再调 descendant_pids 已经找不到它们，只能尽力 TERM 一次。
+  is_pid_running "$pid" || return 0
+
+  for child in $(descendant_pids "$pid"); do
+    kill -TERM "$child" 2>/dev/null || true
+  done
+  kill -TERM "$pid" 2>/dev/null || true
 
   i=0
   while [ "$i" -lt 50 ] && is_pid_running "$pid"; do
@@ -70,14 +98,10 @@ terminate_tree() {
   done
 
   if is_pid_running "$pid"; then
-    if [ -n "$pgid" ] && [ "$pgid" = "$pid" ]; then
-      kill -KILL "-$pgid" 2>/dev/null || true
-    else
-      for child in $(descendant_pids "$pid"); do
-        kill -KILL "$child" 2>/dev/null || true
-      done
-      kill -KILL "$pid" 2>/dev/null || true
-    fi
+    for child in $(descendant_pids "$pid"); do
+      kill -KILL "$child" 2>/dev/null || true
+    done
+    kill -KILL "$pid" 2>/dev/null || true
     sleep 0.5
   fi
 
@@ -113,14 +137,27 @@ port_in_use() {
 
 # 判断进程是否属于本项目：cwd 指向仓库根，或命令行里带仓库路径。
 # 用于避免误杀别人的进程（比如同样占着 3100 的其它服务）。
+#
+# 匹配必须带路径边界：只做子串匹配时 /data/repo 会命中 /data/repo2、/data/repo-old，
+# free_port / stop_process 据此 terminate_tree 就会误杀无关进程。
+# 这里用参数展开而不是 case 通配符：引号里的 $PROJECT_ROOT 按字面匹配，
+# 仓库路径里就算含 * ? [ 也不会被当通配符。
 is_project_process() {
   pid="$1"
   cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
-  [ -n "$cwd" ] && [ "$cwd" = "$PROJECT_ROOT" ] && return 0
+  if [ -n "$cwd" ]; then
+    case "$cwd" in
+      "$PROJECT_ROOT"|"$PROJECT_ROOT"/*) return 0 ;;
+    esac
+  fi
+
   cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
-  case "$cmdline" in
-    *"$PROJECT_ROOT"*) return 0 ;;
-  esac
+  [ -n "$cmdline" ] || return 1
+  if [ "${cmdline#*"$PROJECT_ROOT/"}" != "$cmdline" ] \
+    || [ "${cmdline#*"$PROJECT_ROOT "}" != "$cmdline" ]; then
+    return 0
+  fi
+
   return 1
 }
 

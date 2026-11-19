@@ -73,10 +73,17 @@ export function normalizeApiPreset(preset: Preset): Preset {
   };
 }
 
+/** 磁盘数据未经校验：null / 数组 / 基本类型都可能在手工编辑后出现在列表里 */
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const cloneApiPreset = (preset: Preset): Preset => normalizeApiPreset({ ...preset });
 const clonePromptPreset = (preset: PromptPreset): PromptPreset => ({
   ...preset,
-  items: preset.items.map(item => ({ ...item })),
+  // items 可能在旧数据里缺失或不是数组，直接 map 会让 GET /prompt-presets 抛 500
+  items: Array.isArray(preset.items)
+    ? preset.items.filter(isPlainObject).map(item => ({ ...item })) as PromptPreset['items']
+    : [],
 });
 const cloneDefaultPromptPresets = (): PromptPreset[] => (
   DEFAULT_PROMPT_PRESETS as unknown as PromptPreset[]
@@ -91,8 +98,14 @@ export class ApiPresetRepository {
 
   async list(): Promise<Preset[]> {
     const presets = await this.storage.apiPresets.read();
-    return Array.isArray(presets) && presets.length > 0
-      ? presets.map(cloneApiPreset)
+    if (!Array.isArray(presets)) {
+      return [...DEFAULT_API_PRESETS].map(cloneApiPreset);
+    }
+
+    // 非对象元素（null / 字符串）在 normalizeApiPreset 里解构会抛 TypeError
+    const validPresets = presets.filter(isPlainObject) as unknown as Preset[];
+    return validPresets.length > 0
+      ? validPresets.map(cloneApiPreset)
       : [...DEFAULT_API_PRESETS].map(cloneApiPreset);
   }
 
@@ -114,8 +127,13 @@ export class PromptPresetRepository {
 
   async list(): Promise<PromptPreset[]> {
     const presets = await this.storage.promptPresets.read();
-    return Array.isArray(presets) && presets.length > 0
-      ? presets.map(clonePromptPreset)
+    if (!Array.isArray(presets)) {
+      return cloneDefaultPromptPresets();
+    }
+
+    const validPresets = presets.filter(isPlainObject) as unknown as PromptPreset[];
+    return validPresets.length > 0
+      ? validPresets.map(clonePromptPreset)
       : cloneDefaultPromptPresets();
   }
 

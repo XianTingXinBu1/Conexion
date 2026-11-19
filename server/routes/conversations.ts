@@ -91,6 +91,87 @@ function ensureCharacter(value: unknown): AICharacter | undefined {
   };
 }
 
+function ensureCompression(value: unknown, fieldName: string): Conversation['compression'] {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (!isObject(value)) {
+    throw new HttpError(400, `${fieldName} 必须是对象`);
+  }
+
+  const finiteNumber = (input: unknown, fallback: number): number =>
+    typeof input === 'number' && Number.isFinite(input) ? input : fallback;
+
+  return {
+    compressedAt: finiteNumber(value.compressedAt, Date.now()),
+    summaryContent: typeof value.summaryContent === 'string' ? value.summaryContent : '',
+    promptContent: typeof value.promptContent === 'string' ? value.promptContent : '',
+    sourceMessageCount: finiteNumber(value.sourceMessageCount, 0),
+    sourceMessageIds: ensureOptionalStringArray(value.sourceMessageIds, `${fieldName}.sourceMessageIds`) ?? [],
+    keepRecentCount: finiteNumber(value.keepRecentCount, 0),
+    ...(typeof value.contextBeforeCompression === 'number'
+      ? { contextBeforeCompression: value.contextBeforeCompression }
+      : {}),
+    ...(typeof value.contextAfterCompression === 'number'
+      ? { contextAfterCompression: value.contextAfterCompression }
+      : {}),
+  };
+}
+
+/**
+ * PATCH 的更新体白名单。
+ *
+ * 以前是 `payload as Partial<Conversation>` 直接透传到底层的
+ * `{ ...conversation, ...updates }`：客户端改 id 能让 URL 与数据不一致、
+ * 传 `title: {}` 能把脏数据永久落盘。这里逐字段校验，并显式拒绝 id。
+ */
+function ensureConversationUpdates(value: unknown): Partial<Conversation> {
+  if (!isObject(value)) {
+    throw new HttpError(400, 'updates 必须是对象');
+  }
+
+  if ('id' in value) {
+    throw new HttpError(400, 'updates 不允许包含 id');
+  }
+
+  const updates: Partial<Conversation> = {};
+
+  if (value.title !== undefined) {
+    updates.title = requireNonEmptyString(value.title, 'updates.title');
+  }
+
+  if (value.characterId !== undefined) {
+    updates.characterId = value.characterId === null
+      ? undefined
+      : requireNonEmptyString(value.characterId, 'updates.characterId');
+  }
+
+  if (value.characterName !== undefined) {
+    updates.characterName = value.characterName === null
+      ? undefined
+      : requireNonEmptyString(value.characterName, 'updates.characterName');
+  }
+
+  if (value.messages !== undefined) {
+    updates.messages = ensureMessages(value.messages);
+  }
+
+  if (value.compressed !== undefined) {
+    if (typeof value.compressed !== 'boolean') {
+      throw new HttpError(400, 'updates.compressed 必须是布尔值');
+    }
+
+    updates.compressed = value.compressed;
+  }
+
+  if ('compression' in value) {
+    updates.compression = ensureCompression(value.compression, 'updates.compression');
+  }
+
+  return updates;
+}
+
 function ensureConversation(value: unknown, fieldName: string): Conversation {
   if (!isObject(value)) {
     throw new HttpError(400, `${fieldName} 必须是对象`);
@@ -105,7 +186,7 @@ function ensureConversation(value: unknown, fieldName: string): Conversation {
     characterName: typeof value.characterName === 'string' ? value.characterName : undefined,
     messages: ensureMessages(value.messages),
     compressed: typeof value.compressed === 'boolean' ? value.compressed : undefined,
-    compression: isObject(value.compression) ? value.compression as unknown as Conversation['compression'] : undefined,
+    compression: ensureCompression(value.compression, `${fieldName}.compression`),
     createdAt,
     updatedAt: typeof value.updatedAt === 'number' && Number.isFinite(value.updatedAt) ? value.updatedAt : createdAt,
   };
@@ -153,7 +234,8 @@ export function createConversationRoutes(config: ServerConfig, repository: Conve
 
   app.patch('/conversations/:id', async (c) => {
     const payload = ensureObjectPayload(await readJsonBody(c.req.raw, config.maxBodyBytes));
-    const updates = isObject(payload.updates) ? payload.updates as Partial<Conversation> : payload as Partial<Conversation>;
+    // 兼容两种写法：{ updates: {...} } 包装，或直接把更新的字段放在顶层
+    const updates = ensureConversationUpdates(isObject(payload.updates) ? payload.updates : payload);
     const updated = repository.requireConversation(await repository.update(c.req.param('id'), updates));
     return jsonResponse(updated);
   });
@@ -166,7 +248,7 @@ export function createConversationRoutes(config: ServerConfig, repository: Conve
   app.put('/conversations/:id/messages', async (c) => {
     const payload = ensureObjectPayload(await readJsonBody(c.req.raw, config.maxBodyBytes));
     const messages = ensureMessages(payload.messages);
-    const updates = isObject(payload.updates) ? payload.updates as Partial<Conversation> : {};
+    const updates = isObject(payload.updates) ? ensureConversationUpdates(payload.updates) : {};
     const updated = repository.requireConversation(await repository.updateMessages(c.req.param('id'), messages, updates));
     return jsonResponse(updated);
   });

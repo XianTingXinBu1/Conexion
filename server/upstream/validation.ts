@@ -44,12 +44,24 @@ export function isPrivateHostname(hostname: string): boolean {
   }
 
   if (ipVersion === 6) {
-    const ipv4MappedMatch = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (ipv4MappedMatch?.[1]) {
-      return isPrivateHostname(ipv4MappedMatch[1]);
+    // IPv4-mapped 地址要按内层的 IPv4 判断：`::ffff:808:808` 就是 8.8.8.8，
+    // 一律当内网拦掉会把合法公网地址误伤
+    const dottedMatch = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (dottedMatch?.[1]) {
+      return isPrivateHostname(dottedMatch[1]);
+    }
+
+    const hexMatch = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hexMatch?.[1] && hexMatch[2]) {
+      const high = parseInt(hexMatch[1], 16);
+      const low = parseInt(hexMatch[2], 16);
+      return isPrivateHostname(
+        `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`,
+      );
     }
 
     if (normalized.startsWith('::ffff:')) {
+      // 认不出来的 mapped 写法（压缩形式变体）：宁可拦下
       return true;
     }
 
@@ -61,6 +73,8 @@ export function isPrivateHostname(hostname: string): boolean {
     if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
     // 链路本地 fe80::/10（fe80 – febf）
     if (['fe8', 'fe9', 'fea', 'feb'].some(prefix => firstHextet.startsWith(prefix))) return true;
+    // 站点本地 fec0::/10（已弃用，但仍不该被当成公网目标）
+    if (['fec', 'fed', 'fee', 'fef'].some(prefix => firstHextet.startsWith(prefix))) return true;
     // 组播 ff00::/8
     if (firstHextet.startsWith('ff')) return true;
 

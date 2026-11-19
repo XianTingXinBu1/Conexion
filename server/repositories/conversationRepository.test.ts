@@ -185,4 +185,44 @@ describe('ConversationRepository', () => {
 
     expect(await repository.update(temporary.id, { title: 'x' })).toBeUndefined();
   });
+
+  it('returns deep copies so callers cannot mutate stored data', async () => {
+    const { repository, storage } = await createRepository();
+    const created = await repository.create(message('m1', 'first'), character);
+
+    // variants / reasoningVariants 以前只拷贝数组壳，改一条消息会污染仓储数据
+    await repository.update(created.id, {
+      messages: [
+        { ...message('m1', 'first'), variants: ['first', 'retry'], reasoningVariants: ['think-a'] },
+      ],
+    });
+
+    const fetched = await repository.get(created.id);
+    fetched!.messages[0]!.variants![0] = 'tampered';
+    fetched!.messages[0]!.reasoningVariants![0] = 'tampered';
+    fetched!.messages[0]!.content = 'tampered';
+
+    const reloaded = await repository.get(created.id);
+    expect(reloaded!.messages[0]!.content).toBe('first');
+    expect(reloaded!.messages[0]!.variants).toEqual(['first', 'retry']);
+    expect(reloaded!.messages[0]!.reasoningVariants).toEqual(['think-a']);
+
+    const persisted = await storage.conversations.read();
+    expect(persisted[0]!.messages[0]!.variants).toEqual(['first', 'retry']);
+  });
+
+  it('serializes concurrent writes instead of letting the last one win', async () => {
+    const { repository } = await createRepository();
+    const created = await repository.create(message('m1', 'first'), character);
+
+    // 两个写并发发起：各自读到同一份快照写回时，后写者会覆盖先写者
+    await Promise.all([
+      repository.update(created.id, { title: '改过的标题' }),
+      repository.update(created.id, { compressed: true }),
+    ]);
+
+    const reloaded = await repository.get(created.id);
+    expect(reloaded!.title).toBe('改过的标题');
+    expect(reloaded!.compressed).toBe(true);
+  });
 });

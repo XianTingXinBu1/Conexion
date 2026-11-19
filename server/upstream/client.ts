@@ -32,7 +32,10 @@ interface TimeoutControllerHandle {
  */
 const RETRY_ATTEMPTS = 2;
 const RETRY_BASE_DELAY_MS = 150;
-const RETRYABLE_STATUS_MIN = 500;
+/** 单次重试最多等 5s：上游给的 Retry-After 可能很大，不能让它把请求拖死 */
+const RETRY_MAX_DELAY_MS = 5000;
+/** 只重试「确定是瞬时故障」的状态码 */
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
 function isIdempotentMethod(method: UpstreamRequestOptions['method']): boolean {
   return method === 'GET' || method === 'HEAD';
@@ -45,6 +48,40 @@ function isRetryableError(error: unknown): boolean {
   }
 
   return true;
+}
+
+/** 解析 Retry-After：既支持秒数，也支持 HTTP-date（RFC 7231） */
+function parseRetryAfterMs(headers: Headers): number | undefined {
+  const raw = headers.get('retry-after');
+  if (!raw) {
+    return undefined;
+  }
+
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(seconds * 1000, RETRY_MAX_DELAY_MS);
+  }
+
+  const dateMs = Date.parse(raw);
+  if (Number.isFinite(dateMs)) {
+    return Math.min(Math.max(dateMs - Date.now(), 0), RETRY_MAX_DELAY_MS);
+  }
+
+  return undefined;
+}
+
+/**
+ * 重试等待：上游给了 Retry-After 就听它的，否则指数退避 + 抖动。
+ * 抖动是为了避免多个并发请求在同一时刻一起重试，把上游又打一次尖峰。
+ */
+function resolveRetryDelayMs(attempt: number, headers?: Headers): number {
+  const retryAfterMs = headers ? parseRetryAfterMs(headers) : undefined;
+  if (retryAfterMs !== undefined) {
+    return retryAfterMs;
+  }
+
+  const backoff = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+  return Math.min(backoff + Math.random() * RETRY_BASE_DELAY_MS, RETRY_MAX_DELAY_MS);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -132,16 +169,25 @@ export async function proxyUpstreamRequest(
     try {
       const result = await attemptUpstreamRequest(options);
 
-      if (attempt >= maxAttempts || result.status < RETRYABLE_STATUS_MIN) {
+      if (attempt >= maxAttempts || !RETRYABLE_STATUS_CODES.has(result.status)) {
         return result;
       }
+
+      // 以前是「status >= 500 一律重试」，501/505 这类确定性错误也会白发一次请求
+      console.warn(
+        `[upstream] ${options.method} 上游返回 ${result.status}，第 ${attempt} 次重试`,
+      );
+      await sleep(resolveRetryDelayMs(attempt, result.headers));
     } catch (error) {
       if (attempt >= maxAttempts || !isRetryableError(error)) {
         throw error;
       }
-    }
 
-    await sleep(RETRY_BASE_DELAY_MS * attempt);
+      console.warn(
+        `[upstream] ${options.method} 请求失败（${error instanceof Error ? error.message : String(error)}），第 ${attempt} 次重试`,
+      );
+      await sleep(resolveRetryDelayMs(attempt));
+    }
   }
 }
 

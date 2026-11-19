@@ -11,10 +11,22 @@ const createConversationTitle = (content: string): string => {
   return content.slice(0, 30) + (content.length > 30 ? '...' : '');
 };
 
+/**
+ * 会话副本。messages 里的 variants / reasoningVariants 都是数组，
+ * 只拷数组壳会让调用方改一条消息就污染仓储缓存与落盘数据。
+ */
+const cloneMessage = (message: Message): Message => ({
+  ...message,
+  ...(message.variants ? { variants: [...message.variants] } : {}),
+  ...(message.reasoningVariants ? { reasoningVariants: [...message.reasoningVariants] } : {}),
+});
+
 const cloneConversation = (conversation: Conversation): Conversation => ({
   ...conversation,
-  messages: [...conversation.messages],
-  compression: conversation.compression ? { ...conversation.compression } : undefined,
+  messages: conversation.messages.map(cloneMessage),
+  compression: conversation.compression
+    ? { ...conversation.compression, sourceMessageIds: [...conversation.compression.sourceMessageIds] }
+    : undefined,
 });
 
 const clearCompressionIfSourceChanged = (
@@ -57,6 +69,14 @@ export const createStoredConversation = (
 
 export class ConversationRepository {
   private readonly storage: AppStorage;
+  /**
+   * 写操作串行化。
+   *
+   * 所有写都是「读全量 → 改内存 → 写全量」，并发请求会各自基于同一份快照写回，
+   * 后写者覆盖先写者（同时编辑两个会话时表现最明显）。storage 只串行化了 write，
+   * 挡不住 read-modify-write 之间的竞态，所以这里在仓储层排队。
+   */
+  private writeChain: Promise<unknown> = Promise.resolve();
 
   constructor(storage: AppStorage) {
     this.storage = storage;
@@ -68,9 +88,11 @@ export class ConversationRepository {
   }
 
   async replaceAll(conversations: Conversation[]): Promise<Conversation[]> {
-    const nextConversations = conversations.map(cloneConversation);
-    await this.storage.conversations.write(nextConversations);
-    return nextConversations.map(cloneConversation);
+    return this.runExclusive(async () => {
+      const nextConversations = conversations.map(cloneConversation);
+      await this.storage.conversations.write(nextConversations);
+      return nextConversations.map(cloneConversation);
+    });
   }
 
   async get(id: string): Promise<Conversation | undefined> {
@@ -84,18 +106,19 @@ export class ConversationRepository {
       return createTemporaryConversation(firstMessage);
     }
 
-    const conversations = await this.list();
-    const newConversation = createStoredConversation(firstMessage, character);
-    const existingIndex = conversations.findIndex(conversation => conversation.id === newConversation.id);
+    return this.runExclusive(async () => {
+      const conversations = await this.list();
+      const newConversation = createStoredConversation(firstMessage, character);
 
-    if (existingIndex !== -1) {
-      conversations[existingIndex] = newConversation;
-    } else {
+      // id 是 UUID，撞车意味着调用方显式塞了重复 id：报错好过静默覆盖掉旧会话
+      if (conversations.some(conversation => conversation.id === newConversation.id)) {
+        throw new HttpError(409, '会话 ID 冲突');
+      }
+
       conversations.push(newConversation);
-    }
-
-    await this.storage.conversations.write(conversations);
-    return cloneConversation(newConversation);
+      await this.storage.conversations.write(conversations);
+      return cloneConversation(newConversation);
+    });
   }
 
   async update(id: string, updates: Partial<Conversation>): Promise<Conversation | undefined> {
@@ -111,15 +134,17 @@ export class ConversationRepository {
       return false;
     }
 
-    const conversations = await this.list();
-    const nextConversations = conversations.filter(conversation => conversation.id !== id);
+    return this.runExclusive(async () => {
+      const conversations = await this.list();
+      const nextConversations = conversations.filter(conversation => conversation.id !== id);
 
-    if (nextConversations.length === conversations.length) {
-      return false;
-    }
+      if (nextConversations.length === conversations.length) {
+        return false;
+      }
 
-    await this.storage.conversations.write(nextConversations);
-    return true;
+      await this.storage.conversations.write(nextConversations);
+      return true;
+    });
   }
 
   async updateMessages(
@@ -199,6 +224,15 @@ export class ConversationRepository {
   }
 
   /**
+   * 写队列：用一条 Promise 链把所有写操作串起来，前一个失败不影响后续排队。
+   */
+  private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    const next = this.writeChain.catch(() => {}).then(operation);
+    this.writeChain = next;
+    return next;
+  }
+
+  /**
    * 会话变更的单一入口：读一次、找一次、写一次。
    *
    * 此前的 editMessage / deleteMessage 先 get() 再 update()，会对同一个
@@ -213,20 +247,22 @@ export class ConversationRepository {
       return undefined;
     }
 
-    const conversations = await this.list();
-    const index = conversations.findIndex(conversation => conversation.id === id);
+    return this.runExclusive(async () => {
+      const conversations = await this.list();
+      const index = conversations.findIndex(conversation => conversation.id === id);
 
-    if (index === -1) {
-      return undefined;
-    }
+      if (index === -1) {
+        return undefined;
+      }
 
-    const updated = transform(conversations[index]!);
-    if (!updated) {
-      return undefined;
-    }
+      const updated = transform(conversations[index]!);
+      if (!updated) {
+        return undefined;
+      }
 
-    conversations[index] = updated;
-    await this.storage.conversations.write(conversations);
-    return cloneConversation(updated);
+      conversations[index] = updated;
+      await this.storage.conversations.write(conversations);
+      return cloneConversation(updated);
+    });
   }
 }

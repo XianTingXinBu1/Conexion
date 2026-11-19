@@ -20,6 +20,9 @@ function applyCorsHeaders(response: Response, config: ServerConfig): Response {
   headers.set('Access-Control-Allow-Origin', config.clientOrigin);
   headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // 允许的来源来自配置而非请求头，但响应依然随 Origin 变化，
+  // 不声明 Vary 会让中间缓存把 A 来源的响应发给 B
+  headers.append('Vary', 'Origin');
 
   return new Response(response.body, {
     status: response.status,
@@ -61,15 +64,24 @@ export function createHonoApp(config: ServerConfig, storage: AppStorage = create
   app.route('/api', createSettingsRoutes(config, settingsRepository));
   app.route('/api', createProxyRoutes(config));
 
-  app.notFound(() => jsonResponse({ error: { message: 'Not Found' } }, 404));
+  // 错误响应也要带 CORS 头：中间件里的 `c.res = applyCorsHeaders(...)` 只在
+  // 正常返回时执行，下游抛错会直接跳到 onError，浏览器因此只能看到 CORS 错误、
+  // 读不到真实报错
+  app.notFound(() => applyCorsHeaders(jsonResponse({ error: { message: 'Not Found' } }, 404), config));
 
   app.onError((error, _c) => {
     if (isHttpError(error)) {
-      return jsonResponse({ error: { message: error.message } }, error.statusCode);
+      return applyCorsHeaders(
+        jsonResponse({ error: { message: error.message } }, error.statusCode),
+        config,
+      );
     }
 
     const upstreamError = mapUpstreamError(error, 'Internal Server Error');
-    return jsonResponse({ error: { message: upstreamError.message } }, upstreamError.statusCode);
+    return applyCorsHeaders(
+      jsonResponse({ error: { message: upstreamError.message } }, upstreamError.statusCode),
+      config,
+    );
   });
 
   return app;

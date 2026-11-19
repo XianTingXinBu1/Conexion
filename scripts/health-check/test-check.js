@@ -38,6 +38,12 @@ export async function runTestCheck(options = {}) {
       stdio: 'pipe',
       encoding: 'utf-8',
       cwd: projectRoot,
+      // 默认 maxBuffer 只有 1MB：--coverage.reporter=text 会输出全部文件的明细，
+      // 文件多时很容易超限抛 ENOBUFS，然后被归类成「测试失败」的假失败
+      maxBuffer: 32 * 1024 * 1024,
+      // 用例里有未结束的 timer / 子进程时 vitest 不会自己退出，
+      // 没有超时会让健康检查永久阻塞
+      timeout: 10 * 60 * 1000,
     });
 
     return {
@@ -46,7 +52,9 @@ export async function runTestCheck(options = {}) {
       duration: Date.now() - startTime,
     };
   } catch (error) {
-    const output = error.stderr || error.stdout || error.message || '';
+    const output = [error?.stdout, error?.stderr, error?.message]
+      .filter(part => typeof part === 'string' && part.length > 0)
+      .join('\n');
 
     // 检查是否是因为没有测试文件
     if (output.includes('No test files found')) {

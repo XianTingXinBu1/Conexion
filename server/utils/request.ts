@@ -29,6 +29,11 @@ export async function readJsonBody(request: Request, maxBodyBytes: number): Prom
         chunks.push(value);
       }
     }
+  } catch (error) {
+    // 超限或客户端中途断开时，剩余请求体不再读。不 cancel 的话连接会继续
+    // 收数据、一直保持打开（慢速大包能把连接池和内存磨光）。
+    await reader.cancel().catch(() => {});
+    throw error;
   } finally {
     reader.releaseLock();
   }

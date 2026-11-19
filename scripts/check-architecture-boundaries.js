@@ -1,10 +1,18 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
-import { globSync } from 'node:fs';
 
 const root = resolve(process.cwd(), 'src');
+
+// fs.globSync 是 Node 22 才进 stdlib 的。旧版本上它是 undefined，
+// 直接调会抛 TypeError，检查脚本本身挂掉而给不出结论。
+if (typeof globSync !== 'function') {
+  console.error(
+    `架构边界检查需要 Node.js 22+（fs.globSync 不可用），当前版本：${process.version}`,
+  );
+  process.exit(1);
+}
 
 // 测试文件不参与生产代码的边界检查。
 //
@@ -79,13 +87,29 @@ const rules = [
   },
 ];
 
+/**
+ * 静态 import / re-export 的说明符。
+ *
+ * 关键是不能用 `.+?` 跨行：格式化后的具名导入经常写成多行
+ * （`import {\n  a,\n  b,\n} from '@/utils/storage'`），旧正则会静默放过这类违规。
+ * 这里用有界的 `[\s\S]{0,400}?`，既能跨行，又不会一路贪到下一个语句；
+ * 没有 ` from ` 的裸导入（`import 'x'`）与 re-export（`export * from 'x'`）都能命中。
+ */
+const STATIC_IMPORT_PATTERN = /\b(?:import|export)\s+(?:type\s+)?(?:[\s\S]{0,400}?\s+from\s+)?['"]([^'"]+)['"]/g;
+/** 动态 `import('x')` 同样绕过边界规则 */
+const DYNAMIC_IMPORT_PATTERN = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+
 function getImports(source) {
   const imports = [];
-  const regex = /^import\s+(?:.+?\s+from\s+)?['"]([^'"]+)['"]/gm;
-  let match;
-  while ((match = regex.exec(source))) {
-    imports.push({ specifier: match[1], index: match.index });
+
+  for (const regex of [STATIC_IMPORT_PATTERN, DYNAMIC_IMPORT_PATTERN]) {
+    regex.lastIndex = 0;
+    let match;
+    while ((match = regex.exec(source))) {
+      imports.push({ specifier: match[1], index: match.index });
+    }
   }
+
   return imports;
 }
 

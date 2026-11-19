@@ -492,6 +492,51 @@ describe('server api validation', () => {
     }
   });
 
+  it('rejects PATCH payloads that try to change the conversation id or carry wrong types', async () => {
+    const restoreDataDir = await useTempDataDir();
+    const started = await startTestServer();
+    servers.push(started.server);
+
+    try {
+      const firstMessage = { id: 'msg-1', type: 'user', content: 'Hello', timestamp: 1 };
+      const createResponse = await fetch(`${started.baseUrl}/api/conversations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstMessage,
+          character: { id: 'char-1', name: 'Assistant', description: '', personality: '', createdAt: 1 },
+        }),
+      });
+      const created = await createResponse.json();
+
+      const patch = (body: unknown) => fetch(`${started.baseUrl}/api/conversations/${created.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      // id 由路径决定：允许请求体改 id 会让数据与 URL 不一致
+      const idAttempt = await patch({ updates: { id: 'conv-other' } });
+      expect(idAttempt.status).toBe(400);
+
+      // 类型不合法不能落盘（以前是裸 as Partial<Conversation> 透传）
+      const badTitle = await patch({ updates: { title: {} } });
+      expect(badTitle.status).toBe(400);
+
+      const badMessages = await patch({ updates: { messages: 'x' } });
+      expect(badMessages.status).toBe(400);
+
+      // 合法字段正常生效，且未知字段被丢弃
+      const ok = await patch({ updates: { title: '新标题', sneaky: 'ignored' } });
+      expect(ok.status).toBe(200);
+      const updated = await ok.json();
+      expect(updated.title).toBe('新标题');
+      expect(updated).not.toHaveProperty('sneaky');
+    } finally {
+      restoreDataDir();
+    }
+  });
+
   it('preserves retry variants on message write and edit', async () => {
     const restoreDataDir = await useTempDataDir();
     const started = await startTestServer();

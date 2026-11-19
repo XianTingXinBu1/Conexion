@@ -133,6 +133,11 @@ const handleRequest = async (input: RequestInfo | URL, init: RequestInit = {}): 
   }
 
   if (url.includes('/api/api-presets')) {
+    if (method === 'PUT' && failNextPresetWrite) {
+      failNextPresetWrite = false;
+      return jsonResponse({ error: { message: '磁盘已满' } }, 500);
+    }
+
     if (method === 'PUT') {
       const body = JSON.parse(String(init.body)) as { presets: Preset[] };
       presetStore = body.presets;
@@ -172,6 +177,9 @@ const handleRequest = async (input: RequestInfo | URL, init: RequestInit = {}): 
 };
 
 const fetchMock = vi.fn(handleRequest);
+
+/** 置为 true 时下一次写预设的 PUT 返回 500 */
+let failNextPresetWrite = false;
 
 // ==================== 选择器 ====================
 
@@ -264,6 +272,7 @@ beforeEach(() => {
   connectionGate = null;
 
   clearAll();
+  failNextPresetWrite = false;
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
 });
@@ -292,6 +301,22 @@ describe('ApiPresetPage 预设保存与切换', () => {
     await waitFor(() => {
       expect(toastByTitle('保存成功')).toBeTruthy();
     });
+  });
+
+  it('保存落库失败时不提示成功，且表单保持可编辑', async () => {
+    // 回归：handleSaveCurrentPreset 以前不 await、不看返回值，
+    // 落库失败也照样 updateOriginalData() + 弹「保存成功」
+    const { container } = await renderPage();
+
+    await fireEvent.update(getUrlInput(container), 'https://changed.example.com/v3');
+
+    failNextPresetWrite = true;
+    await fireEvent.click(getSaveButton(container));
+
+    await waitFor(() => expect(toastByTitle('保存失败')).toBeTruthy());
+    expect(toastByTitle('保存成功')).toBeFalsy();
+    // 回滚后表单回到「持久化的值」（提示里已经写明已回滚），不会假装已保存
+    await waitFor(() => expect(getUrlInput(container).value).toBe(PRESET_A.url));
   });
 
   it('切换预设：表单载入目标预设，并把新的选中项写给后端', async () => {

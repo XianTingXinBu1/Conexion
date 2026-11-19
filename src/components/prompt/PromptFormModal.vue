@@ -127,10 +127,9 @@ const handleSave = () => {
     roleType: formData.value.roleType || 'system',
   });
 
-  // 创建模式关闭模态框，编辑模式保持打开
-  if (props.mode === 'create') {
-    emit('update:show', false);
-  }
+  // 是否关闭弹窗由父组件决定：落库成功后才关，失败时保留表单让用户重试
+  // （本组件曾在这里无条件 emit('update:show', false)，导致保存失败时
+  //  用户已经填好的内容被直接关掉）
 };
 
 const handleCancel = () => {

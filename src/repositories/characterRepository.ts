@@ -51,7 +51,13 @@ export async function loadSelectedUserCharacterId(): Promise<string | null> {
   return await getSetting<string | null>(SETTING_KEYS.SELECTED_USER_CHARACTER, null);
 }
 
-export async function saveSelectedUserCharacterId(id: string): Promise<void> {
+/**
+ * 保存当前选中的用户角色。
+ *
+ * 允许传 null：删除/清空选中角色时必须能把设置里的旧 id 一起清掉，
+ * 否则下次加载会把一个已不存在的角色当成当前角色。
+ */
+export async function saveSelectedUserCharacterId(id: string | null): Promise<void> {
   await setSetting(SETTING_KEYS.SELECTED_USER_CHARACTER, id);
 }
 

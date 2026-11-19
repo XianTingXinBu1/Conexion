@@ -5,9 +5,10 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import RegexScriptPage from '../RegexScriptPage.vue';
 
 const showSuccess = vi.fn();
+const showInfo = vi.fn();
 const showError = vi.fn();
 vi.mock('@/modules/notification', () => ({
-  useNotifications: () => ({ showSuccess, showInfo: vi.fn(), showError }),
+  useNotifications: () => ({ showSuccess, showInfo, showError }),
   getNotificationMessage: () => ({ title: '成功', message: '已保存' }),
 }));
 const fetchMock = vi.fn();
@@ -49,5 +50,55 @@ describe('RegexScriptPage', () => {
     await waitFor(() => expect(view.queryByText('新建规则')).toBeNull());
     expect(showSuccess).toHaveBeenCalledTimes(1);
     expect(view.getByText('清理')).toBeTruthy();
+  });
+
+  it('切换启用失败时不提示成功', async () => {
+    // 回归：toggleEnabled 以前忽略返回值，落库失败也照样弹「已启用/已禁用」。
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' } }] });
+    const rule = { id: 'r1', name: '清理', enabled: true, pattern: 'a', flags: '', replacement: 'b', scope: 'all', applyTo: 'after-macro' };
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit = {}) => {
+      const method = (init.method ?? 'GET').toUpperCase();
+      if (method === 'GET') {
+        return new Response(JSON.stringify([rule]), { headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ error: { message: '磁盘已满' } }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    const view = render(RegexScriptPage, { global: { plugins: [router] } });
+    await waitFor(() => expect(view.queryByText('清理')).not.toBeNull());
+
+    await fireEvent.click(view.container.querySelector('.toggle-btn')!);
+
+    await waitFor(() => expect(showError).toHaveBeenCalled());
+    expect(showSuccess).not.toHaveBeenCalled();
+    expect(showInfo).not.toHaveBeenCalled();
+    // 状态没翻转：开关仍是启用的（active）
+    expect(view.container.querySelector('.toggle-btn')!.className).toContain('active');
+  });
+
+  it('切换启用成功时才提示（启用→禁用走 info 提示）', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' } }] });
+    const rule = { id: 'r1', name: '清理', enabled: true, pattern: 'a', flags: '', replacement: 'b', scope: 'all', applyTo: 'after-macro' };
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit = {}) => {
+      const method = (init.method ?? 'GET').toUpperCase();
+      if (method === 'GET') {
+        return new Response(JSON.stringify([rule]), { headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify([{ ...rule, enabled: false }]), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    const view = render(RegexScriptPage, { global: { plugins: [router] } });
+    await waitFor(() => expect(view.queryByText('清理')).not.toBeNull());
+
+    await fireEvent.click(view.container.querySelector('.toggle-btn')!);
+
+    // 由「启用」切到「禁用」走的是 info 提示，不是 success
+    await waitFor(() => expect(showInfo).toHaveBeenCalled());
+    expect(showError).not.toHaveBeenCalled();
   });
 });

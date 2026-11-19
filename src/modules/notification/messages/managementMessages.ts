@@ -10,10 +10,12 @@ export type ManagementMessageKey =
   | 'REGEX_RULE_DELETE_SUCCESS'
   | 'REGEX_RULE_ENABLE_SUCCESS'
   | 'REGEX_RULE_DISABLE_SUCCESS'
+  | 'REGEX_RULE_SAVE_FAILED'
   // 提示词预设相关
   | 'PROMPT_PRESET_CREATE_SUCCESS'
   | 'PROMPT_PRESET_RENAME_SUCCESS'
   | 'PROMPT_PRESET_DELETE_SUCCESS'
+  | 'PROMPT_PRESET_SAVE_FAILED'
   | 'PROMPT_ITEM_DELETE_SUCCESS'
   | 'PROMPT_ITEM_ADD_SUCCESS'
   | 'PROMPT_ITEM_UPDATE_SUCCESS'
@@ -29,6 +31,8 @@ export type ManagementMessageKey =
   | 'CHARACTER_IMPORT_SUCCESS'
   | 'CHARACTER_EXPORT_SUCCESS'
   | 'CHARACTER_IMPORT_FAILED'
+  | 'CHARACTER_SAVE_FAILED'
+  | 'CHARACTER_DELETE_FAILED'
   // 会话管理相关
   | 'CONVERSATION_CREATE_TEMP_SUCCESS'
   | 'CONVERSATION_CREATE_CHARACTER_SUCCESS'
@@ -46,9 +50,13 @@ export type ManagementMessageKey =
   | 'KNOWLEDGE_BASE_ENTRY_UPDATE_SUCCESS'
   | 'KNOWLEDGE_BASE_DELETE_SUCCESS'
   | 'KNOWLEDGE_BASE_ENTRY_DELETE_SUCCESS'
+  | 'KNOWLEDGE_BASE_SAVE_FAILED'
+  | 'KNOWLEDGE_BASE_DELETE_FAILED'
+  | 'KNOWLEDGE_BASE_ENTRY_SAVE_FAILED'
   // 设置相关
   | 'SETTINGS_DATA_DELETE_SUCCESS'
-  | 'SETTINGS_RESTORE_SUCCESS';
+  | 'SETTINGS_RESTORE_SUCCESS'
+  | 'SETTINGS_SAVE_FAILED';
 
 /**
  * 管理相关通知消息配置
@@ -95,6 +103,17 @@ export const MANAGEMENT_MESSAGES: Record<ManagementMessageKey, (params?: Record<
   /**
    * 正则规则禁用成功
    */
+  /**
+   * 正则规则保存失败（新增 / 编辑 / 启停 / 删除共用）
+   *
+   * 规则不存在或落库失败时都会走到这里：以前无论成败都提示成功 + 关弹窗。
+   */
+  REGEX_RULE_SAVE_FAILED: (params) => ({
+    type: 'error',
+    title: '规则未保存',
+    message: `${String(params?.name || '规则')} 未能保存，请重试`,
+  }),
+
   REGEX_RULE_DISABLE_SUCCESS: (params) => ({
     type: 'info',
     title: '已禁用',
@@ -124,6 +143,15 @@ export const MANAGEMENT_MESSAGES: Record<ManagementMessageKey, (params?: Record<
   /**
    * 提示词预设删除成功
    */
+  /**
+   * 提示词预设保存失败（新建 / 重命名 / 删除 / 条目编辑共用）
+   */
+  PROMPT_PRESET_SAVE_FAILED: () => ({
+    type: 'error',
+    title: '预设未保存',
+    message: '写入失败，已回滚到修改前的状态',
+  }),
+
   PROMPT_PRESET_DELETE_SUCCESS: () => ({
     type: 'info',
     title: '预设已删除',
@@ -252,6 +280,24 @@ export const MANAGEMENT_MESSAGES: Record<ManagementMessageKey, (params?: Record<
   /**
    * 角色导入失败
    */
+  /**
+   * 角色保存失败（新增 / 编辑 / 选中切换共用）
+   */
+  CHARACTER_SAVE_FAILED: (params) => ({
+    type: 'error',
+    title: '角色未保存',
+    message: `${String(params?.name || '角色')} 写入失败，已回滚到修改前的状态`,
+  }),
+
+  /**
+   * 角色删除失败
+   */
+  CHARACTER_DELETE_FAILED: (params) => ({
+    type: 'error',
+    title: '删除失败',
+    message: `${String(params?.name || '角色')} 未能删除，已回滚`,
+  }),
+
   CHARACTER_IMPORT_FAILED: (params) => ({
     type: 'error',
     title: '导入失败',
@@ -397,6 +443,33 @@ export const MANAGEMENT_MESSAGES: Record<ManagementMessageKey, (params?: Record<
     message: '知识条目已成功删除',
   }),
 
+  /**
+   * 知识库保存失败（新建 / 更新 / 启停 / 排序共用）
+   */
+  KNOWLEDGE_BASE_SAVE_FAILED: (params) => ({
+    type: 'error',
+    title: '保存失败',
+    message: `${String(params?.name || '知识库')} 未能保存，已回滚到修改前的状态`,
+  }),
+
+  /**
+   * 知识库删除失败
+   */
+  KNOWLEDGE_BASE_DELETE_FAILED: (params) => ({
+    type: 'error',
+    title: '删除失败',
+    message: `${String(params?.name || '知识库')} 未能删除，已回滚`,
+  }),
+
+  /**
+   * 知识条目保存失败（添加 / 更新 / 删除 / 启停共用）
+   */
+  KNOWLEDGE_BASE_ENTRY_SAVE_FAILED: (params) => ({
+    type: 'error',
+    title: '条目保存失败',
+    message: `${String(params?.name || '知识条目')} 未能保存，已回滚到修改前的状态`,
+  }),
+
   // ==================== 设置相关 ====================
 
   /**
@@ -415,5 +488,14 @@ export const MANAGEMENT_MESSAGES: Record<ManagementMessageKey, (params?: Record<
     type: 'success',
     title: '设置已恢复',
     message: '所有设置已恢复为默认值',
+  }),
+
+  /**
+   * 设置写入失败（恢复默认 / 清除数据共用）
+   */
+  SETTINGS_SAVE_FAILED: (params) => ({
+    type: 'error',
+    title: '操作未完成',
+    message: `${String(params?.action || '设置')} 写入失败，请重试`,
   }),
 };

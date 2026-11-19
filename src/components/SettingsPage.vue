@@ -41,7 +41,7 @@ const toggleDebugMode = () => {
 };
 
 // 使用通知 composable
-const { showSuccess } = useNotifications();
+const { showSuccess, showError } = useNotifications();
 
 // 计算数据占用大小
 const dataSize = ref(0);
@@ -52,12 +52,28 @@ const calculateDataSize = async () => {
 };
 
 const handleDeleteAllData = async () => {
-  await clearBackendData();
+  try {
+    await clearBackendData();
+  } catch (error) {
+    const failed = getNotificationMessage('SETTINGS_SAVE_FAILED', { action: '清除数据' });
+    showError(failed.title, `${failed.message}（${error instanceof Error ? error.message : '未知错误'}）`);
+    return;
+  }
+
   location.reload();
 };
 
 const handleRestoreDefaults = async () => {
-  await writeAppSettingsDefaults();
+  try {
+    await writeAppSettingsDefaults();
+  } catch (error) {
+    // 后端可能已写入部分默认值：此时前端 ref 尚未同步，提示失败让用户重试，
+    // 而不是把「写了一半」当成成功继续更新界面
+    const failed = getNotificationMessage('SETTINGS_SAVE_FAILED', { action: '恢复默认设置' });
+    showError(failed.title, `${failed.message}（${error instanceof Error ? error.message : '未知错误'}）`);
+    return;
+  }
+
   updateEnterToSend(APP_SETTINGS_DEFAULTS.enterToSend);
   updateShowWordCount(APP_SETTINGS_DEFAULTS.showWordCount);
   updateEnableMarkdown(APP_SETTINGS_DEFAULTS.enableMarkdown);

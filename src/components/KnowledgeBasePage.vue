@@ -29,7 +29,7 @@ const {
 } = useKnowledgeBases();
 
 const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete } = useConfirmDialog();
-const { showSuccess, showInfo } = useNotifications();
+const { showSuccess, showInfo, showError } = useNotifications();
 
 // 视图状态
 const isViewingList = ref(true);
@@ -52,20 +52,27 @@ const handleSelectKb = (id: string) => {
 };
 
 // 切换知识库全局启用状态
-const handleToggleGlobalEnabled = (id: string) => {
-  const kb = knowledgeBases.value.find(kb => kb.id === id);
-  if (kb) {
-    // 先记下切换前的状态：toggleGlobalEnabled 会同步翻转 globallyEnabled，
-    // 翻转后再读会让提示文案正好反过来
-    const wasEnabled = kb.globallyEnabled;
-    toggleGlobalEnabled(id);
-    if (wasEnabled) {
-      const msg = getNotificationMessage('KNOWLEDGE_BASE_DISABLE_SUCCESS', { name: kb.name });
-      showInfo(msg.title, msg.message);
-    } else {
-      const msg = getNotificationMessage('KNOWLEDGE_BASE_ENABLE_SUCCESS', { name: kb.name });
-      showSuccess(msg.title, msg.message);
-    }
+const handleToggleGlobalEnabled = async (id: string) => {
+  const kb = knowledgeBases.value.find(item => item.id === id);
+  if (!kb) return;
+
+  // 先记下切换前的状态：toggleGlobalEnabled 会同步翻转 globallyEnabled，
+  // 翻转后再读会让提示文案正好反过来
+  const wasEnabled = kb.globallyEnabled;
+  const saved = await toggleGlobalEnabled(id);
+
+  if (!saved) {
+    const failed = getNotificationMessage('KNOWLEDGE_BASE_SAVE_FAILED', { name: kb.name });
+    showError(failed.title, failed.message);
+    return;
+  }
+
+  if (wasEnabled) {
+    const msg = getNotificationMessage('KNOWLEDGE_BASE_DISABLE_SUCCESS', { name: kb.name });
+    showInfo(msg.title, msg.message);
+  } else {
+    const msg = getNotificationMessage('KNOWLEDGE_BASE_ENABLE_SUCCESS', { name: kb.name });
+    showSuccess(msg.title, msg.message);
   }
 };
 
@@ -76,28 +83,39 @@ const handleAddKb = () => {
 };
 
 // 保存知识库
-const handleSaveKb = (data: { name: string; description: string }) => {
-  if (kbFormMode.value === 'create') {
-    createKnowledgeBase(data.name, data.description);
-    const msg = getNotificationMessage('KNOWLEDGE_BASE_CREATE_SUCCESS', { name: data.name });
-    showSuccess(msg.title, msg.message);
-  } else {
-    if (selectedKnowledgeBaseId.value) {
-      updateKnowledgeBase(selectedKnowledgeBaseId.value, data);
-      const msg = getNotificationMessage('KNOWLEDGE_BASE_UPDATE_SUCCESS', { name: data.name });
-      showSuccess(msg.title, msg.message);
-    }
+const handleSaveKb = async (data: { name: string; description: string }) => {
+  const saved = kbFormMode.value === 'create'
+    ? (await createKnowledgeBase(data.name, data.description)) !== null
+    : selectedKnowledgeBaseId.value
+      ? await updateKnowledgeBase(selectedKnowledgeBaseId.value, data)
+      : false;
+
+  if (!saved) {
+    const failed = getNotificationMessage('KNOWLEDGE_BASE_SAVE_FAILED', { name: data.name });
+    showError(failed.title, failed.message);
+    return;
   }
+
+  const msg = kbFormMode.value === 'create'
+    ? getNotificationMessage('KNOWLEDGE_BASE_CREATE_SUCCESS', { name: data.name })
+    : getNotificationMessage('KNOWLEDGE_BASE_UPDATE_SUCCESS', { name: data.name });
+  showSuccess(msg.title, msg.message);
   showKbFormModal.value = false;
 };
 
 // 详情视图：更新知识库
-const handleUpdateBase = (data: { name: string; description: string }) => {
-  if (selectedKnowledgeBaseId.value) {
-    updateKnowledgeBase(selectedKnowledgeBaseId.value, data);
-    const msg = getNotificationMessage('KNOWLEDGE_BASE_UPDATE_SUCCESS', { name: data.name });
-    showSuccess(msg.title, msg.message);
+const handleUpdateBase = async (data: { name: string; description: string }) => {
+  if (!selectedKnowledgeBaseId.value) return;
+
+  const saved = await updateKnowledgeBase(selectedKnowledgeBaseId.value, data);
+  if (!saved) {
+    const failed = getNotificationMessage('KNOWLEDGE_BASE_SAVE_FAILED', { name: data.name });
+    showError(failed.title, failed.message);
+    return;
   }
+
+  const msg = getNotificationMessage('KNOWLEDGE_BASE_UPDATE_SUCCESS', { name: data.name });
+  showSuccess(msg.title, msg.message);
 };
 
 // 详情视图：删除知识库
@@ -108,32 +126,53 @@ const handleDeleteBase = () => {
 };
 
 // 详情视图：切换条目启用状态
-const handleToggleEntry = (entryId: string) => {
-  if (selectedKnowledgeBaseId.value) {
-    toggleKnowledgeEntryEnabled(selectedKnowledgeBaseId.value, entryId);
+const handleToggleEntry = async (entryId: string) => {
+  if (!selectedKnowledgeBaseId.value) return;
+
+  const saved = await toggleKnowledgeEntryEnabled(selectedKnowledgeBaseId.value, entryId);
+  if (!saved) {
+    const failed = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_SAVE_FAILED');
+    showError(failed.title, failed.message);
   }
 };
 
 // 详情视图：更新条目
-const handleUpdateEntry = (entryId: string, data: { name: string; content: string; priority: number }) => {
-  if (selectedKnowledgeBaseId.value) {
-    updateKnowledgeEntry(selectedKnowledgeBaseId.value, entryId, data);
+const handleUpdateEntry = async (
+  entryId: string,
+  data: { name: string; content: string; priority: number },
+) => {
+  if (!selectedKnowledgeBaseId.value) return;
+
+  const saved = await updateKnowledgeEntry(selectedKnowledgeBaseId.value, entryId, data);
+  if (!saved) {
+    const failed = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_SAVE_FAILED', { name: data.name });
+    showError(failed.title, failed.message);
   }
 };
 
 // 详情视图：删除条目
-const handleDeleteEntry = (entryId: string) => {
-  if (selectedKnowledgeBaseId.value) {
-    deleteKnowledgeEntry(selectedKnowledgeBaseId.value, entryId);
-    const msg = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_DELETE_SUCCESS');
-    showInfo(msg.title, msg.message);
+const handleDeleteEntry = async (entryId: string) => {
+  if (!selectedKnowledgeBaseId.value) return;
+
+  const saved = await deleteKnowledgeEntry(selectedKnowledgeBaseId.value, entryId);
+  if (!saved) {
+    const failed = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_SAVE_FAILED');
+    showError(failed.title, failed.message);
+    return;
   }
+
+  const msg = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_DELETE_SUCCESS');
+  showInfo(msg.title, msg.message);
 };
 
 // 详情视图：重新排序条目
-const handleReorderEntries = (entries: KnowledgeEntry[]) => {
-  if (selectedKnowledgeBaseId.value) {
-    updateKnowledgeBase(selectedKnowledgeBaseId.value, { entries });
+const handleReorderEntries = async (entries: KnowledgeEntry[]) => {
+  if (!selectedKnowledgeBaseId.value) return;
+
+  const saved = await updateKnowledgeBase(selectedKnowledgeBaseId.value, { entries });
+  if (!saved) {
+    const failed = getNotificationMessage('KNOWLEDGE_BASE_SAVE_FAILED');
+    showError(failed.title, failed.message);
   }
 };
 
@@ -144,25 +183,33 @@ const handleSaveEntry = async (data: { name: string; content: string; priority: 
   }
 
   const entry = await addKnowledgeEntry(selectedKnowledgeBaseId.value, data.name, data.content, data.priority);
-  if (entry) {
-    const msg = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_ADD_SUCCESS', { name: data.name });
-    showSuccess(msg.title, msg.message);
+  if (!entry) {
+    const failed = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_SAVE_FAILED', { name: data.name });
+    showError(failed.title, failed.message);
+    return;
   }
+
+  const msg = getNotificationMessage('KNOWLEDGE_BASE_ENTRY_ADD_SUCCESS', { name: data.name });
+  showSuccess(msg.title, msg.message);
 };
 
 // 确认删除
-const handleConfirmDelete = () => {
+const handleConfirmDelete = async () => {
   const id = confirmDelete();
   if (!id) return;
 
-  // 删除知识库
-  const kbIndex = knowledgeBases.value.findIndex(kb => kb.id === id);
-  if (kbIndex !== -1) {
-    deleteKnowledgeBase(id);
-    const msg = getNotificationMessage('KNOWLEDGE_BASE_DELETE_SUCCESS');
-    showInfo(msg.title, msg.message);
-    goToListView();
+  const name = knowledgeBases.value.find(kb => kb.id === id)?.name ?? '知识库';
+  const removed = await deleteKnowledgeBase(id);
+
+  if (!removed) {
+    const failed = getNotificationMessage('KNOWLEDGE_BASE_DELETE_FAILED', { name });
+    showError(failed.title, failed.message);
+    return;
   }
+
+  const msg = getNotificationMessage('KNOWLEDGE_BASE_DELETE_SUCCESS');
+  showInfo(msg.title, msg.message);
+  goToListView();
 };
 
 const handleBack = () => {

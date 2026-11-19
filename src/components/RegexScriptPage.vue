@@ -87,10 +87,15 @@ const handleSaveEdit = () => runOperation(async () => {
     applyTo: editRuleForm.value.applyTo,
   });
 
-  if (success) {
-    const msg = getNotificationMessage('REGEX_RULE_UPDATE_SUCCESS', { name: editRuleForm.value.name });
-    showSuccess(msg.title, msg.message);
+  if (!success) {
+    // 规则已经被删掉或落库失败：提示失败并保留弹窗，不要伪装成保存成功
+    const failed = getNotificationMessage('REGEX_RULE_SAVE_FAILED', { name: editRuleForm.value.name });
+    showError(failed.title, failed.message);
+    return;
   }
+
+  const msg = getNotificationMessage('REGEX_RULE_UPDATE_SUCCESS', { name: editRuleForm.value.name });
+  showSuccess(msg.title, msg.message);
   showEditModal.value = false;
   editingRuleId.value = null;
 });
@@ -121,7 +126,13 @@ const handleToggleEnabled = (id: string) => runOperation(async () => {
   if (!rule) return;
 
   const newEnabled = !rule.enabled;
-  await toggleEnabled(id);
+  const saved = await toggleEnabled(id);
+
+  if (!saved) {
+    const failed = getNotificationMessage('REGEX_RULE_SAVE_FAILED', { name: rule.name });
+    showError(failed.title, failed.message);
+    return;
+  }
 
   if (newEnabled) {
     const msg = getNotificationMessage('REGEX_RULE_ENABLE_SUCCESS', { name: rule.name });

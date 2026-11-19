@@ -88,10 +88,30 @@ export function useApiPresets() {
     await loadSelectedPreset();
   }
 
-  // 保存预设
-  async function savePresets() {
-    await saveApiPresets(presets.value);
-  }
+  /**
+   * 写操作串行化 + 失败回滚。
+   *
+   * 所有写都是「整个预设数组 PUT」：并发发起时后一次会基于旧快照覆盖前一次；
+   * 而且以前都是「先改内存 → await 保存」，保存失败后内存与后端不一致，
+   * 界面还照样提示成功。这里统一排队，并在失败时用快照还原。
+   */
+  let writeChain: Promise<unknown> = Promise.resolve();
+
+  const runWrite = (mutate: () => void): Promise<void> => {
+    const next = writeChain.catch(() => {}).then(async () => {
+      const backup = JSON.parse(JSON.stringify(presets.value)) as Preset[];
+      mutate();
+      try {
+        await saveApiPresets(presets.value);
+      } catch (error) {
+        presets.value = backup;
+        throw error;
+      }
+    });
+
+    writeChain = next;
+    return next as Promise<void>;
+  };
 
   // 加载选中的预设
   async function loadSelectedPreset() {
@@ -123,40 +143,49 @@ export function useApiPresets() {
   }
 
   // 保存当前预设
-  async function saveCurrentPreset(formData: PresetFormData) {
+  async function saveCurrentPreset(formData: PresetFormData): Promise<boolean> {
     const presetIndex = presets.value.findIndex(p => p.id === selectedPreset.value);
-    if (presetIndex !== -1) {
-      const existing = presets.value[presetIndex]!;
+    if (presetIndex === -1) {
+      showError('保存失败', '未找到要更新的预设');
+      return false;
+    }
+
+    try {
       // 合并而非重建：保留表单未管理的字段，避免无关编辑把已有配置静默清空。
-      presets.value[presetIndex] = {
-        ...existing,
-        url: formData.url,
-        apiKey: formData.apiKey,
-        model: formData.model,
-        streamEnabled: formData.streamEnabled,
-        showThinking: formData.showThinking ?? true,
-        temperature: formData.temperature,
-        topP: formData.topP,
-        frequencyPenalty: formData.frequencyPenalty,
-        presencePenalty: formData.presencePenalty,
-        stopSequences: [...formData.stopSequences],
-        seed: formData.seed,
-        contextLength: formData.contextLength,
-        maxOutputTokens: formData.maxOutputTokens,
-        updatedAt: Date.now(),
-      };
-      await savePresets();
+      await runWrite(() => {
+        const existing = presets.value[presetIndex]!;
+        presets.value[presetIndex] = {
+          ...existing,
+          url: formData.url,
+          apiKey: formData.apiKey,
+          model: formData.model,
+          streamEnabled: formData.streamEnabled,
+          showThinking: formData.showThinking ?? true,
+          temperature: formData.temperature,
+          topP: formData.topP,
+          frequencyPenalty: formData.frequencyPenalty,
+          presencePenalty: formData.presencePenalty,
+          stopSequences: [...formData.stopSequences],
+          seed: formData.seed,
+          contextLength: formData.contextLength,
+          maxOutputTokens: formData.maxOutputTokens,
+          updatedAt: Date.now(),
+        };
+      });
+
       // 确保选中的预设 ID 也被保存
       await saveSelectedPreset(selectedPreset.value);
-    } else {
-      showError('保存失败', '未找到要更新的预设');
+      return true;
+    } catch (error) {
+      showError('保存失败', error instanceof Error ? error.message : '预设未能保存，已回滚');
+      return false;
     }
   }
 
   // 创建新预设
-  async function createNewPreset(formData: PresetFormData = cloneDefaultPresetFormData()) {
+  async function createNewPreset(formData: PresetFormData = cloneDefaultPresetFormData()): Promise<boolean> {
     if (!newPresetName.value.trim()) {
-      return;
+      return false;
     }
 
     const newPreset: Preset = {
@@ -179,14 +208,21 @@ export function useApiPresets() {
       updatedAt: Date.now(),
     };
 
-    presets.value.push(newPreset);
-    await savePresets();
-    selectedPreset.value = newPreset.id;
-    await saveSelectedPreset(newPreset.id);
+    try {
+      await runWrite(() => {
+        presets.value.push(newPreset);
+      });
+      selectedPreset.value = newPreset.id;
+      await saveSelectedPreset(newPreset.id);
+    } catch (error) {
+      showError('创建失败', error instanceof Error ? error.message : '预设未能创建，已回滚');
+      return false;
+    }
+
     newPresetName.value = '';
     showNewPresetDialog.value = false;
-
     showSuccess('创建成功', '预设已创建');
+    return true;
   }
 
   // 删除预设
@@ -203,21 +239,30 @@ export function useApiPresets() {
   }
 
   // 处理删除确认
-  async function handleConfirmDelete() {
+  async function handleConfirmDelete(): Promise<boolean> {
     const id = confirmDelete();
-    if (!id) return;
+    if (!id) return false;
 
-    const index = presets.value.findIndex(p => p.id === id);
-    if (index !== -1) {
-      presets.value.splice(index, 1);
-      if (selectedPreset.value === id) {
-        if (presets.value.length > 0) {
-          selectedPreset.value = presets.value[0]!.id;
+    if (!presets.value.some(p => p.id === id)) return false;
+
+    const previousSelected = selectedPreset.value;
+
+    try {
+      await runWrite(() => {
+        presets.value = presets.value.filter(p => p.id !== id);
+        if (selectedPreset.value === id) {
+          selectedPreset.value = presets.value[0]?.id ?? selectedPreset.value;
         }
-      }
-      await savePresets();
-      showSuccess('删除成功', '预设已删除');
+      });
+    } catch (error) {
+      // 删除失败：列表已回滚，选中态也要还原
+      selectedPreset.value = previousSelected;
+      showError('删除失败', error instanceof Error ? error.message : '预设未能删除，已回滚');
+      return false;
     }
+
+    showSuccess('删除成功', '预设已删除');
+    return true;
   }
 
   // 打开重命名对话框
@@ -231,21 +276,30 @@ export function useApiPresets() {
   }
 
   // 重命名预设
-  async function renamePreset() {
+  async function renamePreset(): Promise<boolean> {
     if (!renamePresetName.value.trim()) {
-      return;
+      return false;
     }
 
-    const index = presets.value.findIndex(p => p.id === renamePresetId.value);
-    if (index !== -1) {
-      const preset = presets.value[index]!;
-      preset.name = renamePresetName.value;
-      preset.updatedAt = Date.now();
-      await savePresets();
-      renamePresetName.value = '';
-      showRenameDialog.value = false;
-      showSuccess('重命名成功', '预设已重命名');
+    const targetId = renamePresetId.value;
+    if (!presets.value.some(p => p.id === targetId)) return false;
+
+    try {
+      await runWrite(() => {
+        const preset = presets.value.find(p => p.id === targetId);
+        if (!preset) return;
+        preset.name = renamePresetName.value;
+        preset.updatedAt = Date.now();
+      });
+    } catch (error) {
+      showError('重命名失败', error instanceof Error ? error.message : '预设未能重命名，已回滚');
+      return false;
     }
+
+    renamePresetName.value = '';
+    showRenameDialog.value = false;
+    showSuccess('重命名成功', '预设已重命名');
+    return true;
   }
 
   // 打开新建预设对话框

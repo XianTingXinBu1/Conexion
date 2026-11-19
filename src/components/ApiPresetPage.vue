@@ -167,18 +167,21 @@ watch(urlInput, (newUrl, oldUrl) => {
 });
 
 // 保存当前预设
-function handleSaveCurrentPreset() {
-  saveCurrentPreset(getFormData());
-  // 更新原始数据
+async function handleSaveCurrentPreset(): Promise<boolean> {
+  // 以前既不 await 也不看返回值：落库失败也照样「更新原始数据 + 弹成功」
+  const saved = await saveCurrentPreset(getFormData());
+  if (!saved) return false;
+
   updateOriginalData();
-  // 显示成功通知
   const msg = getNotificationMessage('API_PRESET_SAVE_SUCCESS');
   showSuccess(msg.title, msg.message);
+  return true;
 }
 
 // 创建新预设
-function handleCreateNewPreset() {
-  createNewPreset();
+async function handleCreateNewPreset() {
+  // 失败提示由 composable 统一发出，这里只保证异步错误不会变成未捕获 rejection
+  await createNewPreset();
 }
 
 // 处理返回按钮点击
@@ -188,16 +191,24 @@ function handleBack() {
 
 // 保存并退出
 async function onSaveAndExit() {
-  await handleSaveAndLeave(() => {
-    handleSaveCurrentPreset();
-    router.back();
-  });
+  try {
+    // 保存失败时抛错可以阻止 handleSaveAndLeave 执行离开回调；
+    // 导航本身由回调里的 router.back() 完成，不需要再退一次
+    await handleSaveAndLeave(async () => {
+      if (!(await handleSaveCurrentPreset())) {
+        throw new Error('预设保存失败');
+      }
+    });
+  } catch {
+    // 失败提示已由 handleSaveCurrentPreset 弹出，这里只负责不离开页面
+  }
 }
 
 // 不保存直接退出
 function onDiscardAndExit() {
+  // handleDiscardAndLeave 内部已经执行 pendingLeaveCallback（即 router.back），
+  // 以前这里又调了一次 router.back()，等于连退两页
   handleDiscardAndLeave();
-  router.back();
 }
 
 // 取消退出

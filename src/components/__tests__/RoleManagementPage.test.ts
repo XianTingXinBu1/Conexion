@@ -84,6 +84,11 @@ const handleRequest = async (input: RequestInfo | URL, init: RequestInit = {}): 
   const body = init.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
 
   if (url.includes('/api/characters/users')) {
+    if (method === 'PUT' && failNextUsersWrite) {
+      failNextUsersWrite = false;
+      return jsonResponse({ error: { message: '磁盘已满' } }, 500);
+    }
+
     if (method === 'PUT') {
       userStore = structuredClone(body?.characters as UserCharacter[]);
       savedUsers.push(structuredClone(userStore));
@@ -119,6 +124,9 @@ const handleRequest = async (input: RequestInfo | URL, init: RequestInit = {}): 
 };
 
 const fetchMock = vi.fn(handleRequest);
+
+/** 置为 true 时下一次写用户角色的 PUT 返回 500（验证失败回滚与提示） */
+let failNextUsersWrite = false;
 
 // ==================== 选择器 ====================
 
@@ -212,6 +220,7 @@ beforeEach(() => {
   savedAIs = [];
   savedSettings = [];
   clearAll();
+  failNextUsersWrite = false;
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
 });
@@ -351,6 +360,24 @@ describe('RoleManagementPage 删除与导入导出', () => {
     await waitFor(() => expect(getCards(view.container)).toHaveLength(1));
     expect(getCard(view.container, userB.name).className).toContain('character-card--selected');
     expect(savedSettings).toContainEqual({ key: SETTING_KEY, value: userB.id });
+  });
+
+  it('删除落库失败时回滚列表与选中态，并提示失败', async () => {
+    // 回归：以前是「先删内存 → await 保存」，保存失败后角色从界面消失但后端还在，
+    // 刷新后「复活」，而且只留下一个未捕获的 rejection
+    const view = await renderPage();
+
+    await fireEvent.click(q(getCard(view.container, userA.name), '.action-btn--delete'));
+    await waitFor(() => expect(document.body.querySelector('.btn-confirm')).not.toBeNull());
+
+    failNextUsersWrite = true;
+    await fireEvent.click(getConfirmButton());
+
+    await waitFor(() => expect(toastTitles()).toContain('删除失败'));
+    expect(toastTitles()).not.toContain('角色已删除');
+    // 卡片还在，选中态也还是原来的
+    expect(getCards(view.container)).toHaveLength(2);
+    expect(getCard(view.container, userA.name).className).toContain('character-card--selected');
   });
 
   it('只剩一个用户角色时删除按钮禁用', async () => {

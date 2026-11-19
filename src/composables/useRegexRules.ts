@@ -2,6 +2,7 @@ import { onMounted, ref } from 'vue';
 import type { RegexRule } from '@/types';
 import { DEFAULT_REGEX_SCRIPTS } from '../constants';
 import { validateRegex } from '@/utils/regexEngine';
+import { createId } from '@/utils/id';
 import { loadRegexRules as loadStoredRules, saveRegexRules as saveStoredRules } from '@/repositories/regexRuleRepository';
 
 export function useRegexRules() {
@@ -44,7 +45,7 @@ export function useRegexRules() {
 
   const addRule = async (rule: Omit<RegexRule, 'id'>): Promise<RegexRule> => {
     assertValid(rule);
-    const next = { ...rule, id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}` };
+    const next = { ...rule, id: createId() };
     await commit([...rules.value, next]);
     return next;
   };
@@ -52,7 +53,9 @@ export function useRegexRules() {
   const updateRule = async (id: string, updates: Partial<RegexRule>): Promise<boolean> => {
     const original = rules.value.find(rule => rule.id === id);
     if (!original) return false;
-    const next = { ...original, ...updates };
+    // id 不允许被 updates 改掉：改了之后所有按 id 的查找/删除都会失效
+    const { id: _ignoredId, ...safeUpdates } = updates;
+    const next = { ...original, ...safeUpdates };
     assertValid(next);
     await commit(rules.value.map(rule => rule.id === id ? next : rule));
     return true;

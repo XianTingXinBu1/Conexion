@@ -80,6 +80,8 @@ let settingsStore: Record<string, unknown> = {};
 /** 观测到的请求 */
 let savedPresets: PromptPreset[][] = [];
 let savedSettings: { key: string; value: unknown }[] = [];
+/** 置为 true 时下一次预设 PUT 返回 500，用来覆盖「落库失败」链路 */
+let failPresetPut = false;
 
 const { notifications, clearAll } = useNotifications();
 
@@ -101,6 +103,10 @@ const handleRequest = async (input: RequestInfo | URL, init: RequestInit = {}): 
 
   if (url.includes('/api/prompt-presets')) {
     if (method === 'PUT') {
+      if (failPresetPut) {
+        failPresetPut = false;
+        return jsonResponse({ error: '写入失败' }, 500);
+      }
       const body = JSON.parse(String(init.body)) as { presets: PromptPreset[] };
       store = structuredClone(body.presets);
       savedPresets.push(structuredClone(body.presets));
@@ -217,6 +223,7 @@ beforeEach(() => {
   settingsStore = { [SETTING_KEY]: 'default' };
   savedPresets = [];
   savedSettings = [];
+  failPresetPut = false;
   clearAll();
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
@@ -376,6 +383,69 @@ describe('PromptPresetPage 条目操作', () => {
     expect(items.map(item => item.id)).toEqual([itemC.id, itemB.id, itemA.id]);
     expect(items.map(item => item.insertPosition)).toEqual([1, 2, 3]);
     expect(itemNames(view.container)).toEqual(['条目C', '条目B', '条目A']);
+  });
+});
+
+describe('PromptPresetPage 条目落库失败', () => {
+  it('新建条目落库失败：提示失败、弹窗保持打开、列表不出现新条目', async () => {
+    const view = await renderPage();
+
+    const headerButtons = Array.from(view.container.querySelectorAll<HTMLButtonElement>('.page-header .nav-btn'));
+    await fireEvent.click(headerButtons[headerButtons.length - 1]!);
+    await waitFor(() => expect(view.queryByText('新建条目')).not.toBeNull());
+
+    const modal = getModal('新建条目');
+    await fireEvent.update(q<HTMLInputElement>(modal, 'input[type="text"]'), '新条目');
+    await fireEvent.update(modal.querySelectorAll<HTMLTextAreaElement>('textarea')[0]!, '描述');
+
+    failPresetPut = true;
+    await fireEvent.click(byText<HTMLButtonElement>(modal, '.btn-primary', ADD_BUTTON_LABEL));
+
+    await waitFor(() => expect(toastTitles()).toContain('预设未保存'));
+    // 回滚：没有发出成功请求，列表上也不该多出这一条
+    expect(savedPresets).toHaveLength(0);
+    expect(itemNames(view.container)).toEqual(['条目B', '条目C', '条目A']);
+    // 表单仍开着，用户可以重试
+    expect(getModal('新建条目')).toBeTruthy();
+    expect(toastTitles()).not.toContain('条目已添加');
+  });
+
+  it('内联编辑落库失败：提示失败、列表回滚到原名称、编辑态保留', async () => {
+    const view = await renderPage();
+    const cardA = getItemCard(view.container, '条目A');
+
+    await fireEvent.click(q(cardA, '.action-btn--edit'));
+    await waitFor(() => expect(cardA.querySelector('.edit-form')).not.toBeNull());
+    await fireEvent.update(q<HTMLInputElement>(cardA, '.edit-form input[type="text"]'), '条目A改');
+
+    failPresetPut = true;
+    await fireEvent.click(byText<HTMLButtonElement>(cardA, '.form-action-btn', '保存'));
+
+    await waitFor(() => expect(toastTitles()).toContain('预设未保存'));
+    expect(savedPresets).toHaveLength(0);
+    // 编辑态下那张卡片渲染的是表单，所以只看另外两张的名字
+    expect(itemNames(view.container).slice(0, 2)).toEqual(['条目B', '条目C']);
+    // 失败不清空编辑态，否则用户刚敲的内容直接没了
+    const editingCard = cards(view.container)[2]!;
+    expect(editingCard.querySelector('.edit-form')).not.toBeNull();
+    expect((q<HTMLInputElement>(editingCard, '.edit-form input[type="text"]')).value).toBe('条目A改');
+    expect(toastTitles()).not.toContain('条目已更新');
+  });
+
+  it('拖拽排序落库失败：提示失败、列表退回原顺序', async () => {
+    const view = await renderPage();
+    const handles = view.container.querySelectorAll<HTMLElement>('.prompt-item .drag-handle');
+
+    handles[0]!.dispatchEvent(touchEvent('touchstart', 0));
+    handles[0]!.dispatchEvent(touchEvent('touchmove', 74));
+    await waitFor(() => expect(q(view.container, '.prompt-item--insert-before')).toBeTruthy());
+
+    failPresetPut = true;
+    handles[0]!.dispatchEvent(touchEvent('touchend', 74));
+
+    await waitFor(() => expect(toastTitles()).toContain('预设未保存'));
+    expect(savedPresets).toHaveLength(0);
+    expect(itemNames(view.container)).toEqual(['条目B', '条目C', '条目A']);
   });
 });
 

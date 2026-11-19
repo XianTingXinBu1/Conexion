@@ -64,6 +64,8 @@ let store: KnowledgeBase[] = [];
 let requestLog: { method: string; url: string }[] = [];
 let savedBases: KnowledgeBase[][] = [];
 let clearedReferences: string[] = [];
+/** 置为 true 时，下一次写知识库的 PUT 返回 500（用于验证失败回滚与提示） */
+let failNextWrite = false;
 
 const { notifications, clearAll } = useNotifications();
 
@@ -85,6 +87,11 @@ const handleRequest = async (input: RequestInfo | URL, init: RequestInit = {}): 
   requestLog.push({ method, url });
 
   if (url.includes('/api/knowledge-bases')) {
+    if (method === 'PUT' && failNextWrite) {
+      failNextWrite = false;
+      return jsonResponse({ error: { message: '写入失败' } }, 500);
+    }
+
     if (method === 'PUT') {
       const body = JSON.parse(String(init.body)) as { knowledgeBases: KnowledgeBase[] };
       store = structuredClone(body.knowledgeBases);
@@ -153,6 +160,7 @@ beforeEach(() => {
   requestLog = [];
   savedBases = [];
   clearedReferences = [];
+  failNextWrite = false;
   clearAll();
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
@@ -346,5 +354,39 @@ describe('KnowledgeBasePage 重命名', () => {
 
     // 一次保存只应有一条成功提示
     expect(toastTitles().filter(title => title === '知识库已更新')).toHaveLength(1);
+  });
+});
+
+describe('KnowledgeBasePage 写失败', () => {
+  it('保存失败时提示失败、不提示成功，并回滚内存状态', async () => {
+    const view = await renderPage();
+
+    failNextWrite = true;
+    await fireEvent.click(q(view.container, '.global-toggle-btn'));
+
+    await waitFor(() => expect(toastTitles()).toContain('保存失败'));
+    // 成功提示不能出现，开关也要回到未启用
+    expect(toastTitles()).not.toContain('已启用');
+    await waitFor(() => {
+      const toggle = q<HTMLElement>(view.container, '.global-toggle-btn');
+      expect(toggle.className).not.toContain('active');
+    });
+  });
+
+  it('删除失败时提示失败，并留在详情页', async () => {
+    const view = await renderPage();
+    await openDetail(view, BASE.name);
+
+    // 删除入口在详情的菜单里（与成功路径用例保持一致）
+    await fireEvent.click(q(view.container, '.menu-container .nav-btn'));
+    await fireEvent.click(byText<HTMLButtonElement>(view.container, '.dropdown-item', '删除'));
+
+    failNextWrite = true;
+    await waitFor(() => expect(getConfirmButton()).toBeTruthy());
+    await fireEvent.click(getConfirmButton());
+
+    await waitFor(() => expect(toastTitles()).toContain('删除失败'));
+    expect(toastTitles()).not.toContain('知识库已删除');
+    expect(view.container.querySelector('.kb-detail-view')).not.toBeNull();
   });
 });

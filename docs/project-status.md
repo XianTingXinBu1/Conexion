@@ -6,7 +6,9 @@
 「已完成清单 / 边界规则 / 待办优先级 / 验证命令」上互相重复，且各有一套
 冲突的优先级编号。
 
-> 文档同步状态：最后校对 2026-11-15（把覆盖率统计范围改回全量 `src/**`，
+> 文档同步状态：最后校对 2026-11-19（按实测重算质量基线：66 文件 / 437 测试，
+> 覆盖率语句 79.9% / 分支 68.0% / 函数 74.8% / 行 81.2%，并校正各页面语句覆盖率）。
+> 此前 2026-11-15 把覆盖率统计范围改回全量 `src/**`，
 > 使本文档记的页面覆盖率可复现；去除 E2E 文档中已过时的 Termux 主导描述。
 > 此前 2026-10-14 补齐 9 个路由页 + `AppProvider.vue`
 > 的页面级单测并校正质量基线，`src/components` 语句覆盖率 26.7% → 81.2%；再前
@@ -42,7 +44,7 @@ src/modules/<name>/README.md    各 module 的独立说明（8 个 module 已全
 质量基线：
 
 ```bash
-npx vitest run                 # 60 文件 / 386 测试
+npx vitest run                 # 66 文件 / 437 测试
 npm run check:architecture     # 180 文件扫描
 npx vue-tsc -b                 # 类型检查
 npm run build                  # 构建
@@ -55,8 +57,8 @@ npm run health-check:full      # 同上加 E2E，约 105s
 > 覆盖率口径：`vitest.config.ts` 的 `coverage.include` 为 `src/**/*.{ts,vue}`，
 > 只排除测试文件、类型声明与进程入口 `src/main.ts`。早前该配置只统计
 > `src/modules/system-prompt` 与 `src/utils` 两个目录，导致本文档记的页面覆盖率
-> 无法用 `npm run test:coverage` 复现；改回全量后在 2026-11-15 校正为
-> 语句 78.1% / 分支 65.6% / 函数 72.4% / 行 79.8%（`src/components` 语句 79.9%）。
+> 无法用 `npm run test:coverage` 复现；改回全量后在 2026-11-19 实测为
+> 语句 79.9% / 分支 68.0% / 函数 74.8% / 行 81.2%（`src/components` 语句 80.4%）。
 >
 > 门槛（`coverage.thresholds`）：语句 77 / 分支 64 / 函数 71 / 行 78，略低于实测，
 > 用于拦住「新增代码不带测试」的明显退步。v8 覆盖率有约 ±0.3% 的抖动，
@@ -267,6 +269,9 @@ npm ci → npx vue-tsc -b --noEmit → npm run check:architecture
 - 正式会话草稿按会话保存到后端 settings，新角色会话草稿在首次保存后迁移；临时会话草稿仅驻留页面。草稿延迟保存 300ms，页面离开时尝试刷新保存。
 - 正则编辑支持语法校验和单条替换预览；新增、修改、删除、切换启用均等待保存成功后更新列表和提示，失败保留原状态。删除全部规则后保持空列表，首次没有数据文件时才提供默认规则。
 - settings 的读改写操作串行化，避免草稿与设置并发写入相互覆盖；JSON 写入队列在单次失败后允许后续重试。
+- 管理页写操作统一收口：API 预设 / 知识库 / 提示词预设 / 正则 / 角色 / 设置的写都在
+  `writeChain` 上串行执行，落库失败用内存快照回滚，界面只在成功后提示；提示词条目表单
+  在保存失败时保持打开并保留已填内容。
 
 ## 四、已知风险与热点
 
@@ -284,12 +289,14 @@ npm ci → npx vue-tsc -b --noEmit → npm run check:architecture
    `ConversationListPage.vue` 433、`PromptPresetPage.vue` 398。
    聊天页主体已经瘦下来（`ChatPage.vue` 204 行），厚度转移到了聊天侧的大组件上。
 4. **页面级测试已补齐，但两页仍偏薄**。9 个路由页与 `AppProvider.vue` 都有页面级
-   单测了，其中 `SettingsPage` 97.2% / `ConversationListPage` 91.1% /
-   `PromptPresetPage` 90.1% / `RoleManagementPage` 87.0% / `ChatPage` 82.6% /
-   `KnowledgeBasePage` 86.2% / `MainPage` 68.1% 语句覆盖；仍偏薄的是
-   `ApiPresetPage.vue`（56.6%）与 `RegexScriptPage.vue`（49.5%），
-   聊天侧大组件（`PromptPreviewModal.vue`、`TokenDetailsPanel.vue`）与
-   `FormSlider.vue` 还是空白。E2E 目前 9 个文件 / 15 个用例（含聊天布局 / 条件跟随滚动 /
+   单测了（2026-11-19 实测语句覆盖率）：`AppProvider` 95.5% /
+   `ConversationListPage` 91.1% / `RoleManagementPage` 90.9% /
+   `PromptPresetPage` 90.1% / `SettingsPage` 84.1% / `ChatPage` 82.6% /
+   `KnowledgeBasePage` 78.2% / `MainPage` 68.1%；仍偏薄的是
+   `ApiPresetPage.vue`（57.8%）与 `RegexScriptPage.vue`（56.0%）。
+   聊天侧大组件里 `TokenDetailsPanel.vue` 82.7%、`PromptPreviewModal.vue` 38.1%、
+   `FormSlider.vue` 55.8%，均有测试但覆盖不深。E2E 目前 9 个文件 / 15 个用例
+   （含聊天布局 / 条件跟随滚动 /
    新建角色弹窗与编辑器返回键），覆盖冒烟、
    两处渲染与两处交互，还没形成页面回归网。
 5. **横切 UI 尚未完全收口**。`ConfirmDialog`（10 处）与 `Modal`（8 个文件）已是事实上

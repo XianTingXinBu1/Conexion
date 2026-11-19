@@ -44,6 +44,12 @@ const aiCharacters = ref<AICharacter[]>([]);
 
 const deleteTargetType = ref<CharacterType | null>(null);
 
+/** 提交锁：保存未完成时忽略重复提交（编辑器要等保存成功才关闭） */
+const isSubmitting = ref(false);
+
+/** 回滚用的深拷贝：角色数组是纯 JSON 数据 */
+const cloneList = <T,>(list: T[]): T[] => JSON.parse(JSON.stringify(list)) as T[];
+
 // 编辑器状态：editingCharacter 为空表示新建
 const isCreateOpen = ref(false);
 const isImporting = ref(false);
@@ -88,9 +94,9 @@ const saveAICharacters = async () => {
 };
 
 const saveSelectedUser = async () => {
-  if (selectedUserId.value) {
-    await saveSelectedUserCharacterId(selectedUserId.value);
-  }
+  // 不能只在非空时写：清空选中（例如删掉了当前角色）也要把设置里的旧 id 清掉，
+  // 否则下次加载会指向一个不存在的角色
+  await saveSelectedUserCharacterId(selectedUserId.value);
 };
 
 const selectUser = async (id: string) => {
@@ -121,44 +127,67 @@ const closeEditor = () => {
 };
 
 const handleEditorSubmit = async (character: UserCharacter | AICharacter) => {
+  // 提交锁：编辑器在保存完成后才关闭，慢网络下用户可重复点击，
+  // 新建路径会反复 push 同一份数据
+  if (isSubmitting.value) return;
+
   const isNew = !editorCharacter.value;
+  const backupUserCharacters = cloneList(userCharacters.value);
+  const backupAICharacters = cloneList(aiCharacters.value);
+  const backupSelectedUserId = selectedUserId.value;
 
-  if (activeTab.value === 'user') {
-    const next = character as UserCharacter;
+  isSubmitting.value = true;
 
-    if (isNew) {
-      userCharacters.value.push(next);
-      if (userCharacters.value.length === 1) {
-        selectedUserId.value = next.id;
-        await saveSelectedUser();
+  try {
+    if (activeTab.value === 'user') {
+      const next = character as UserCharacter;
+
+      if (isNew) {
+        userCharacters.value.push(next);
+        if (userCharacters.value.length === 1) {
+          selectedUserId.value = next.id;
+        }
+      } else {
+        const index = userCharacters.value.findIndex(item => item.id === next.id);
+        if (index !== -1) userCharacters.value[index] = next;
       }
+
+      await saveUserCharacters();
+      await saveSelectedUser();
+
+      const msg = getNotificationMessage(
+        isNew ? 'CHARACTER_ADD_USER_SUCCESS' : 'CHARACTER_UPDATE_USER_SUCCESS',
+        { name: next.name },
+      );
+      showSuccess(msg.title, msg.message);
     } else {
-      const index = userCharacters.value.findIndex(item => item.id === next.id);
-      if (index !== -1) userCharacters.value[index] = next;
+      const next = character as AICharacter;
+
+      if (isNew) {
+        aiCharacters.value.push(next);
+      } else {
+        const index = aiCharacters.value.findIndex(item => item.id === next.id);
+        if (index !== -1) aiCharacters.value[index] = next;
+      }
+
+      await saveAICharacters();
+
+      const msg = getNotificationMessage(
+        isNew ? 'CHARACTER_ADD_AI_SUCCESS' : 'CHARACTER_UPDATE_AI_SUCCESS',
+        { name: next.name },
+      );
+      showSuccess(msg.title, msg.message);
     }
-
-    await saveUserCharacters();
-    const msg = getNotificationMessage(
-      isNew ? 'CHARACTER_ADD_USER_SUCCESS' : 'CHARACTER_UPDATE_USER_SUCCESS',
-      { name: next.name },
-    );
-    showSuccess(msg.title, msg.message);
-  } else {
-    const next = character as AICharacter;
-
-    if (isNew) {
-      aiCharacters.value.push(next);
-    } else {
-      const index = aiCharacters.value.findIndex(item => item.id === next.id);
-      if (index !== -1) aiCharacters.value[index] = next;
-    }
-
-    await saveAICharacters();
-    const msg = getNotificationMessage(
-      isNew ? 'CHARACTER_ADD_AI_SUCCESS' : 'CHARACTER_UPDATE_AI_SUCCESS',
-      { name: next.name },
-    );
-    showSuccess(msg.title, msg.message);
+  } catch (error) {
+    // 落库失败：回滚内存，别让界面显示一份后端并不存在的角色
+    userCharacters.value = backupUserCharacters;
+    aiCharacters.value = backupAICharacters;
+    selectedUserId.value = backupSelectedUserId;
+    const failed = getNotificationMessage('CHARACTER_SAVE_FAILED', { name: character.name });
+    showError(failed.title, failed.message);
+    return;
+  } finally {
+    isSubmitting.value = false;
   }
 
   closeEditor();
@@ -177,23 +206,40 @@ const handleConfirmDelete = async () => {
   const id = confirmDelete();
   if (!id || !deleteTargetType.value) return;
 
-  if (deleteTargetType.value === 'user') {
-    if (id === selectedUserId.value) {
+  const name = (deleteTargetType.value === 'user' ? userCharacters.value : aiCharacters.value)
+    .find(item => item.id === id)?.name ?? '角色';
+
+  const backupUserCharacters = cloneList(userCharacters.value);
+  const backupAICharacters = cloneList(aiCharacters.value);
+  const backupSelectedUserId = selectedUserId.value;
+
+  try {
+    if (deleteTargetType.value === 'user') {
       const remaining = userCharacters.value.filter(c => c.id !== id);
-      selectedUserId.value = remaining[0]?.id ?? null;
+      userCharacters.value = remaining;
+      if (id === selectedUserId.value) {
+        selectedUserId.value = remaining[0]?.id ?? null;
+      }
+      // 先落库角色列表，再落库选中态；任一步失败都整体回滚
+      await saveUserCharacters();
       await saveSelectedUser();
+    } else {
+      aiCharacters.value = aiCharacters.value.filter(c => c.id !== id);
+      await saveAICharacters();
     }
-    userCharacters.value = userCharacters.value.filter(c => c.id !== id);
-    await saveUserCharacters();
-    const msg = getNotificationMessage('CHARACTER_DELETE_USER_SUCCESS');
-    showInfo(msg.title, msg.message);
-  } else {
-    aiCharacters.value = aiCharacters.value.filter(c => c.id !== id);
-    await saveAICharacters();
-    const msg = getNotificationMessage('CHARACTER_DELETE_AI_SUCCESS');
-    showInfo(msg.title, msg.message);
+  } catch (error) {
+    userCharacters.value = backupUserCharacters;
+    aiCharacters.value = backupAICharacters;
+    selectedUserId.value = backupSelectedUserId;
+    const failed = getNotificationMessage('CHARACTER_DELETE_FAILED', { name });
+    showError(failed.title, failed.message);
+    return;
   }
 
+  const msg = getNotificationMessage(
+    deleteTargetType.value === 'user' ? 'CHARACTER_DELETE_USER_SUCCESS' : 'CHARACTER_DELETE_AI_SUCCESS',
+  );
+  showInfo(msg.title, msg.message);
   deleteTargetType.value = null;
 };
 

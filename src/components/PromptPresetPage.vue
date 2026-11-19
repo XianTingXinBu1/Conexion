@@ -24,7 +24,7 @@ const router = useRouter();
 const { confirmDialogProps, showDeleteConfirm, confirmDelete, cancelDelete } = useConfirmDialog();
 
 // 使用通知 composable
-const { showSuccess, showInfo } = useNotifications();
+const { showSuccess, showInfo, showError } = useNotifications();
 
 // 删除目标类型：'preset' 或 'item'
 const deleteTargetType = ref<'preset' | 'item'>('preset');
@@ -62,22 +62,57 @@ const currentPresetName = computed(() => {
 const enabledCount = computed(() => promptItems.value.filter(i => i.enabled).length);
 
 // 保存当前预设的条目
-const saveCurrentPresetItems = async () => {
+const saveCurrentPresetItems = async (): Promise<boolean> => {
   const index = presets.value.findIndex(p => p.id === selectedPresetId.value);
-  if (index !== -1 && presets.value[index]) {
-    const itemsWithUpdatedPosition = promptItems.value.map((item, idx) => ({
-      ...item,
-      insertPosition: idx + 1,
-    }));
-    presets.value[index].items = itemsWithUpdatedPosition;
-    presets.value[index].updatedAt = Date.now();
+  if (index === -1 || !presets.value[index]) {
+    // 选中的预设已经不存在（例如被删/被替换）：不能静默成功
+    reportSaveFailure(new Error('未找到当前预设'));
+    return false;
+  }
+
+  const backupPresets = cloneList(presets.value);
+  const itemsWithUpdatedPosition = promptItems.value.map((item, idx) => ({
+    ...item,
+    insertPosition: idx + 1,
+  }));
+  presets.value[index].items = itemsWithUpdatedPosition;
+  presets.value[index].updatedAt = Date.now();
+
+  try {
     await savePresets();
+    return true;
+  } catch (error) {
+    reportSaveFailure(error, backupPresets);
+    // 视图数据是独立 ref，也必须退回落库失败前的状态，
+    // 否则界面仍显示一份后端并不存在的条目列表
+    const restored = backupPresets.find(p => p.id === selectedPresetId.value);
+    if (restored) {
+      promptItems.value = normalizeItems(restored.items);
+    }
+    return false;
   }
 };
 
 // 保存预设列表
 const savePresets = async () => {
   await savePromptPresetsToRepository(presets.value);
+};
+
+const cloneList = <T,>(list: T[]): T[] => JSON.parse(JSON.stringify(list)) as T[];
+
+/**
+ * 落库失败时的统一处理：回滚 presets（改内存 → PUT 的写路径都在这里收口），
+ * 并把错误摆到用户面前。
+ *
+ * 以前所有 repository 调用都是裸 await：失败时界面已经改了、提示还没出现，
+ * 控制台只有一个未捕获的 rejection。
+ */
+const reportSaveFailure = (error: unknown, backupPresets?: PromptPreset[]): void => {
+  if (backupPresets) {
+    presets.value = backupPresets;
+  }
+  const msg = getNotificationMessage('PROMPT_PRESET_SAVE_FAILED');
+  showError(msg.title, error instanceof Error ? `${msg.message}（${error.message}）` : msg.message);
 };
 
 // 保存当前选中的预设ID
@@ -100,19 +135,23 @@ const loadPresets = async () => {
   loadCurrentPresetItems();
 };
 
+/** 把落库数据规范成视图数据：补默认值，再按 insertPosition 排序 */
+const normalizeItems = (items: PromptItem[]): PromptItem[] =>
+  items
+    .map((item, idx) => ({
+      ...item,
+      enabled: item.enabled !== undefined ? item.enabled : true,
+      prompt: item.prompt !== undefined ? item.prompt : '',
+      roleType: item.roleType !== undefined ? item.roleType : 'system',
+      insertPosition: item.insertPosition !== undefined ? item.insertPosition : idx + 1,
+    }))
+    .sort((a, b) => (a.insertPosition ?? 999) - (b.insertPosition ?? 999));
+
 // 加载当前预设的条目
 const loadCurrentPresetItems = () => {
   const currentPreset = presets.value.find(p => p.id === selectedPresetId.value);
   if (currentPreset) {
-    promptItems.value = currentPreset.items
-      .map((item, idx) => ({
-        ...item,
-        enabled: item.enabled !== undefined ? item.enabled : true,
-        prompt: item.prompt !== undefined ? item.prompt : '',
-        roleType: item.roleType !== undefined ? item.roleType : 'system',
-        insertPosition: item.insertPosition !== undefined ? item.insertPosition : idx + 1,
-      }))
-      .sort((a, b) => (a.insertPosition ?? 999) - (b.insertPosition ?? 999));
+    promptItems.value = normalizeItems(currentPreset.items);
   } else {
     promptItems.value = [...DEFAULT_PROMPT_ITEMS].map(item => ({ ...item }));
   }
@@ -147,8 +186,16 @@ const handleAddPreset = async (name: string) => {
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+  const backupPresets = cloneList(presets.value);
+
   presets.value.push(newPreset);
-  await savePresets();
+  try {
+    await savePresets();
+  } catch (error) {
+    reportSaveFailure(error, backupPresets);
+    return;
+  }
+
   await selectPreset(newPreset.id);
   const msg = getNotificationMessage('PROMPT_PRESET_CREATE_SUCCESS', { name });
   showSuccess(msg.title, msg.message);
@@ -159,13 +206,24 @@ const renamePreset = async (presetId: string, name: string) => {
   if (!name.trim()) return;
 
   const index = presets.value.findIndex(p => p.id === presetId);
-  if (index !== -1 && presets.value[index]) {
-    presets.value[index].name = name.trim();
-    presets.value[index].updatedAt = Date.now();
-    await savePresets();
-    const msg = getNotificationMessage('PROMPT_PRESET_RENAME_SUCCESS', { name });
-    showSuccess(msg.title, msg.message);
+  if (index === -1 || !presets.value[index]) {
+    reportSaveFailure(new Error('预设不存在'));
+    return;
   }
+
+  const backupPresets = cloneList(presets.value);
+  presets.value[index].name = name.trim();
+  presets.value[index].updatedAt = Date.now();
+
+  try {
+    await savePresets();
+  } catch (error) {
+    reportSaveFailure(error, backupPresets);
+    return;
+  }
+
+  const msg = getNotificationMessage('PROMPT_PRESET_RENAME_SUCCESS', { name });
+  showSuccess(msg.title, msg.message);
 };
 
 // 打开删除确认
@@ -187,8 +245,18 @@ const handleConfirmDelete = async () => {
   if (deleteTargetType.value === 'preset') {
     if (presets.value.length <= 1) return;
 
+    const backupPresets = cloneList(presets.value);
+    const backupSelected = selectedPresetId.value;
+
     presets.value = presets.value.filter(p => p.id !== id);
-    await savePresets();
+    try {
+      await savePresets();
+    } catch (error) {
+      selectedPresetId.value = backupSelected;
+      reportSaveFailure(error, backupPresets);
+      return;
+    }
+
     const msg = getNotificationMessage('PROMPT_PRESET_DELETE_SUCCESS');
     showInfo(msg.title, msg.message);
 
@@ -197,7 +265,10 @@ const handleConfirmDelete = async () => {
     }
   } else {
     promptItems.value = promptItems.value.filter(i => i.id !== id);
-    await saveCurrentPresetItems();
+    // saveCurrentPresetItems 内部已处理失败提示与回滚，这里只在成功时提示
+    if (!(await saveCurrentPresetItems())) {
+      return;
+    }
     const msg = getNotificationMessage('PROMPT_ITEM_DELETE_SUCCESS');
     showInfo(msg.title, msg.message);
   }
@@ -220,7 +291,8 @@ const addNewItem = async (item: Partial<PromptItem>) => {
   };
 
   promptItems.value.push(newItemData);
-  await saveCurrentPresetItems();
+  // 落库失败时 saveCurrentPresetItems 已回滚并提示，这里保留表单让用户重试
+  if (!(await saveCurrentPresetItems())) return;
   const msg = getNotificationMessage('PROMPT_ITEM_ADD_SUCCESS', { name: item.name });
   showSuccess(msg.title, msg.message);
   showNewItemForm.value = false;
@@ -246,7 +318,8 @@ const saveEdit = async () => {
       enabled: promptItems.value[index].enabled,
       insertPosition: promptItems.value[index].insertPosition,
     };
-    await saveCurrentPresetItems();
+    // 失败时保留编辑态，别把用户输入一起关掉
+    if (!(await saveCurrentPresetItems())) return;
     const msg = getNotificationMessage('PROMPT_ITEM_UPDATE_SUCCESS', { name: editingItem.value.name });
     showSuccess(msg.title, msg.message);
   }
@@ -263,7 +336,7 @@ const toggleItemEnabled = async (id: string) => {
   const index = promptItems.value.findIndex(i => i.id === id);
   if (index !== -1 && promptItems.value[index]) {
     promptItems.value[index].enabled = !promptItems.value[index].enabled;
-    await saveCurrentPresetItems();
+    if (!(await saveCurrentPresetItems())) return;
     const item = promptItems.value[index];
     if (item.enabled) {
       const msg = getNotificationMessage('PROMPT_ITEM_ENABLE_SUCCESS', { name: item.name });
@@ -285,6 +358,7 @@ const deleteItem = (id: string) => {
 
 const handleReorder = async (newOrder: PromptItem[]) => {
   promptItems.value = newOrder;
+  // 失败时 saveCurrentPresetItems 会把列表退回原顺序
   await saveCurrentPresetItems();
 };
 
